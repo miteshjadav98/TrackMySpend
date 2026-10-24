@@ -8,10 +8,10 @@ come from Secret Manager via Cloud Run environment bindings.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 Environment = Literal["local", "test", "staging", "production"]
 ThinkingLevel = Literal["minimal", "low", "medium", "high"]
@@ -54,7 +54,10 @@ class Settings(BaseSettings):
     session_ttl_days: int = Field(default=30, ge=1)
     cookie_secure: bool = True
     cookie_domain: str | None = None
-    allowed_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    # Comma-separated in the environment: ALLOWED_ORIGINS=https://a.example,https://b.example
+    allowed_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:3000"]
+    )
     password_min_length: int = Field(default=10, ge=8)
 
     # --- rate limits (per user / per IP, fixed window) --------------------------------

@@ -87,10 +87,9 @@ def compose_saved(
             else ""
         )
         noun = "expense" if tx.type == "expense" else "income"
-        text = (
-            f"Saved {tx.amount_formatted} {noun}{what}{category} "
-            f"on {format_day(tx.occurred_on, today)}{paid}."
-        )
+        day = format_day(tx.occurred_on, today)
+        when = day if day in ("today", "yesterday") else f"on {day}"
+        text = f"Saved {tx.amount_formatted} {noun}{what}{category} {when}{paid}."
     else:
         items = [
             f"{tx.amount_formatted} {tx.description or (tx.category.name if tx.category else '')}".strip()

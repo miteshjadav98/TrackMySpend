@@ -24,7 +24,8 @@ conversation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar
 )
 
 _STANDARD_ATTRS = frozenset(
-    logging.LogRecord("", 0, "", 0, "", (), None).__dict__.keys() | {"message", "asctime"}
+    logging.LogRecord("", 0, "", 0, "", (), None).__dict__.keys()
+    | {"message", "asctime", "color_message", "taskName"}
 )
 
 

@@ -18,18 +18,22 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
 - LLM layer: provider-neutral interface, Gemini on Vertex AI (verified live: `gemini-3.5-flash-lite`,
   thinking `minimal`, ~1.3 s warm), offline rules engine (also the outage fallback), timeouts/failover.
 - LangGraph workflow (`finance-v1`): understand → prepare_record ⇄ clarify (interrupt) → save → respond,
-  plus summarize and search. Compiles; not yet exercised end to end.
+  plus summarize and search.
+- Agent runtime: Postgres checkpointer (strict serde, `agent` schema), `FinanceAgent`, `ChatService`
+  (replay, crash recovery, per-conversation lock, rate limits, answer validation), checkpoint retention,
+  `python -m finance_core.manage migrate | prune-checkpoints`.
+- FastAPI app (`python -m finance_api.serve`): auth, profile, categories, transactions, reports,
+  conversations, chat turns over SSE (`/messages/stream`) and JSON (`/messages`). Smoke-tested over HTTP:
+  clarify → resume, pending question survives reload, stale answers rejected, idempotent create
+  (201 then 200), exact summaries, cross-site POST blocked.
+- OpenAPI exported to `packages/contracts/openapi.json` (includes the `TurnEvent` stream schema).
 
 ## Next
 
-1. `finance_core/agents/`: checkpointer pool (strict serde, `agent` schema), `FinanceAgent` runtime,
-   `ChatService` (replay, recovery, lock, rate limits, answer validation), turn events, checkpoint pruning.
-2. `apps/api`: FastAPI app factory, middleware (request id, logging, security headers, Origin check),
-   error envelope, routes (auth, profile, categories, transactions, reports, conversations + SSE turns).
-3. Tests: unit (money, dates, rules, drafts/answers) and integration (auth, isolation, idempotency,
-   cache invalidation, full chat flows incl. clarify/resume/restart).
-4. Next.js web app + generated TypeScript contracts.
-5. Docs: README, architecture, PRD improvement suggestions.
+1. Automated tests: unit (money, dates, rules, drafts/answers) and integration (auth, isolation,
+   idempotency, cache invalidation, full chat flows incl. clarify/resume/restart).
+2. Next.js web app + generated TypeScript contracts.
+3. Dockerfiles, CI workflow, docs (README, architecture), PRD improvement suggestions.
 
 ## Resume
 

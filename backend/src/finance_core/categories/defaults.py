@@ -48,7 +48,7 @@ SYSTEM_CATEGORIES: tuple[CategoryDefinition, ...] = (
     )),
     CategoryDefinition("housing", "Rent & Housing", "expense", "home", 50, (
         "rent", "house rent", "maintenance", "society", "pg", "hostel", "repair", "plumber",
-        "electrician", "furniture", "home",
+        "electrician", "furniture",
     )),
     CategoryDefinition("utilities", "Bills & Utilities", "expense", "receipt", 60, (
         "electricity", "electricity bill", "water bill", "gas", "cylinder", "lpg",
@@ -61,7 +61,7 @@ SYSTEM_CATEGORIES: tuple[CategoryDefinition, ...] = (
     )),
     CategoryDefinition("entertainment", "Entertainment", "expense", "clapperboard", 80, (
         "movie", "movies", "cinema", "pvr", "inox", "concert", "game", "gaming", "party",
-        "outing", "bookmyshow", "event", "show",
+        "outing", "bookmyshow", "event",
     )),
     CategoryDefinition("health", "Health & Fitness", "expense", "heart-pulse", 90, (
         "doctor", "hospital", "medicine", "medicines", "pharmacy", "chemist", "clinic",
