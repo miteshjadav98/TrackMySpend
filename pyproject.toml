@@ -1,0 +1,90 @@
+# Workspace root (virtual: not a package itself).
+# Members:
+#   backend/   -> finance-core : domain services, persistence, LLM + LangGraph workflows
+#   apps/api/  -> finance-api  : FastAPI HTTP/SSE service (thin layer over finance-core)
+# A future apps/mcp-server will be a third member that reuses finance-core unchanged.
+
+[tool.uv.workspace]
+members = ["backend", "apps/api"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4",
+  "pytest-asyncio>=1.2",
+  "httpx>=0.28",
+  "ruff>=0.14",
+  "mypy>=1.18",
+  "import-linter>=2.5",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+addopts = "-ra --strict-markers"
+markers = [
+  "integration: needs the local Postgres + Redis from docker compose",
+  "live_llm: calls the real Gemini API on Vertex AI (opt-in with RUN_LIVE_LLM=1)",
+]
+filterwarnings = [
+  "error::DeprecationWarning:finance_core.*",
+  "error::DeprecationWarning:finance_api.*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["backend/src", "apps/api/src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF", "SIM", "PL", "DTZ", "T20"]
+ignore = [
+  "PLR0913", # many args are fine for service constructors / FastAPI endpoints
+  "PLR2004", # magic values in comparisons are fine when named nearby
+  "PLR0911",
+  "PLR0912",
+  "S101",    # asserts are used in tests
+  "RUF012",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "PLR0915", "DTZ"]
+"backend/migrations/**" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = ["backend/src", "apps/api/src"]
+packages = ["finance_core", "finance_api"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["langgraph.*", "langchain_core.*", "langchain_google_genai.*", "babel.*", "psycopg_pool.*"]
+ignore_missing_imports = true
+
+# Architecture rules, enforced in CI with `uv run lint-imports`.
+# Domain code must never depend on the web layer, and the agent layer sits above domain services.
+[tool.importlinter]
+root_packages = ["finance_core", "finance_api"]
+
+[[tool.importlinter.contracts]]
+name = "Core library never imports the API app"
+type = "forbidden"
+source_modules = ["finance_core"]
+forbidden_modules = ["finance_api", "fastapi", "starlette"]
+
+[[tool.importlinter.contracts]]
+name = "Domain services do not depend on the agent/LLM layers"
+type = "forbidden"
+source_modules = [
+  "finance_core.transactions",
+  "finance_core.reports",
+  "finance_core.categories",
+  "finance_core.users",
+  "finance_core.auth",
+  "finance_core.conversations",
+  "finance_core.audit",
+]
+forbidden_modules = ["finance_core.workflows", "finance_core.agents", "finance_core.llm", "langgraph", "langchain_core"]

@@ -1,0 +1,25 @@
+[project]
+name = "finance-core"
+version = "0.1.0"
+description = "Domain services, persistence, and LangGraph workflows for the MoneyMoney personal finance assistant."
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.12",
+  "pydantic-settings>=2.11",
+  "sqlalchemy[asyncio]>=2.0.44",
+  "psycopg[binary,pool]>=3.2.12",
+  "alembic>=1.17",
+  "redis>=6.4",
+  "langgraph>=1.0",
+  "langgraph-checkpoint-postgres>=3.0",
+  "langchain-core>=1.0",
+  "langchain-google-genai>=4.0",
+  "argon2-cffi>=25.1",
+  "babel>=2.17",
+  "tzdata>=2025.2",
+  "email-validator>=2.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.13"]
+build-backend = "uv_build"
