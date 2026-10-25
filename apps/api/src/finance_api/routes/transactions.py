@@ -40,7 +40,7 @@ async def list_transactions(
     ctx: UserContextDep,
     session: SessionDep,
     container: ContainerDep,
-    type: Annotated[TransactionTypeField | None, Query()] = None,  # noqa: A002
+    type: Annotated[TransactionTypeField | None, Query()] = None,
     category_id: Annotated[uuid.UUID | None, Query(alias="categoryId")] = None,
     date_from: Annotated[date | None, Query(alias="from")] = None,
     date_to: Annotated[date | None, Query(alias="to")] = None,

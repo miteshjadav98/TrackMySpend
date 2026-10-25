@@ -80,7 +80,8 @@ class RedisClient:
         return result
 
     async def get(self, key: str) -> str | None:
-        return await self._call(lambda: self._redis.get(key))
+        value = await self._call(lambda: self._redis.get(key))
+        return value.decode() if isinstance(value, bytes) else value  # decode_responses=True
 
     async def set(self, key: str, value: str, *, ttl_seconds: int) -> None:
         await self._call(lambda: self._redis.set(key, value, ex=ttl_seconds))
@@ -93,11 +94,11 @@ class RedisClient:
         await self._call(lambda: self._redis.delete(key))
 
     async def eval(self, script: str, keys: list[str], args: list[Any]) -> Any:
-        return await self._call(lambda: self._redis.eval(script, len(keys), *keys, *args))  # type: ignore[no-untyped-call]
+        return await self._call(lambda: self._redis.eval(script, len(keys), *keys, *args))
 
     async def ping(self) -> bool:
         try:
-            return bool(await self._call(lambda: self._redis.ping()))  # type: ignore[no-untyped-call]
+            return bool(await self._call(self._redis.ping))
         except RedisUnavailableError:
             return False
 

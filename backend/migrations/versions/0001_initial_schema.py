@@ -56,8 +56,18 @@ def system_category_id(slug: str) -> uuid.UUID:
 
 def _timestamps() -> list[sa.Column]:
     return [
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     ]
 
 
@@ -87,7 +97,12 @@ def upgrade() -> None:
         sa.Column("timezone", sa.String(length=64), nullable=False),
         sa.Column("locale", sa.String(length=16), nullable=False),
         *_timestamps(),
-        sa.ForeignKeyConstraint(["user_id"], ["identity.users.id"], name=op.f("fk_financial_profiles_user_id_users"), ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["identity.users.id"],
+            name=op.f("fk_financial_profiles_user_id_users"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("user_id", name=op.f("pk_financial_profiles")),
         schema="identity",
     )
@@ -97,18 +112,36 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=False),
         sa.Column("token_hash", sa.LargeBinary(length=32), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("user_agent", sa.String(length=256), nullable=True),
         sa.Column("ip_address", sa.String(length=45), nullable=True),
-        sa.ForeignKeyConstraint(["user_id"], ["identity.users.id"], name=op.f("fk_auth_sessions_user_id_users"), ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["identity.users.id"],
+            name=op.f("fk_auth_sessions_user_id_users"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_auth_sessions")),
         schema="identity",
     )
-    op.create_index("ix_auth_sessions_user_id", "auth_sessions", ["user_id"], unique=False, schema="identity")
-    op.create_index("uq_auth_sessions_token_hash", "auth_sessions", ["token_hash"], unique=True, schema="identity")
+    op.create_index(
+        "ix_auth_sessions_user_id", "auth_sessions", ["user_id"], unique=False, schema="identity"
+    )
+    op.create_index(
+        "uq_auth_sessions_token_hash",
+        "auth_sessions",
+        ["token_hash"],
+        unique=True,
+        schema="identity",
+    )
 
     # --- ledger -------------------------------------------------------------------------
     categories = op.create_table(
@@ -121,14 +154,38 @@ def upgrade() -> None:
         sa.Column("icon", sa.String(length=32), nullable=True),
         sa.Column("sort_order", sa.SmallInteger(), nullable=False),
         sa.Column("is_archived", sa.Boolean(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.CheckConstraint("kind IN ('expense', 'income')", name=op.f("ck_categories_kind")),
-        sa.ForeignKeyConstraint(["user_id"], ["identity.users.id"], name=op.f("fk_categories_user_id_users"), ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["identity.users.id"],
+            name=op.f("fk_categories_user_id_users"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_categories")),
         schema="ledger",
     )
-    op.create_index("uq_categories_system_slug", "categories", ["slug"], unique=True, schema="ledger", postgresql_where=sa.text("user_id IS NULL"))
-    op.create_index("uq_categories_user_slug", "categories", ["user_id", "slug"], unique=True, schema="ledger", postgresql_where=sa.text("user_id IS NOT NULL"))
+    op.create_index(
+        "uq_categories_system_slug",
+        "categories",
+        ["slug"],
+        unique=True,
+        schema="ledger",
+        postgresql_where=sa.text("user_id IS NULL"),
+    )
+    op.create_index(
+        "uq_categories_user_slug",
+        "categories",
+        ["user_id", "slug"],
+        unique=True,
+        schema="ledger",
+        postgresql_where=sa.text("user_id IS NOT NULL"),
+    )
 
     op.create_table(
         "transactions",
@@ -155,24 +212,54 @@ def upgrade() -> None:
             "'card', 'net_banking', 'wallet', 'bank_transfer', 'cheque', 'other')",
             name=op.f("ck_transactions_payment_method"),
         ),
-        sa.CheckConstraint("source IN ('chat', 'manual', 'import', 'api')", name=op.f("ck_transactions_source")),
-        sa.CheckConstraint("type IN ('expense', 'income', 'transfer')", name=op.f("ck_transactions_type")),
-        sa.CheckConstraint("amount_minor > 0 AND amount_minor <= 1000000000000000", name=op.f("ck_transactions_amount")),
-        sa.ForeignKeyConstraint(["category_id"], ["ledger.categories.id"], name=op.f("fk_transactions_category_id_categories"), ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(["user_id"], ["identity.users.id"], name=op.f("fk_transactions_user_id_users"), ondelete="CASCADE"),
+        sa.CheckConstraint(
+            "source IN ('chat', 'manual', 'import', 'api')", name=op.f("ck_transactions_source")
+        ),
+        sa.CheckConstraint(
+            "type IN ('expense', 'income', 'transfer')", name=op.f("ck_transactions_type")
+        ),
+        sa.CheckConstraint(
+            "amount_minor > 0 AND amount_minor <= 1000000000000000",
+            name=op.f("ck_transactions_amount"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["category_id"],
+            ["ledger.categories.id"],
+            name=op.f("fk_transactions_category_id_categories"),
+            ondelete="RESTRICT",
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["identity.users.id"],
+            name=op.f("fk_transactions_user_id_users"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_transactions")),
         schema="ledger",
     )
     op.create_index(
-        "ix_transactions_user_live_date", "transactions",
+        "ix_transactions_user_live_date",
+        "transactions",
         ["user_id", sa.literal_column("occurred_on DESC"), sa.literal_column("id DESC")],
-        unique=False, schema="ledger", postgresql_where=sa.text("deleted_at IS NULL"),
+        unique=False,
+        schema="ledger",
+        postgresql_where=sa.text("deleted_at IS NULL"),
     )
     op.create_index(
-        "ix_transactions_user_source_ref", "transactions", ["user_id", "source_ref"],
-        unique=False, schema="ledger", postgresql_where=sa.text("source_ref IS NOT NULL"),
+        "ix_transactions_user_source_ref",
+        "transactions",
+        ["user_id", "source_ref"],
+        unique=False,
+        schema="ledger",
+        postgresql_where=sa.text("source_ref IS NOT NULL"),
     )
-    op.create_index("uq_transactions_user_idempotency", "transactions", ["user_id", "idempotency_key"], unique=True, schema="ledger")
+    op.create_index(
+        "uq_transactions_user_idempotency",
+        "transactions",
+        ["user_id", "idempotency_key"],
+        unique=True,
+        schema="ledger",
+    )
 
     # --- chat ---------------------------------------------------------------------------
     op.create_table(
@@ -182,13 +269,31 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=200), nullable=True),
         sa.Column("status", sa.String(length=16), nullable=False),
         *_timestamps(),
-        sa.Column("last_message_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.CheckConstraint("status IN ('active', 'archived')", name=op.f("ck_conversations_status")),
-        sa.ForeignKeyConstraint(["user_id"], ["identity.users.id"], name=op.f("fk_conversations_user_id_users"), ondelete="CASCADE"),
+        sa.Column(
+            "last_message_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "status IN ('active', 'archived')", name=op.f("ck_conversations_status")
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["identity.users.id"],
+            name=op.f("fk_conversations_user_id_users"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_conversations")),
         schema="chat",
     )
-    op.create_index("ix_conversations_user_recent", "conversations", ["user_id", sa.literal_column("last_message_at DESC")], unique=False, schema="chat")
+    op.create_index(
+        "ix_conversations_user_recent",
+        "conversations",
+        ["user_id", sa.literal_column("last_message_at DESC")],
+        unique=False,
+        schema="chat",
+    )
 
     op.create_table(
         "messages",
@@ -202,18 +307,52 @@ def upgrade() -> None:
         sa.Column("client_message_id", sa.Uuid(), nullable=True),
         sa.Column("reply_to_id", sa.Uuid(), nullable=True),
         sa.Column("status", sa.String(length=16), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.CheckConstraint("role IN ('user', 'assistant')", name=op.f("ck_messages_role")),
         sa.CheckConstraint("status IN ('completed', 'failed')", name=op.f("ck_messages_status")),
-        sa.ForeignKeyConstraint(["conversation_id"], ["chat.conversations.id"], name=op.f("fk_messages_conversation_id_conversations"), ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["reply_to_id"], ["chat.messages.id"], name=op.f("fk_messages_reply_to_id_messages"), ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["user_id"], ["identity.users.id"], name=op.f("fk_messages_user_id_users"), ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["conversation_id"],
+            ["chat.conversations.id"],
+            name=op.f("fk_messages_conversation_id_conversations"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["reply_to_id"],
+            ["chat.messages.id"],
+            name=op.f("fk_messages_reply_to_id_messages"),
+            ondelete="SET NULL",
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["identity.users.id"],
+            name=op.f("fk_messages_user_id_users"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_messages")),
         schema="chat",
     )
-    op.create_index("ix_messages_conversation_created", "messages", ["conversation_id", "created_at", "id"], unique=False, schema="chat")
-    op.create_index("ix_messages_reply_to", "messages", ["reply_to_id"], unique=False, schema="chat")
-    op.create_index("uq_messages_conversation_client_id", "messages", ["conversation_id", "client_message_id"], unique=True, schema="chat")
+    op.create_index(
+        "ix_messages_conversation_created",
+        "messages",
+        ["conversation_id", "created_at", "id"],
+        unique=False,
+        schema="chat",
+    )
+    op.create_index(
+        "ix_messages_reply_to", "messages", ["reply_to_id"], unique=False, schema="chat"
+    )
+    op.create_index(
+        "uq_messages_conversation_client_id",
+        "messages",
+        ["conversation_id", "client_message_id"],
+        unique=True,
+        schema="chat",
+    )
 
     # --- audit --------------------------------------------------------------------------
     op.create_table(
@@ -226,14 +365,38 @@ def upgrade() -> None:
         sa.Column("entity_id", sa.Uuid(), nullable=True),
         sa.Column("request_id", sa.String(length=64), nullable=True),
         sa.Column("data", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.CheckConstraint("actor IN ('user', 'assistant', 'system')", name=op.f("ck_audit_events_actor")),
-        sa.ForeignKeyConstraint(["user_id"], ["identity.users.id"], name=op.f("fk_audit_events_user_id_users"), ondelete="CASCADE"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "actor IN ('user', 'assistant', 'system')", name=op.f("ck_audit_events_actor")
+        ),
+        sa.ForeignKeyConstraint(
+            ["user_id"],
+            ["identity.users.id"],
+            name=op.f("fk_audit_events_user_id_users"),
+            ondelete="CASCADE",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_audit_events")),
         schema="audit",
     )
-    op.create_index("ix_audit_events_entity", "audit_events", ["entity_type", "entity_id"], unique=False, schema="audit")
-    op.create_index("ix_audit_events_user_created", "audit_events", ["user_id", sa.literal_column("created_at DESC")], unique=False, schema="audit")
+    op.create_index(
+        "ix_audit_events_entity",
+        "audit_events",
+        ["entity_type", "entity_id"],
+        unique=False,
+        schema="audit",
+    )
+    op.create_index(
+        "ix_audit_events_user_created",
+        "audit_events",
+        ["user_id", sa.literal_column("created_at DESC")],
+        unique=False,
+        schema="audit",
+    )
 
     # --- reference data -----------------------------------------------------------------
     op.bulk_insert(

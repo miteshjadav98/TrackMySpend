@@ -10,8 +10,9 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import aclosing
+from typing import cast
 
 from finance_core.llm.base import (
     LLMClient,
@@ -48,10 +49,11 @@ class ResilientLLMClient:
             result = await self._fallback.understand(request)
             return dataclasses.replace(result, degraded=True)
 
-    async def _bounded(self, stream: AsyncIterator[str]) -> AsyncIterator[str]:
+    async def _bounded(self, source: AsyncIterator[str]) -> AsyncGenerator[str]:
         """Enforce a total time budget without wrapping `yield` in a cancel scope."""
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self._timeout
+        stream = cast(AsyncGenerator[str], source)  # every client implements replies as generators
         async with aclosing(stream):
             iterator = aiter(stream)
             while True:

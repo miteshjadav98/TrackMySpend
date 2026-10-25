@@ -1,4 +1,12 @@
-from finance_api.routes import auth, categories, conversations, health, profile, reports, transactions
+from finance_api.routes import (
+    auth,
+    categories,
+    conversations,
+    health,
+    profile,
+    reports,
+    transactions,
+)
 
 ROUTERS = (
     health.router,

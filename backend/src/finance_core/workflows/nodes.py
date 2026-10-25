@@ -31,18 +31,19 @@ from finance_core.llm.base import (
 )
 from finance_core.llm.rules import RulesLLMClient
 from finance_core.llm.schemas import PeriodSpec, SearchSpec
-from finance_core.money import find_amounts
 from finance_core.reports.service import ReportService
 from finance_core.transactions.schemas import TransactionCreate, TransactionQuery
 from finance_core.transactions.service import TransactionService
 from finance_core.workflows.answers import AnswerApplier, AnswerOutcome, pending_field
 from finance_core.workflows.drafts import TransactionDraft, draft_from_extraction, first_issue
 from finance_core.workflows.questions import build_question
+from finance_core.workflows.reconcile import reconcile
 from finance_core.workflows.replies import (
     STATIC_REPLIES,
     compose_saved,
     compose_search,
     compose_summary,
+    reply_is_grounded,
     suggestions_for,
 )
 from finance_core.workflows.state import (
@@ -58,9 +59,6 @@ logger = logging.getLogger(__name__)
 
 MAX_DRAFTS = 10
 MAX_SEARCH_RESULTS = 20
-# The reply prompt's own example amount; any other figure in a free-form reply is invented.
-_ALLOWED_REPLY_AMOUNTS = {Decimal(350)}
-
 # Per-turn keys cleared whenever a new request starts.
 _TURN_RESET: dict[str, Any] = {
     "drafts": [],
@@ -145,6 +143,8 @@ class FinanceNodes:
                 },
             )
         understanding = result.understanding
+        if result.source != "rules":
+            understanding = reconcile(understanding, text, today=ctx.today, locale=ctx.locale)
         meta = {
             "intent": understanding.intent,
             "source": result.source,
@@ -153,7 +153,11 @@ class FinanceNodes:
         }
         logger.info(
             "turn understood",
-            extra={"intent": understanding.intent, "llmSource": result.source, "degraded": result.degraded},
+            extra={
+                "intent": understanding.intent,
+                "llmSource": result.source,
+                "degraded": result.degraded,
+            },
         )
 
         if followup:
@@ -161,7 +165,9 @@ class FinanceNodes:
             drafts = _drafts(state)
             index = int(followup.get("draftIndex", 0))
             if answer and answer.answers_question and answer.value and 0 <= index < len(drafts):
-                outcome = await self._apply_followup_answer(ctx, followup, answer.value, drafts[index])
+                outcome = await self._apply_followup_answer(
+                    ctx, followup, answer.value, drafts[index]
+                )
                 if outcome.kind == "applied" and outcome.draft is not None:
                     drafts[index] = outcome.draft
                 return Command(
@@ -175,7 +181,11 @@ class FinanceNodes:
                     },
                 )
 
-        update: dict[str, Any] = {**_TURN_RESET, **meta, "abandoned": bool(followup and state.get("drafts"))}
+        update: dict[str, Any] = {
+            **_TURN_RESET,
+            **meta,
+            "abandoned": bool(followup and state.get("drafts")),
+        }
         intent = understanding.intent
         if intent == "record_transactions":
             message_id = state.get("message_id") or ""
@@ -208,9 +218,12 @@ class FinanceNodes:
         if field == "amount_confirm":
             confirmed = value.strip().lower() in ("yes", "y", "true", "confirm")
             if confirmed:
-                return AnswerOutcome("applied", draft=draft.model_copy(update={"amount_confirmed": True}))
+                return AnswerOutcome(
+                    "applied", draft=draft.model_copy(update={"amount_confirmed": True})
+                )
             return AnswerOutcome(
-                "applied", draft=draft.model_copy(update={"amount": None, "amount_confirmed": False})
+                "applied",
+                draft=draft.model_copy(update={"amount": None, "amount_confirmed": False}),
             )
         async with self._deps.session_factory() as session:
             applier = AnswerApplier(
@@ -235,7 +248,12 @@ class FinanceNodes:
         async with self._deps.session_factory() as session:
             categories = CategoryService(session)
             for index, draft in enumerate(drafts):
-                if draft.category_id or not draft.category_slug or not draft.type or draft.category_text:
+                if (
+                    draft.category_id
+                    or not draft.category_slug
+                    or not draft.type
+                    or draft.category_text
+                ):
                     continue
                 category = await categories.by_slug(ctx.user_id, draft.category_slug, draft.type)
                 if category is not None:
@@ -252,7 +270,9 @@ class FinanceNodes:
                         goto="respond", update={"drafts": [], "pending": None, "outcome": "gave_up"}
                     )
                 options = (
-                    await categories.ranked_for_choice(ctx.user_id, draft.type or "expense", ctx.today)
+                    await categories.ranked_for_choice(
+                        ctx.user_id, draft.type or "expense", ctx.today
+                    )
                     if issue.field == "category"
                     else []
                 )
@@ -276,7 +296,9 @@ class FinanceNodes:
                         "notice": None,
                     },
                 )
-        return Command(goto="save", update={"drafts": _dump(drafts), "pending": None, "notice": None})
+        return Command(
+            goto="save", update={"drafts": _dump(drafts), "pending": None, "notice": None}
+        )
 
     async def clarify(self, state: FinanceState, runtime: Runtime[TurnContext]) -> Command[str]:
         pending = state.get("pending") or {}
@@ -301,7 +323,9 @@ class FinanceNodes:
                 CategoryService(session), user_id=ctx.user_id, today=ctx.today, locale=ctx.locale
             )
             if payload.get("kind") == "text":
-                outcome = await applier.from_text(pending, str(payload.get("text", "")), drafts[index])
+                outcome = await applier.from_text(
+                    pending, str(payload.get("text", "")), drafts[index]
+                )
             elif payload.get("kind") == "response":
                 outcome = await applier.from_response(pending, payload, drafts[index])
             else:
@@ -383,7 +407,9 @@ class FinanceNodes:
                             )
                             category_id = created.id
                         except (ConflictError, ValidationFailedError):
-                            matched = await categories.match(ctx.user_id, draft.category_text, draft.type)
+                            matched = await categories.match(
+                                ctx.user_id, draft.category_text, draft.type
+                            )
                             category_id = matched.id if matched else None
                     if category_id is None:
                         fallback = await categories.by_slug(
@@ -398,12 +424,14 @@ class FinanceNodes:
                         category_id=category_id,
                         description=draft.description,
                         merchant=draft.merchant,
-                        payment_method=draft.payment_method,  # type: ignore[arg-type]
+                        payment_method=draft.payment_method,
                     )
                     try:
                         resolved = await transactions.resolve(ctx.user, data)
                     except ValidationFailedError:
-                        logger.warning("draft failed validation at save", extra={"draftId": draft.id})
+                        logger.warning(
+                            "draft failed validation at save", extra={"draftId": draft.id}
+                        )
                         return {"outcome": "save_failed", "drafts": []}
                     items.append((resolved, f"chat:{draft.id}"))
                 results = await transactions.create_resolved(
@@ -427,7 +455,12 @@ class FinanceNodes:
         spec = PeriodSpec.model_validate(state.get("period") or {})
         try:
             return resolve_period(
-                spec.kind, ctx.today, month=spec.month, start=spec.start, end=spec.end, days=spec.days
+                spec.kind,
+                ctx.today,
+                month=spec.month,
+                start=spec.start,
+                end=spec.end,
+                days=spec.days,
             )
         except PeriodError:
             return resolve_period("this_month", ctx.today)
@@ -473,7 +506,9 @@ class FinanceNodes:
                     limit=min(spec.limit or 10, MAX_SEARCH_RESULTS),
                 ),
             )
-        noun = {"expense": "expenses", "income": "income entries"}.get(spec.type or "", "transactions")
+        noun = {"expense": "expenses", "income": "income entries"}.get(
+            spec.type or "", "transactions"
+        )
         if category_name:
             noun = f"{category_name} {noun}"
         if spec.text:
@@ -483,7 +518,11 @@ class FinanceNodes:
             "results": {
                 "items": [item.model_dump(mode="json", by_alias=True) for item in page.items],
                 "hasMore": page.next_cursor is not None,
-                "period": {"start": period.start.isoformat(), "end": period.end.isoformat(), "label": period.label},
+                "period": {
+                    "start": period.start.isoformat(),
+                    "end": period.end.isoformat(),
+                    "label": period.label,
+                },
                 "title": title[0].upper() + title[1:],
             },
             "outcome": "search",
@@ -533,8 +572,7 @@ class FinanceNodes:
                 runtime.stream_writer(text_event(chunk))
             streamed = True
             text = "".join(parts).strip()
-            allowed = _ALLOWED_REPLY_AMOUNTS | {m.value for m in find_amounts(user_text)}
-            if not text or any(m.value not in allowed for m in find_amounts(text)):
+            if not reply_is_grounded(text, user_text):
                 # Free-form replies must never carry invented financial figures.
                 fallback = RulesLLMClient().stream_reply(
                     ReplyRequest(kind=kind, text=user_text, locale=ctx.locale)  # type: ignore[arg-type]

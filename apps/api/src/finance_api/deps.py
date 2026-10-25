@@ -41,7 +41,9 @@ async def get_principal(request: Request, container: ContainerDep) -> Principal:
     # A short-lived session of its own: streaming endpoints must not hold a pooled
     # connection for the duration of a chat turn just because they authenticated.
     async with container.session_factory() as session:
-        principal = await AuthService(session, container.settings, container.clock).authenticate(token)
+        principal = await AuthService(session, container.settings, container.clock).authenticate(
+            token
+        )
     if principal is None:
         raise AuthenticationError(
             "Your session has expired. Please sign in again.", code="session_expired"

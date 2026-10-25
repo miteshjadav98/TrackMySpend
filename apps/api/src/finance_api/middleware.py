@@ -30,11 +30,11 @@ class RequestContextMiddleware:
     def _request_id(self, scope: Scope) -> str:
         for name, value in scope.get("headers", []):
             if name == b"x-request-id":
-                candidate = value.decode("latin-1")
+                candidate = str(value.decode("latin-1"))
                 if _REQUEST_ID.match(candidate):
                     return candidate
             if name == b"x-cloud-trace-context":  # Google front end trace id
-                trace = value.decode("latin-1").split("/", 1)[0]
+                trace = str(value.decode("latin-1")).split("/", 1)[0]
                 if _REQUEST_ID.match(trace):
                     return trace
         return uuid.uuid4().hex
@@ -85,4 +85,4 @@ class RequestContextMiddleware:
             for var, token in zip(
                 (request_id_var, user_id_var, conversation_id_var), tokens, strict=True
             ):
-                var.reset(token)  # type: ignore[attr-defined]
+                var.reset(token)

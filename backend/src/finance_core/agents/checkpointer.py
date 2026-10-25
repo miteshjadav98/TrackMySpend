@@ -50,7 +50,7 @@ async def open_checkpointer(settings: Settings) -> AsyncIterator[AsyncPostgresSa
     )
     await pool.open(wait=True, timeout=15)
     try:
-        yield AsyncPostgresSaver(pool, serde=strict_serializer())  # type: ignore[arg-type]
+        yield AsyncPostgresSaver(pool, serde=strict_serializer())
     finally:
         await pool.close()
 

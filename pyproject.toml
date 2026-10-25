@@ -40,7 +40,9 @@ src = ["backend/src", "apps/api/src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF", "SIM", "PL", "DTZ", "T20"]
 ignore = [
+  "E501",    # line length is owned by `ruff format`
   "PLR0913", # many args are fine for service constructors / FastAPI endpoints
+  "PLR0917",
   "PLR2004", # magic values in comparisons are fine when named nearby
   "PLR0911",
   "PLR0912",
@@ -49,7 +51,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106", "PLR0915", "DTZ"]
+"tests/**" = ["S105", "S106", "PLR0915", "DTZ", "PLC0415", "RUF001"]
 "backend/migrations/**" = ["E501"]
 
 [tool.mypy]
@@ -68,6 +70,7 @@ ignore_missing_imports = true
 # Domain code must never depend on the web layer, and the agent layer sits above domain services.
 [tool.importlinter]
 root_packages = ["finance_core", "finance_api"]
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Core library never imports the API app"

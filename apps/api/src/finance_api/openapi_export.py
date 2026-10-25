@@ -15,7 +15,7 @@ from finance_core.config import Settings
 
 
 def main() -> None:
-    app = create_app(Settings(_env_file=None, environment="test", log_json=False))  # type: ignore[call-arg]
+    app = create_app(Settings(_env_file=None, environment="test", log_json=False))
     document = json.dumps(app.openapi(), indent=2, ensure_ascii=False) + "\n"
     if len(sys.argv) > 1:
         target = Path(sys.argv[1])

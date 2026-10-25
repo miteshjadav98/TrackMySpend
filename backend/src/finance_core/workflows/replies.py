@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
+from decimal import Decimal
 from typing import Any
 
 from finance_core.dates import format_day
@@ -20,6 +21,7 @@ from finance_core.interactions import (
     TransactionListInteraction,
     TransactionsSavedInteraction,
 )
+from finance_core.money import find_amounts
 from finance_core.reports.schemas import CurrencySummary, PeriodView, SpendingSummary
 from finance_core.schemas import MoneyAmount
 from finance_core.transactions.schemas import PAYMENT_METHOD_LABELS, TransactionView
@@ -61,7 +63,9 @@ def _join(parts: list[str]) -> str:
 def period_phrase(label: str) -> str:
     """'This week' -> 'this week' mid-sentence; 'October 2026' stays as is."""
     first = label.split(" ", 1)[0]
-    return label[0].lower() + label[1:] if first in ("Today", "Yesterday", "This", "Last") else label
+    return (
+        label[0].lower() + label[1:] if first in ("Today", "Yesterday", "This", "Last") else label
+    )
 
 
 def compose_saved(
@@ -98,9 +102,11 @@ def compose_saved(
         text = f"Saved {len(views)} transactions: {_join(items)}."
     if abandoned:
         text = "I set aside the earlier unfinished entry. " + text
-    total_amounts = [
-        MoneyAmount.of(minor, currency, locale) for currency, minor in totals.items()
-    ] if len(views) > 1 else []
+    total_amounts = (
+        [MoneyAmount.of(minor, currency, locale) for currency, minor in totals.items()]
+        if len(views) > 1
+        else []
+    )
     card = TransactionsSavedInteraction(id=interaction_id, transactions=views, totals=total_amounts)
     return text, [card]
 
@@ -136,10 +142,15 @@ def compose_summary(
     focus_slug = (focus or {}).get("category")
     if focus_slug:
         for cs in summary.currencies:
-            match = next((c for c in cs.expense_by_category + cs.income_by_category if c.slug == focus_slug), None)
+            match = next(
+                (c for c in cs.expense_by_category + cs.income_by_category if c.slug == focus_slug),
+                None,
+            )
             if match:
                 plural = "s" if match.count != 1 else ""
-                lines.append(f"{match.name} in {label}: {match.total.formatted} across {match.count} transaction{plural}.")
+                lines.append(
+                    f"{match.name} in {label}: {match.total.formatted} across {match.count} transaction{plural}."
+                )
                 break
         else:
             lines.append(f"Nothing recorded under that category for {label}.")
@@ -148,10 +159,14 @@ def compose_summary(
     others = [cs.currency for cs in summary.currencies[1:]]
     if others:
         lines.append(f"You also have transactions in {_join(others)} (shown separately).")
-    return " ".join(line for line in lines if line), [SummaryInteraction(id=interaction_id, summary=summary)]
+    return " ".join(line for line in lines if line), [
+        SummaryInteraction(id=interaction_id, summary=summary)
+    ]
 
 
-def compose_search(results: dict[str, Any], *, interaction_id: str) -> tuple[str, list[Interaction]]:
+def compose_search(
+    results: dict[str, Any], *, interaction_id: str
+) -> tuple[str, list[Interaction]]:
     items = [TransactionView.model_validate(item) for item in results.get("items", [])]
     period = PeriodView.model_validate(results["period"]) if results.get("period") else None
     title = results.get("title") or "Transactions"
@@ -160,7 +175,11 @@ def compose_search(results: dict[str, Any], *, interaction_id: str) -> tuple[str
         text = f"I couldn't find any matching transactions{when}."
     elif len(items) == 1:
         tx = items[0]
-        text = f"{title}{when}: {tx.amount_formatted}" + (f" for {tx.description}" if tx.description else "") + f" on {tx.occurred_on:%d %b}."
+        text = (
+            f"{title}{when}: {tx.amount_formatted}"
+            + (f" for {tx.description}" if tx.description else "")
+            + f" on {tx.occurred_on:%d %b}."
+        )
     else:
         text = f"Here are {len(items)} {title.lower()}{when}."
     card = TransactionListInteraction(
@@ -171,6 +190,20 @@ def compose_search(results: dict[str, Any], *, interaction_id: str) -> tuple[str
         has_more=bool(results.get("hasMore")),
     )
     return text, [card]
+
+
+# The reply prompt's own example amount; any other figure in a free-form reply is invented.
+_ALLOWED_REPLY_AMOUNTS = frozenset({Decimal(350)})
+
+
+def reply_is_grounded(reply: str, user_text: str) -> bool:
+    """False if a free-form model reply mentions an amount the user never wrote.
+
+    Free-form replies are not computed from the ledger, so any figure in them would be
+    invented. The caller then falls back to a canned reply.
+    """
+    allowed = _ALLOWED_REPLY_AMOUNTS | {m.value for m in find_amounts(user_text)}
+    return bool(reply.strip()) and all(m.value in allowed for m in find_amounts(reply))
 
 
 STATIC_REPLIES: dict[str, str] = {

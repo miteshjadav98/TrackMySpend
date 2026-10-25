@@ -230,7 +230,9 @@ def extract_transactions(text: str, today: date, locale: str) -> list[ExtractedT
         if kind is None and found is not None:
             kind = found[0].kind  # "uber 220" -> transport -> an expense
         date_text = find_date_expression(segment) or global_date
-        resolved = resolve_date_expression(date_text, today, day_first=day_first) if date_text else None
+        resolved = (
+            resolve_date_expression(date_text, today, day_first=day_first) if date_text else None
+        )
         merchant = detect_merchant(segment)
         results.append(
             ExtractedTransaction(
@@ -242,7 +244,7 @@ def extract_transactions(text: str, today: date, locale: str) -> list[ExtractedT
                 date=resolved.isoformat() if resolved else None,
                 description=_description(segment, keyword, merchant, category),
                 merchant=merchant,
-                payment_method=detect_payment_method(segment) or global_payment,  # type: ignore[arg-type]
+                payment_method=detect_payment_method(segment) or global_payment,
             )
         )
     return results
@@ -269,8 +271,10 @@ def extract_period(text: str, today: date) -> PeriodSpec:
     if match := re.search(rf"\b({_MONTH_ALT})\b(?:\s+(\d{{4}}))?", t):
         month = MONTHS[match.group(1)]
         if match.group(1) != "may" or match.group(2) or re.search(r"\b(in|for|during)\s+may\b", t):
-            year = int(match.group(2)) if match.group(2) else (
-                today.year if month <= today.month else today.year - 1
+            year = (
+                int(match.group(2))
+                if match.group(2)
+                else (today.year if month <= today.month else today.year - 1)
             )
             return PeriodSpec(kind="month", month=f"{year:04d}-{month:02d}")
     return PeriodSpec(kind="this_month")
@@ -290,14 +294,18 @@ def extract_search(text: str) -> SearchSpec:
         category=infer_category_slug(text, kind),
         text=merchant,
         sort="largest" if _LARGEST.search(t) else "recent",
-        limit=int(top.group(1)) if top else (1 if _LARGEST.search(t) and "expenses" not in t else None),
+        limit=int(top.group(1))
+        if top
+        else (1 if _LARGEST.search(t) and "expenses" not in t else None),
     )
 
 
 def classify(text: str) -> Intent:
     stripped = text.strip()
     has_amount = bool(find_amounts(_strip_dates(stripped)))
-    question = stripped.endswith("?") or bool(re.match(r"^(how|what|which|where|when|show|list)\b", stripped, _I))
+    question = stripped.endswith("?") or bool(
+        re.match(r"^(how|what|which|where|when|show|list)\b", stripped, _I)
+    )
     if _SEARCH.search(stripped) and not (has_amount and not question):
         return "search_transactions"
     if _SUMMARY.search(stripped) and not (has_amount and not question):

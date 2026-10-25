@@ -24,7 +24,8 @@ AnswerKind = Literal["applied", "invalid", "cancel_all", "not_an_answer"]
 
 _I = re.IGNORECASE
 _YES = re.compile(
-    r"^\s*(y|ya|yes|yeah|yep|yup|sure|correct|right|ok|okay|confirm|save|that'?s right|haan|ha)\b", _I
+    r"^\s*(y|ya|yes|yeah|yep|yup|sure|correct|right|ok|okay|confirm|save|that'?s right|haan|ha)\b",
+    _I,
 )
 _NO = re.compile(r"^\s*(n|no|nope|nah|wrong|incorrect|not right|change)\b", _I)
 _CANCEL_ALL = re.compile(

@@ -10,7 +10,7 @@ def build_llm_client(settings: Settings) -> LLMClient:
     rules = RulesLLMClient()
     if settings.llm_provider == "rules":
         return rules
-    from finance_core.llm.gemini import GeminiLLMClient  # heavy import; only when used
+    from finance_core.llm.gemini import GeminiLLMClient  # noqa: PLC0415 (heavy; only when used)
 
     return ResilientLLMClient(
         GeminiLLMClient(settings),

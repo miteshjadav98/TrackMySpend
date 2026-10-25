@@ -16,7 +16,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Literal
 
-from sqlalchemy import Select, and_, or_, select, tuple_
+from sqlalchemy import and_, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
@@ -56,7 +56,7 @@ MAX_BATCH = 20
 def to_view(row: Transaction, category: Category | None, locale: str = "en-IN") -> TransactionView:
     return TransactionView(
         id=row.id,
-        type=row.type,  # type: ignore[arg-type]
+        type=row.type,
         amount=from_minor(row.amount_minor, row.currency),
         amount_minor=row.amount_minor,
         currency=row.currency,
@@ -69,9 +69,9 @@ def to_view(row: Transaction, category: Category | None, locale: str = "en-IN") 
         ),
         description=row.description,
         merchant=row.merchant,
-        payment_method=row.payment_method,  # type: ignore[arg-type]
+        payment_method=row.payment_method,
         notes=row.notes,
-        source=row.source,  # type: ignore[arg-type]
+        source=row.source,
         version=row.version,
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -89,7 +89,9 @@ def _decode_cursor(cursor: str) -> tuple[date, uuid.UUID]:
         data = json.loads(base64.urlsafe_b64decode(padded.encode()))
         return date.fromisoformat(data["d"]), uuid.UUID(data["i"])
     except (ValueError, KeyError, TypeError, binascii.Error, json.JSONDecodeError):
-        raise ValidationFailedError("Invalid pagination cursor", details={"field": "cursor"}) from None
+        raise ValidationFailedError(
+            "Invalid pagination cursor", details={"field": "cursor"}
+        ) from None
 
 
 def _escape_like(text: str) -> str:
@@ -297,7 +299,7 @@ class TransactionService:
             return (await self._views([row.id], ctx.locale))[row.id]
 
         merged = TransactionCreate(
-            type=patch.type if "type" in fields and patch.type else row.type,  # type: ignore[arg-type]
+            type=patch.type if "type" in fields and patch.type else row.type,
             amount=(
                 patch.amount
                 if "amount" in fields and patch.amount is not None
@@ -313,12 +315,14 @@ class TransactionService:
             description=patch.description if "description" in fields else row.description,
             merchant=patch.merchant if "merchant" in fields else row.merchant,
             payment_method=(
-                patch.payment_method if "payment_method" in fields else row.payment_method  # type: ignore[arg-type]
+                patch.payment_method if "payment_method" in fields else row.payment_method
             ),
             notes=patch.notes if "notes" in fields else row.notes,
         )
         if merged.type != row.type and "category_id" not in fields:
-            merged = merged.model_copy(update={"category_id": None})  # old category is the wrong kind
+            merged = merged.model_copy(
+                update={"category_id": None}
+            )  # old category is the wrong kind
         resolved = await self._resolve_for_update(ctx, merged, row)
 
         before = _audit_snapshot(row)
@@ -327,7 +331,10 @@ class TransactionService:
                      "description", "merchant", "payment_method", "notes"):  # fmt: skip
             old, new = getattr(row, attr), getattr(resolved, attr)
             if old != new:
-                changes[attr] = [str(old) if old is not None else None, str(new) if new is not None else None]
+                changes[attr] = [
+                    str(old) if old is not None else None,
+                    str(new) if new is not None else None,
+                ]
                 setattr(row, attr, new)
         if not changes:
             return (await self._views([row.id], ctx.locale))[row.id]
@@ -428,7 +435,7 @@ class TransactionService:
 
     async def search(self, ctx: UserContext, query: TransactionQuery) -> TransactionPage:
         limit = max(1, min(query.limit, MAX_PAGE_SIZE))
-        stmt: Select[tuple[Transaction, Category | None]] = (
+        stmt = (
             select(Transaction, Category)
             .outerjoin(Category, Category.id == Transaction.category_id)
             .where(Transaction.user_id == ctx.user_id, Transaction.deleted_at.is_(None))
@@ -475,9 +482,9 @@ class TransactionService:
                 )
             stmt = stmt.order_by(Transaction.occurred_on.desc(), Transaction.id.desc())
 
-        rows = (await self._session.execute(stmt.limit(limit + 1))).all()
-        has_more = len(rows) > limit
-        rows = rows[:limit]
+        result = (await self._session.execute(stmt.limit(limit + 1))).all()
+        has_more = len(result) > limit
+        rows = list(result[:limit])
         items = [to_view(row, category, ctx.locale) for row, category in rows]
         next_cursor = None
         if has_more and query.sort == "recent" and rows:

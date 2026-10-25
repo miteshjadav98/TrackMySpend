@@ -50,7 +50,9 @@ def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
         data = json.loads(base64.urlsafe_b64decode((cursor + "=" * (-len(cursor) % 4)).encode()))
         return datetime.fromisoformat(data["t"]), uuid.UUID(data["i"])
     except (ValueError, KeyError, TypeError, binascii.Error):
-        raise ValidationFailedError("Invalid pagination cursor", details={"field": "cursor"}) from None
+        raise ValidationFailedError(
+            "Invalid pagination cursor", details={"field": "cursor"}
+        ) from None
 
 
 def parse_ui(raw: list[dict[str, Any]] | None) -> list[Interaction]:
@@ -71,10 +73,10 @@ def dump_ui(items: list[Interaction]) -> list[dict[str, Any]]:
 def message_view(row: Message) -> MessageView:
     return MessageView(
         id=row.id,
-        role=row.role,  # type: ignore[arg-type]
+        role=row.role,
         content=row.content,
         ui=parse_ui(row.ui),
-        status=row.status,  # type: ignore[arg-type]
+        status=row.status,
         reply_to_id=row.reply_to_id,
         client_message_id=row.client_message_id,
         created_at=row.created_at,
@@ -174,7 +176,9 @@ class ConversationService:
             anchor = await self._session.get(Message, before)
             if anchor is None or anchor.conversation_id != conversation_id:
                 raise ValidationFailedError("Unknown message cursor", details={"field": "before"})
-            stmt = stmt.where(tuple_(Message.created_at, Message.id) < (anchor.created_at, anchor.id))
+            stmt = stmt.where(
+                tuple_(Message.created_at, Message.id) < (anchor.created_at, anchor.id)
+            )
         rows = (
             await self._session.scalars(
                 stmt.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit + 1)
@@ -200,7 +204,10 @@ class ConversationService:
                 stmt.order_by(Message.created_at.desc(), Message.id.desc()).limit(limit)
             )
         ).all()
-        return [HistoryItem(role=role, text=content[:500]) for role, content in reversed(rows)]
+        return [
+            HistoryItem(role="assistant" if role == "assistant" else "user", text=content[:500])
+            for role, content in reversed(rows)
+        ]
 
     async def find_user_message(
         self, conversation_id: uuid.UUID, client_message_id: uuid.UUID

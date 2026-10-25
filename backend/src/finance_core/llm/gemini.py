@@ -65,7 +65,9 @@ def render_understand_prompt(request: UnderstandRequest) -> str:
 
 def _usage(message: Any) -> dict[str, Any]:
     usage = getattr(message, "usage_metadata", None) or {}
-    return {k: usage.get(k) for k in ("input_tokens", "output_tokens", "total_tokens") if k in usage}
+    return {
+        k: usage.get(k) for k in ("input_tokens", "output_tokens", "total_tokens") if k in usage
+    }
 
 
 class GeminiLLMClient:
@@ -109,9 +111,11 @@ class GeminiLLMClient:
         started = time.perf_counter()
         result = await self._understander.ainvoke(messages)
         latency_ms = int((time.perf_counter() - started) * 1000)
-        parsed = result.get("parsed") if isinstance(result, dict) else None
+        if not isinstance(result, dict):  # include_raw=True always returns a dict
+            raise LLMError("Unexpected structured-output shape")
+        parsed = result.get("parsed")
         if not isinstance(parsed, TurnUnderstanding):
-            error = result.get("parsing_error") if isinstance(result, dict) else None
+            error = result.get("parsing_error")
             raise LLMError(f"Gemini returned unparseable output: {type(error).__name__}")
         usage = _usage(result.get("raw"))
         logger.info(

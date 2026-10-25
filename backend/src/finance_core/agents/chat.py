@@ -1,11 +1,11 @@
 """One chat turn, end to end.
 
-    prepare()  -> ownership, idempotent replay, crash recovery, rate limits, per-conversation
-                  lock, answer validation, persist the user's message. Raises domain errors
-                  (404/409/422/429) *before* any streaming starts.
-    execute()  -> run the graph, stream events, persist the assistant's message, release
-                  the lock. Runs as its own task so a client disconnect cannot cut a turn
-                  in half.
+prepare()  -> ownership, idempotent replay, crash recovery, rate limits, per-conversation
+              lock, answer validation, persist the user's message. Raises domain errors
+              (404/409/422/429) *before* any streaming starts.
+execute()  -> run the graph, stream events, persist the assistant's message, release
+              the lock. Runs as its own task so a client disconnect cannot cut a turn
+              in half.
 """
 
 from __future__ import annotations
@@ -50,7 +50,13 @@ from finance_core.interactions import (
     SuggestionsInteraction,
     TextInput,
 )
-from finance_core.money import SUPPORTED_CURRENCIES, MoneyError, format_money, parse_amount, to_minor
+from finance_core.money import (
+    SUPPORTED_CURRENCIES,
+    MoneyError,
+    format_money,
+    parse_amount,
+    to_minor,
+)
 from finance_core.users.service import UserService
 from finance_core.workflows.replies import DEFAULT_SUGGESTIONS
 from finance_core.workflows.state import AgentDeps, TurnContext
@@ -169,7 +175,9 @@ class ChatService:
 
     async def delete_conversation(self, user_id: uuid.UUID, conversation_id: uuid.UUID) -> None:
         async with self._deps.session_factory() as session:
-            await ConversationService(session, clock=self._deps.clock).delete(user_id, conversation_id)
+            await ConversationService(session, clock=self._deps.clock).delete(
+                user_id, conversation_id
+            )
         await self._agent.delete_thread(user_id, conversation_id)
 
     # -- turn lifecycle -------------------------------------------------------------------
@@ -263,7 +271,9 @@ class ChatService:
 
             async def on_event(event: dict[str, Any]) -> None:
                 if event.get("type") == "status":
-                    await emit(StatusEvent(stage=str(event.get("stage")), label=str(event.get("label"))))
+                    await emit(
+                        StatusEvent(stage=str(event.get("stage")), label=str(event.get("label")))
+                    )
                 elif event.get("type") == "text.delta" and event.get("delta"):
                     await emit(TextDeltaEvent(delta=str(event["delta"])))
 
@@ -286,7 +296,9 @@ class ChatService:
                 "outcome": outcome.outcome,
                 "degraded": outcome.degraded,
             }
-            assistant = await self._save_assistant(turn.context, turn.user_message_id, content, ui, meta)
+            assistant = await self._save_assistant(
+                turn.context, turn.user_message_id, content, ui, meta
+            )
             for item in ui:
                 if not isinstance(item, SuggestionsInteraction):
                     await emit(InteractionEvent(interaction=item))
@@ -298,7 +310,11 @@ class ChatService:
             await emit(TurnCompletedEvent(result=result))
             logger.info(
                 "turn completed",
-                extra={"intent": outcome.intent, "outcome": outcome.outcome, "llmSource": outcome.source},
+                extra={
+                    "intent": outcome.intent,
+                    "outcome": outcome.outcome,
+                    "llmSource": outcome.source,
+                },
             )
             return result
         finally:
@@ -392,7 +408,10 @@ class ChatService:
             return
         settings = self._deps.settings
         await self._rate_limiter.hit(
-            "chat-minute", str(user_id), limit=settings.rate_limit_chat_per_minute, window_seconds=60
+            "chat-minute",
+            str(user_id),
+            limit=settings.rate_limit_chat_per_minute,
+            window_seconds=60,
         )
         await self._rate_limiter.hit(
             "chat-day", str(user_id), limit=settings.rate_limit_chat_per_day, window_seconds=86_400

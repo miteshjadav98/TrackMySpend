@@ -27,13 +27,18 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
   clarify → resume, pending question survives reload, stale answers rejected, idempotent create
   (201 then 200), exact summaries, cross-site POST blocked.
 - OpenAPI exported to `packages/contracts/openapi.json` (includes the `TurnEvent` stream schema).
+- Tests: 139 passing (`uv run pytest`): unit tests plus integration tests against real Postgres/Redis
+  covering auth, isolation, idempotency, optimistic locking, cache invalidation, Redis outage,
+  clarify/resume, restart mid-question, double-texting, Gemini outage fallback, crash recovery, SSE.
+- LLM quality: eval set in `tests/evals` (`RUN_LIVE_LLM=1`). Production pipeline =
+  gemini-3.5-flash-lite (thinking `low`) + deterministic reconciliation with the rules engine:
+  78/78 live runs correct, p50 1.26 s, p90 1.65 s (flash-lite `minimal` was only 51%).
+- Static checks clean: ruff, mypy --strict, import-linter architecture contracts.
 
 ## Next
 
-1. Automated tests: unit (money, dates, rules, drafts/answers) and integration (auth, isolation,
-   idempotency, cache invalidation, full chat flows incl. clarify/resume/restart).
-2. Next.js web app + generated TypeScript contracts.
-3. Dockerfiles, CI workflow, docs (README, architecture), PRD improvement suggestions.
+1. Next.js web app + generated TypeScript contracts.
+2. Dockerfiles, CI workflow, docs (README, architecture), PRD improvement suggestions.
 
 ## Resume
 

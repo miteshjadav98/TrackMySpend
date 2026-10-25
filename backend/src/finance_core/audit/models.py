@@ -8,7 +8,13 @@ from sqlalchemy import CheckConstraint, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from finance_core.database.base import SCHEMA_AUDIT, SCHEMA_IDENTITY, Base, created_at_column, uuid_pk
+from finance_core.database.base import (
+    SCHEMA_AUDIT,
+    SCHEMA_IDENTITY,
+    Base,
+    created_at_column,
+    uuid_pk,
+)
 
 
 class AuditEvent(Base):

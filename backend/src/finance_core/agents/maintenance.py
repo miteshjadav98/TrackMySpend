@@ -46,7 +46,9 @@ async def prune_checkpoints(settings: Settings, *, inactive_days: int = 30) -> d
     try:
         async with create_session_factory(engine)() as session:
             rows = (
-                await session.execute(select(Conversation.user_id, Conversation.id, Conversation.last_message_at))
+                await session.execute(
+                    select(Conversation.user_id, Conversation.id, Conversation.last_message_at)
+                )
             ).all()
             orphans = [row[0] for row in (await session.execute(_ORPHANS_SQL)).all()]
     finally:

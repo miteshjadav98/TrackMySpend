@@ -41,7 +41,9 @@ _WEEKDAY_NAMES = "|".join(sorted(WEEKDAYS, key=len, reverse=True))
 
 _ISO = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
 _NUMERIC = re.compile(r"^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2}|\d{4}))?$")
-_DAY_MONTH = re.compile(rf"^(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({_MONTH_NAMES})(?:,?\s+(\d{{4}}))?$")
+_DAY_MONTH = re.compile(
+    rf"^(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({_MONTH_NAMES})(?:,?\s+(\d{{4}}))?$"
+)
 _MONTH_DAY = re.compile(rf"^({_MONTH_NAMES})\s+(\d{{1,2}})(?:st|nd|rd|th)?(?:,?\s+(\d{{4}}))?$")
 _DAYS_AGO = re.compile(r"^(\d{1,3}|a|an|one|two|three|four|five|six|seven)\s+days?\s+ago$")
 _WEEKS_AGO = re.compile(r"^(a|an|one|two|three|1|2|3)\s+weeks?\s+ago$")
@@ -216,7 +218,7 @@ def resolve_period(
         year = today.year - 1
         return DateRange(date(year, 1, 1), date(year, 12, 31), str(year))
     if kind == "last_n_days":
-        count = days or 30
+        count = 30 if days is None else days
         if not 1 <= count <= MAX_RANGE_DAYS:
             raise PeriodError("The number of days must be between 1 and 1830")
         return DateRange(today - timedelta(days=count - 1), today, f"Last {count} days")
@@ -236,7 +238,7 @@ def resolve_period(
             raise PeriodError("The end date must be on or after the start date")
         if (end_date - start_date).days + 1 > MAX_RANGE_DAYS:
             raise PeriodError("A custom range can cover at most 5 years")
-        return DateRange(start_date, end_date, f"{_fmt(start_date)} – {_fmt(end_date)}")
+        return DateRange(start_date, end_date, f"{_fmt(start_date)} – {_fmt(end_date)}")  # noqa: RUF001 (en dash for display)
     raise PeriodError(f"Unknown period: {kind}")
 
 

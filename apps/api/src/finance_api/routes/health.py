@@ -30,5 +30,11 @@ async def readyz(container: ContainerDep) -> JSONResponse:
         checks["database"] = "unavailable"
     checks["redis"] = "ok" if await container.redis.ping() else "degraded"
     database_ok = checks["database"] == "ok"
-    status = "ok" if database_ok and checks["redis"] == "ok" else ("degraded" if database_ok else "unavailable")
-    return JSONResponse({"status": status, "checks": checks}, status_code=200 if database_ok else 503)
+    status = (
+        "ok"
+        if database_ok and checks["redis"] == "ok"
+        else ("degraded" if database_ok else "unavailable")
+    )
+    return JSONResponse(
+        {"status": status, "checks": checks}, status_code=200 if database_ok else 503
+    )

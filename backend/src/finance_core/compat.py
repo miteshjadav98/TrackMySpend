@@ -10,9 +10,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from collections.abc import Callable, Coroutine
-from typing import Any, TypeVar
-
-T = TypeVar("T")
+from typing import Any
 
 IS_WINDOWS = sys.platform == "win32"
 
@@ -21,6 +19,6 @@ def loop_factory() -> Callable[[], asyncio.AbstractEventLoop] | None:
     return asyncio.SelectorEventLoop if IS_WINDOWS else None
 
 
-def run(coro: Coroutine[Any, Any, T]) -> T:
+def run[T](coro: Coroutine[Any, Any, T]) -> T:
     """`asyncio.run` with a psycopg-compatible event loop on every platform."""
     return asyncio.run(coro, loop_factory=loop_factory())

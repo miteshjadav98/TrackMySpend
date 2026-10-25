@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import random
 import uuid
@@ -69,10 +70,8 @@ class ReportService:
         if cache_key is not None and self._redis is not None:
             # Jittered TTL so entries written together do not all expire together.
             ttl = self._ttl + random.randint(0, max(1, self._ttl // 10))  # noqa: S311
-            try:
+            with contextlib.suppress(RedisUnavailableError):
                 await self._redis.set(cache_key, summary.model_dump_json(), ttl_seconds=ttl)
-            except RedisUnavailableError:
-                pass
         return summary
 
     async def _compute(self, ctx: UserContext, period: DateRange) -> SpendingSummary:
@@ -112,7 +111,9 @@ class ReportService:
 
         categories: dict[uuid.UUID, Category] = {}
         if category_ids:
-            result = await self._session.scalars(select(Category).where(Category.id.in_(category_ids)))
+            result = await self._session.scalars(
+                select(Category).where(Category.id.in_(category_ids))
+            )
             categories = {c.id: c for c in result.all()}
 
         def breakdown(bucket: _Bucket, currency: str) -> list[CategoryTotal]:

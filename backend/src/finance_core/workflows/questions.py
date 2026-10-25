@@ -27,7 +27,9 @@ from finance_core.workflows.drafts import Issue, TransactionDraft
 _COMMON_CURRENCIES = ("INR", "USD", "EUR", "GBP", "AED", "SGD")
 
 
-def preview(draft: TransactionDraft, *, base_currency: str, locale: str, today: date) -> DraftPreview:
+def preview(
+    draft: TransactionDraft, *, base_currency: str, locale: str, today: date
+) -> DraftPreview:
     amount: MoneyAmount | None = None
     value = draft.decimal_amount()
     currency = draft.effective_currency(base_currency)
@@ -147,8 +149,12 @@ def build_question(
             field="type",
             input_kind="single_select",
             options=[
-                Option(label="Expense", value="expense", description="Money out", icon="arrow-up-right"),
-                Option(label="Income", value="income", description="Money in", icon="arrow-down-left"),
+                Option(
+                    label="Expense", value="expense", description="Money out", icon="arrow-up-right"
+                ),
+                Option(
+                    label="Income", value="income", description="Money in", icon="arrow-down-left"
+                ),
             ],
             **common,
         )
@@ -159,9 +165,7 @@ def build_question(
             message=f"{prefix}Which category fits {subject}?",
             field="category",
             input_kind="single_select",
-            options=[
-                Option(label=c.name, value=c.slug, icon=c.icon) for c in category_options
-            ],
+            options=[Option(label=c.name, value=c.slug, icon=c.icon) for c in category_options],
             allow_custom_input=True,
             allow_skip=True,
             placeholder="Or type a new category",

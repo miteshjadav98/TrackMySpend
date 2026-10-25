@@ -58,9 +58,7 @@ class FinanceAgent:
         self._settings = settings
 
     @classmethod
-    def build(
-        cls, deps: AgentDeps, checkpointer: BaseCheckpointSaver[Any]
-    ) -> FinanceAgent:
+    def build(cls, deps: AgentDeps, checkpointer: BaseCheckpointSaver[Any]) -> FinanceAgent:
         graph = build_graph(deps).compile(checkpointer=checkpointer, name="finance-agent")
         return cls(graph, checkpointer, deps.settings)
 
@@ -88,7 +86,9 @@ class FinanceAgent:
             last_message_id=values.get("last_message_id"),
         )
 
-    async def pending(self, user_id: uuid.UUID, conversation_id: uuid.UUID) -> dict[str, Any] | None:
+    async def pending(
+        self, user_id: uuid.UUID, conversation_id: uuid.UUID
+    ) -> dict[str, Any] | None:
         return (await self.thread_state(user_id, conversation_id)).pending
 
     def _expired(self, created_at: str | None) -> bool:
@@ -110,7 +110,7 @@ class FinanceAgent:
     ) -> AgentOutcome:
         config = self._config(context.user_id, context.conversation_id, context.request_id)
         async for mode, chunk in self._graph.astream(
-            graph_input,  # type: ignore[arg-type]
+            graph_input,
             config,
             context=context,
             stream_mode=["custom", "updates"],

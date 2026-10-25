@@ -71,11 +71,12 @@ class Settings(BaseSettings):
     gcp_project: str | None = None
     # Gemini 3.x models are served from the global / multi-region endpoints.
     vertex_location: str = "global"
-    # Model selection per task. Extraction is latency-critical and well-specified, so it
-    # runs on the cheapest model with minimal thinking (measured: ~1.3 s warm, accurate).
-    # Use gemini-3.8-flash (thinking "low"; it rejects "minimal") for harder reasoning.
+    # Model selection per task, from the eval set (tests/evals, 4x13 runs, 2026-10-25):
+    #   flash-lite + "minimal": 51% accurate        -> not usable
+    #   flash-lite + "low":     87% (96% with rules reconciliation), p50 1.4 s, p90 1.9 s
+    #   3.8-flash  + "low":     100%, but p50 2.3 s and a 35 s tail -> too slow for chat
     llm_understand_model: str = "gemini-3.5-flash-lite"
-    llm_understand_thinking: ThinkingLevel = "minimal"
+    llm_understand_thinking: ThinkingLevel = "low"
     llm_reply_model: str = "gemini-3.5-flash-lite"
     llm_reply_thinking: ThinkingLevel = "minimal"
     llm_timeout_seconds: float = Field(default=12.0, gt=0)  # per attempt

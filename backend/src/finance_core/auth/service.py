@@ -13,7 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from finance_core.audit.service import record_audit
 from finance_core.auth.models import AuthSession
 from finance_core.auth.passwords import hash_password, needs_rehash, verify_password
-from finance_core.auth.schemas import AuthResult, ClientInfo, LoginRequest, Principal, RegisterRequest
+from finance_core.auth.schemas import (
+    AuthResult,
+    ClientInfo,
+    LoginRequest,
+    Principal,
+    RegisterRequest,
+)
 from finance_core.clock import Clock
 from finance_core.config import Settings
 from finance_core.errors import AuthenticationError, ConflictError, ValidationFailedError

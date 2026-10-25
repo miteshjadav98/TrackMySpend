@@ -27,7 +27,7 @@ def to_view(category: Category) -> CategoryView:
         id=category.id,
         slug=category.slug,
         name=category.name,
-        kind=category.kind,  # type: ignore[arg-type]
+        kind=category.kind,
         icon=category.icon,
         is_system=category.user_id is None,
     )
@@ -40,7 +40,9 @@ class CategoryService:
     def _visible(self, user_id: uuid.UUID):  # type: ignore[no-untyped-def]
         return or_(Category.user_id.is_(None), Category.user_id == user_id)
 
-    async def list_visible(self, user_id: uuid.UUID, kind: CategoryKind | None = None) -> list[CategoryView]:
+    async def list_visible(
+        self, user_id: uuid.UUID, kind: CategoryKind | None = None
+    ) -> list[CategoryView]:
         query = select(Category).where(self._visible(user_id), Category.is_archived.is_(False))
         if kind is not None:
             query = query.where(Category.kind == kind)
@@ -68,7 +70,9 @@ class CategoryService:
             )
         ).all()
         own = [row for row in rows if row.user_id is not None]
-        return (own or list(rows) or [None])[0]
+        if own:
+            return own[0]
+        return rows[0] if rows else None
 
     async def match(self, user_id: uuid.UUID, text: str, kind: CategoryKind) -> Category | None:
         """Interpret free text as a category: exact slug/name, then keyword inference."""
@@ -116,12 +120,16 @@ class CategoryService:
     ) -> CategoryView:
         slug = slugify(data.name)
         if not slug:
-            raise ValidationFailedError("Category name needs letters or numbers", details={"field": "name"})
+            raise ValidationFailedError(
+                "Category name needs letters or numbers", details={"field": "name"}
+            )
         existing = await self.by_slug(user_id, slug, data.kind)
         if existing is not None:
             if existing.user_id is None:
                 return to_view(existing)  # reuse the equivalent system category
-            raise ConflictError("You already have a category with this name", code="category_exists")
+            raise ConflictError(
+                "You already have a category with this name", code="category_exists"
+            )
         count = await self._session.scalar(
             select(func.count()).select_from(Category).where(Category.user_id == user_id)
         )
