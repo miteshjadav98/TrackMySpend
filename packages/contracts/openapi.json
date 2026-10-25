@@ -1595,10 +1595,21 @@
         },
         "type": "object",
         "required": [
+          "type",
           "id",
+          "version",
           "message",
           "field",
-          "inputKind"
+          "inputKind",
+          "options",
+          "allowCustomInput",
+          "allowSkip",
+          "placeholder",
+          "currency",
+          "maxDate",
+          "draft",
+          "draftIndex",
+          "draftCount"
         ],
         "title": "ClarificationInteraction"
       },
@@ -1657,9 +1668,15 @@
         },
         "type": "object",
         "required": [
+          "type",
           "id",
+          "version",
           "message",
-          "reason"
+          "reason",
+          "confirmLabel",
+          "cancelLabel",
+          "drafts",
+          "destructive"
         ],
         "title": "ConfirmationInteraction"
       },
@@ -1999,7 +2016,17 @@
         },
         "type": "object",
         "title": "DraftPreview",
-        "description": "What the assistant has understood so far, shown next to a question."
+        "description": "What the assistant has understood so far, shown next to a question.",
+        "required": [
+          "type",
+          "amount",
+          "category",
+          "occurredOn",
+          "occurredOnLabel",
+          "description",
+          "merchant",
+          "paymentMethod"
+        ]
       },
       "HTTPValidationError": {
         "properties": {
@@ -2225,6 +2252,7 @@
           "id",
           "role",
           "content",
+          "ui",
           "status",
           "replyToId",
           "clientMessageId",
@@ -2308,7 +2336,9 @@
         "type": "object",
         "required": [
           "label",
-          "value"
+          "value",
+          "description",
+          "icon"
         ],
         "title": "Option"
       },
@@ -2529,7 +2559,8 @@
           "baseCurrency",
           "currencies",
           "transactionCount",
-          "generatedAt"
+          "generatedAt",
+          "dataSource"
         ],
         "title": "SpendingSummary",
         "description": "Totals for one period, computed in SQL from the ledger (never by the model).\n\nAmounts are grouped per currency: values in different currencies are never summed."
@@ -2570,7 +2601,9 @@
         "type": "object",
         "required": [
           "label",
-          "prompt"
+          "prompt",
+          "mode",
+          "icon"
         ],
         "title": "SuggestedPrompt"
       },
@@ -2596,6 +2629,7 @@
         },
         "type": "object",
         "required": [
+          "type",
           "id",
           "prompts"
         ],
@@ -2619,6 +2653,7 @@
         },
         "type": "object",
         "required": [
+          "type",
           "id",
           "summary"
         ],
@@ -2814,9 +2849,12 @@
         },
         "type": "object",
         "required": [
+          "type",
           "id",
           "title",
-          "transactions"
+          "period",
+          "transactions",
+          "hasMore"
         ],
         "title": "TransactionListInteraction"
       },
@@ -3174,6 +3212,7 @@
         },
         "type": "object",
         "required": [
+          "type",
           "id",
           "transactions",
           "totals"
@@ -3229,7 +3268,9 @@
         "type": "object",
         "required": [
           "userMessage",
-          "assistantMessage"
+          "assistantMessage",
+          "pendingInteraction",
+          "replayed"
         ],
         "title": "TurnResult"
       },
@@ -3347,6 +3388,7 @@
           }
         },
         "required": [
+          "type",
           "interaction"
         ],
         "title": "InteractionEvent",
@@ -3370,6 +3412,7 @@
           }
         },
         "required": [
+          "type",
           "stage",
           "label"
         ],
@@ -3390,6 +3433,7 @@
           }
         },
         "required": [
+          "type",
           "delta"
         ],
         "title": "TextDeltaEvent",
@@ -3408,6 +3452,7 @@
           }
         },
         "required": [
+          "type",
           "result"
         ],
         "title": "TurnCompletedEvent",
@@ -3447,9 +3492,11 @@
           }
         },
         "required": [
+          "type",
           "code",
           "message",
-          "retryable"
+          "retryable",
+          "requestId"
         ],
         "title": "TurnErrorEvent",
         "type": "object"
@@ -3467,6 +3514,7 @@
           }
         },
         "required": [
+          "type",
           "userMessage"
         ],
         "title": "TurnStartedEvent",

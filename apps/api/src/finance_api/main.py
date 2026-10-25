@@ -21,6 +21,7 @@ from finance_core.clock import Clock
 from finance_core.config import Settings, get_settings
 from finance_core.llm import LLMClient
 from finance_core.observability import configure_logging
+from finance_core.schemas import response_model_names
 
 API_VERSION = "0.1.0"
 
@@ -45,6 +46,13 @@ def _install_openapi(app: FastAPI) -> None:
         for name, definition in event_schema.pop("$defs", {}).items():
             components.setdefault(name, definition)
         components["TurnEvent"] = event_schema
+        # Responses serialise every field (defaults included, nothing excluded), so clients
+        # should see every response property as present. Request models keep defaults
+        # optional.
+        outputs = response_model_names()
+        for name, component in components.items():
+            if name in outputs and isinstance(component.get("properties"), dict):
+                component["required"] = list(component["properties"])
         app.openapi_schema = schema
         return schema
 

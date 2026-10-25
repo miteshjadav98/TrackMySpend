@@ -35,9 +35,14 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
   78/78 live runs correct, p50 1.26 s, p90 1.65 s (flash-lite `minimal` was only 51%).
 - Static checks clean: ruff, mypy --strict, import-linter architecture contracts.
 
+- Web app (`apps/web`, Next.js 16 + React 19 + Tailwind 4): sign in/up, chat with streamed turns and
+  typed interaction cards (clarify, confirm, saved slip with undo/edit, summary, list, suggestions),
+  running monthly tally, transactions page (filters, edit, delete/restore), settings. Types generated
+  from OpenAPI into `packages/contracts`. Typecheck, lint and production build pass.
+
 ## Next
 
-1. Next.js web app + generated TypeScript contracts.
+1. User testing feedback on the web app.
 2. Dockerfiles, CI workflow, docs (README, architecture), PRD improvement suggestions.
 
 ## Resume

@@ -33,6 +33,18 @@ class ApiInput(ApiModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
+def response_model_names() -> set[str]:
+    """Names of every response (non-input) model, for OpenAPI post-processing."""
+    names: set[str] = set()
+    stack: list[type[ApiModel]] = [ApiModel]
+    while stack:
+        for subclass in stack.pop().__subclasses__():
+            stack.append(subclass)
+            if not issubclass(subclass, ApiInput):
+                names.add(subclass.__name__)
+    return names
+
+
 class MoneyAmount(ApiModel):
     """An exact amount. `amount` is a decimal string; never parse it as a float."""
 

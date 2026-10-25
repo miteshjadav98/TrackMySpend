@@ -1,0 +1,19 @@
+{
+  "name": "moneymoney",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/contracts"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d postgres redis",
+    "db:migrate": "uv run python -m finance_core.manage migrate",
+    "dev:api": "uv run python -m finance_api.serve --reload",
+    "dev:web": "npm run dev -w web",
+    "contracts": "uv run python -m finance_api.openapi_export packages/contracts/openapi.json && npm run generate -w @moneymoney/contracts",
+    "test:api": "uv run pytest",
+    "check:api": "uv run ruff check backend apps/api tests && uv run ruff format --check backend apps/api tests && uv run mypy && uv run lint-imports",
+    "check:web": "npm run typecheck -w web && npm run lint -w web",
+    "build:web": "npm run build -w web"
+  }
+}

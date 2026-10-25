@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/*
+ * Palette drawn from Indian banknotes: intaglio ink, the lavender of the ₹100 note, and the
+ * turmeric of the ₹200 note (used only for "waiting on you"). Expenses are ink, not red:
+ * spending is normal, not an error. Red is reserved for destructive actions and failures.
+ */
+@theme {
+  --color-paper: #f6f5f9;
+  --color-surface: #ffffff;
+  --color-ink: #1e1b3a;
+  --color-ink-soft: #46435f;
+  --color-ink-faint: #6b6884;
+  --color-line: #e3e0ec;
+  --color-line-strong: #cfcadd;
+  --color-lavender: #8e7cc3;
+  --color-lavender-deep: #5b4ba0;
+  --color-lavender-ink: #463a80;
+  --color-lavender-wash: #eeeaf8;
+  --color-turmeric: #e8a317;
+  --color-turmeric-ink: #7a5300;
+  --color-turmeric-wash: #fdf3dc;
+  --color-income: #1b7a63;
+  --color-income-wash: #e3f3ee;
+  --color-danger: #b3261e;
+  --color-danger-wash: #fbe9e7;
+
+  --font-display: var(--font-anek), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-hind), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 14px;
+  --shadow-card: 0 1px 0 rgb(30 27 58 / 0.04), 0 6px 20px -12px rgb(30 27 58 / 0.18);
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+/* Figures: condensed, tabular, so columns of amounts line up like a ledger. */
+.figure {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: "wdth" 82;
+  letter-spacing: -0.01em;
+}
+
+/* Headings: the same family at a generous width. */
+.display {
+  font-family: var(--font-display);
+  font-variation-settings: "wdth" 112;
+  letter-spacing: -0.015em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-lavender-deep);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise-in {
+  animation: rise-in 220ms ease-out both;
+}
+
+@keyframes pulse-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
