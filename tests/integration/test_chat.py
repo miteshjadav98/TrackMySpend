@@ -346,6 +346,8 @@ async def test_streaming_turn_emits_typed_events(client: httpx.AsyncClient, user
     response = await client.post(url, json=body, headers={"Accept": "text/event-stream"})
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
+    # One cache header, and it forbids proxy compression (which would buffer the stream).
+    assert response.headers.get_list("cache-control") == ["no-store, no-transform"]
     events = parse_sse(response.text)
     names = [name for name, _ in events]
     assert names[0] == "turn.started" and names[-1] == "turn.completed"

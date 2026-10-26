@@ -137,7 +137,10 @@ def prepared_database(settings: Settings) -> None:
     """Fresh schema per test session: drop everything, then run the real deploy migration."""
     problem = _reachable()
     if problem:
-        pytest.skip(f"integration services unavailable (run `docker compose up -d`): {problem}")
+        message = f"integration services unavailable (run `docker compose up -d`): {problem}"
+        if os.environ.get("CI"):  # in CI a skipped integration suite must not pass as green
+            pytest.fail(message)
+        pytest.skip(message)
     import psycopg
     import redis
 

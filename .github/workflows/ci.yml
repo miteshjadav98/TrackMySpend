@@ -1,0 +1,117 @@
+# Every check a pull request must pass. Each step mirrors a script in package.json, so
+# `npm run check:api`, `npm run test:api` and `npm run check:web` reproduce CI locally.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (lint, types, tests, migrations, contract)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: moneymoney
+          POSTGRES_PASSWORD: moneymoney
+          POSTGRES_DB: moneymoney_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U moneymoney -d moneymoney_test"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://moneymoney:moneymoney@localhost:5432/moneymoney_test
+      TEST_REDIS_URL: redis://localhost:6379/1
+      # alembic check compares the models against the database the tests just migrated.
+      DATABASE_URL: postgresql://moneymoney:moneymoney@localhost:5432/moneymoney_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.12.22"
+          enable-cache: true
+      - name: Install
+        run: uv sync --all-packages --frozen
+      - name: Lint and format
+        run: |
+          uv run ruff check backend apps/api tests
+          uv run ruff format --check backend apps/api tests
+      - name: Type check (mypy --strict)
+        run: uv run mypy
+      - name: Architecture rules
+        run: uv run lint-imports
+      - name: Tests (unit + integration against Postgres and Redis)
+        run: uv run pytest
+      - name: Migrations match the models
+        working-directory: backend
+        run: uv run alembic check
+      - name: OpenAPI contract is committed
+        run: |
+          uv run python -m finance_api.openapi_export packages/contracts/openapi.json
+          git diff --exit-code -- packages/contracts/openapi.json || {
+            echo "::error::packages/contracts/openapi.json is stale. Run 'npm run contracts' and commit the result."
+            exit 1
+          }
+
+  web:
+    name: Web (contract types, types, lint, build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: TypeScript types match the OpenAPI contract
+        run: |
+          npm run generate -w @moneymoney/contracts
+          git diff --exit-code -- packages/contracts/src/schema.d.ts || {
+            echo "::error::packages/contracts/src/schema.d.ts is stale. Run 'npm run contracts' and commit the result."
+            exit 1
+          }
+      - name: Type check
+        run: npm run typecheck -w web
+      - name: Lint
+        run: npm run lint -w web
+      - name: Build
+        run: npm run build -w web
+
+  images:
+    name: Container images build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [api, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          tags: moneymoney-${{ matrix.app }}:ci
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}

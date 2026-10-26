@@ -71,9 +71,9 @@ class Settings(BaseSettings):
     gcp_project: str | None = None
     # Gemini 3.x models are served from the global / multi-region endpoints.
     vertex_location: str = "global"
-    # Model selection per task, from the eval set (tests/evals, 4x13 runs, 2026-10-25):
+    # Model selection per task, from the eval set (tests/evals, repeated runs, 2026-10-25):
     #   flash-lite + "minimal": 51% accurate        -> not usable
-    #   flash-lite + "low":     87% (96% with rules reconciliation), p50 1.4 s, p90 1.9 s
+    #   flash-lite + "low":     87% raw; 78/78 with workflows/reconcile.py, p50 1.26 s, p90 1.65 s
     #   3.8-flash  + "low":     100%, but p50 2.3 s and a 35 s tail -> too slow for chat
     llm_understand_model: str = "gemini-3.5-flash-lite"
     llm_understand_thinking: ThinkingLevel = "low"

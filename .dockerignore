@@ -1,0 +1,33 @@
+# Build context is the repo root (both images need shared workspace files).
+# Keep secrets, local environments and build output out of every image.
+
+.git
+.github
+.claude
+.env
+.env.*
+**/*.pem
+**/*.key
+
+# Python
+.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.import_linter_cache
+.coverage
+htmlcov
+
+# Node / Next.js
+**/node_modules
+**/.next
+**/out
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+# Not needed at runtime. (Markdown is not excluded: the LLM prompts are .md files.)
+tests
+docs
+infrastructure

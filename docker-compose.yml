@@ -1,6 +1,6 @@
 # Local development stack.
-#   docker compose up -d                 -> Postgres + Redis only (run API and web natively)
-#   docker compose --profile app up -d   -> also builds and runs the API and web app
+#   docker compose up -d                          -> Postgres + Redis only (run API and web natively)
+#   docker compose --profile app up -d --build    -> also migrates, then runs the API and web app
 name: moneymoney
 
 services:
@@ -33,26 +33,52 @@ services:
       timeout: 3s
       retries: 20
 
-  api:
+  # One-shot deploy step (a Cloud Run Job in production). The API never runs DDL itself.
+  migrate:
     profiles: ["app"]
-    build:
+    image: moneymoney-api:local
+    build: &api-build
       context: .
       dockerfile: apps/api/Dockerfile
     env_file: .env
-    environment:
+    environment: &api-env
       DATABASE_URL: postgresql://moneymoney:moneymoney@postgres:5432/moneymoney
       REDIS_URL: redis://redis:6379/0
       COOKIE_SECURE: "false"
-    ports:
-      - "8000:8000"
+      # Gemini auth inside the container uses your local Application Default Credentials
+      # (gcloud auth application-default login), mounted read-only below.
+      GOOGLE_APPLICATION_CREDENTIALS: /gcloud/application_default_credentials.json
+      GOOGLE_CLOUD_PROJECT: ${GCP_PROJECT:-}
+    command: ["python", "-m", "finance_core.manage", "migrate"]
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
+
+  api:
+    profiles: ["app"]
+    image: moneymoney-api:local
+    build: *api-build
+    env_file: .env
+    environment:
+      <<: *api-env
+      # Requests arrive through the web container's /api rewrite; trust its X-Forwarded-For
+      # so rate limits see the real client. Never use "*" where the API is publicly reachable.
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      # Windows: set GCLOUD_CONFIG_DIR=C:/Users/<you>/AppData/Roaming/gcloud in .env.
+      - ${GCLOUD_CONFIG_DIR:-~/.config/gcloud}:/gcloud:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
   web:
     profiles: ["app"]
+    image: moneymoney-web:local
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -61,7 +87,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

@@ -61,7 +61,11 @@ class RequestContextMiddleware:
                 headers["x-content-type-options"] = "nosniff"
                 headers["x-frame-options"] = "DENY"
                 headers["referrer-policy"] = "strict-origin-when-cross-origin"
-                if "cache-control" not in headers:
+                if headers.get("content-type", "").startswith("text/event-stream"):
+                    # no-transform stops proxies (including Next.js's gzip on the /api
+                    # rewrite) from compressing the stream, which buffers it until the end.
+                    headers["cache-control"] = "no-store, no-transform"
+                elif "cache-control" not in headers:
                     headers["cache-control"] = "no-store"  # financial data: never cache
                 if secure:
                     headers["strict-transport-security"] = "max-age=31536000; includeSubDomains"

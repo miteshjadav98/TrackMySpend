@@ -40,10 +40,22 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
   running monthly tally, transactions page (filters, edit, delete/restore), settings. Types generated
   from OpenAPI into `packages/contracts`. Typecheck, lint and production build pass.
 
+- Containers: `apps/api/Dockerfile` (uv, non-root, read-only code) and `apps/web/Dockerfile` (Next.js
+  standalone). `docker compose --profile app up -d --build` runs migrate → API → web, all healthy;
+  Gemini works in the container via mounted ADC (`GCLOUD_CONFIG_DIR`). Smoke-tested through the web
+  proxy: register, streamed turn, ₹350.00 summary.
+- Fixed: Next.js gzip on the `/api` rewrite buffered SSE until the turn finished; event streams now
+  send `Cache-Control: no-store, no-transform` (first event 0.13 s instead of at the end).
+- CI (`.github/workflows/ci.yml`, actions pinned to SHAs, Dependabot): ruff, mypy, import rules,
+  pytest against Postgres/Redis services (fails instead of skipping when `CI` is set), `alembic
+  check`, OpenAPI and TS contract drift, web typecheck/lint/build, both images build. Not yet run on
+  GitHub: the repo has no remote.
+
 ## Next
 
-1. User testing feedback on the web app.
-2. Dockerfiles, CI workflow, docs (README, architecture), PRD improvement suggestions.
+1. Docs: README (setup, env vars, migrations), docs/architecture.md, deployment assumptions.
+2. Phase 1 report + PRD improvement suggestions.
+3. User testing feedback on the web app.
 
 ## Resume
 
