@@ -11,6 +11,8 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from finance_core.agents.chat import TurnFailedError
@@ -93,6 +95,19 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
         code = {404: "not_found", 405: "method_not_allowed"}.get(exc.status_code, "http_error")
         return error_response(exc.status_code, code, str(exc.detail))
+
+    # Database unreachable, failing over, pool exhausted or statement timeout: transient,
+    # so 503 + Retry-After (clients and load balancers retry) rather than a generic 500.
+    @app.exception_handler(OperationalError)
+    @app.exception_handler(PoolTimeoutError)
+    async def _database_unavailable(_: Request, exc: Exception) -> JSONResponse:
+        logger.error("database unavailable", exc_info=exc)
+        return error_response(
+            503,
+            "database_unavailable",
+            "We can't reach your records right now. Please try again in a moment.",
+            headers={"Retry-After": "5"},
+        )
 
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception) -> JSONResponse:

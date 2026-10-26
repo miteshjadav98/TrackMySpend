@@ -51,11 +51,21 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
   check`, OpenAPI and TS contract drift, web typecheck/lint/build, both images build. Not yet run on
   GitHub: the repo has no remote.
 
+- Database outages return 503 + `Retry-After` in the error envelope (was a generic 500); verified
+  live by stopping Postgres (503 in 4 s, `/readyz` 503, recovers on restart without an API restart).
+- Docs: `README.md` (setup, commands, env vars, migrations, contracts, tests),
+  `docs/architecture.md` (design, workflow, failure behaviour, GCP deployment spec, scale plan),
+  `docs/phase-1-report.md` (PRD report + PRD improvement suggestions). 142 tests passing.
+
+**Phase 1 is complete.**
+
 ## Next
 
-1. Docs: README (setup, env vars, migrations), docs/architecture.md, deployment assumptions.
-2. Phase 1 report + PRD improvement suggestions.
-3. User testing feedback on the web app.
+1. User testing feedback on the web app (stack runs via `docker compose --profile app up -d`).
+2. Push to a GitHub remote so CI runs (needs a repo URL from the user).
+3. Phase 2 remainder: long-term preferences (merchant → category memory with inspect/edit/delete),
+   transfers in chat, plus any accepted PRD suggestions (accounts entity, data export/deletion,
+   password reset). See docs/phase-1-report.md.
 
 ## Resume
 
