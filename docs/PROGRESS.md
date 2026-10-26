@@ -59,6 +59,16 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
 
 **Phase 1 is complete.**
 
+## Pending decisions (ask the user at the start of the next session)
+
+1. Browser testing feedback on the web app.
+2. GitHub repo URL, so CI can run.
+3. PRD suggestions in docs/phase-1-report.md: accept or reject each one. The biggest are
+   accounts as an entity, data export/deletion with transcript retention, and measurable
+   targets (p95 < 3 s, eval ≥ 95%).
+4. Whether to apply the two pending system-design skill fixes: `background: false`, and
+   removing the two leftover reference pointers.
+
 ## Next
 
 1. User testing feedback on the web app (stack runs via `docker compose --profile app up -d`).
