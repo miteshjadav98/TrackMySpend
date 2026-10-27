@@ -51,6 +51,11 @@ def _applied(draft: TransactionDraft, **changes: Any) -> AnswerOutcome:
     return AnswerOutcome("applied", draft=draft.model_copy(update=changes))
 
 
+def _with_type(draft: TransactionDraft, kind: str) -> AnswerOutcome:
+    # A category belongs to one type, so the draft's category is worked out again.
+    return _applied(draft, type=kind, category_id=None, category_name=None, category_source=None)
+
+
 def _invalid(notice: str) -> AnswerOutcome:
     return AnswerOutcome("invalid", notice=notice)
 
@@ -160,11 +165,11 @@ class AnswerApplier:
         if field == "type":
             lowered = text.lower()
             if lowered in ("expense", "income"):
-                return _applied(draft, type=lowered, category_id=None, category_name=None)
+                return _with_type(draft, lowered)
             if _EXPENSE.search(text) and not _INCOME.search(text):
-                return _applied(draft, type="expense", category_id=None, category_name=None)
+                return _with_type(draft, "expense")
             if _INCOME.search(text) and not _EXPENSE.search(text):
-                return _applied(draft, type="income", category_id=None, category_name=None)
+                return _with_type(draft, "income")
             return _invalid("Was it money out (expense) or money in (income)?")
         if field == "category":
             kind = draft.type or "expense"
@@ -174,6 +179,7 @@ class AnswerApplier:
                     draft,
                     category_id=str(category.id),
                     category_name=category.name,
+                    category_source="picked",  # the user's own pick outranks everything
                     category_text=None,
                     category_skipped=False,
                 )

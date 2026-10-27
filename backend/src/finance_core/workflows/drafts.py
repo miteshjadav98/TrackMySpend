@@ -28,6 +28,7 @@ from finance_core.money import (
     parse_amount_with_currency,
     to_minor,
 )
+from finance_core.workflows.category_choice import CategorySource
 
 IssueField = Literal["amount", "amount_confirm", "currency", "type", "category", "date"]
 
@@ -37,6 +38,8 @@ class TransactionDraft(BaseModel):
 
     id: str
     origin_message_id: str
+    # The user's message this draft was understood from: a category named in it wins.
+    source_text: str = ""
     type: Literal["expense", "income"] | None = None
     amount: str | None = None  # exact decimal string
     amount_confirmed: bool = False  # literally typed by the user, or confirmed by them
@@ -44,6 +47,7 @@ class TransactionDraft(BaseModel):
     category_slug: str | None = None  # what the model/parser suggested
     category_id: str | None = None  # resolved against the user's categories
     category_name: str | None = None
+    category_source: CategorySource | None = None  # which precedence level chose it
     category_text: str | None = None  # the user's own name for a new category
     category_skipped: bool = False
     date: str | None = None  # ISO date
@@ -116,6 +120,7 @@ def draft_from_extraction(
     return TransactionDraft(
         id=draft_id,
         origin_message_id=origin_message_id,
+        source_text=source_text,
         type=extracted.type,
         amount=amount,
         amount_confirmed=grounded,

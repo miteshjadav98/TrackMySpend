@@ -1,7 +1,8 @@
 """Transaction service: the only code path that writes financial records.
 
 REST endpoints, the chat agent, and (later) MCP tools all call this service, so validation,
-idempotency, auditing, and cache invalidation are implemented exactly once.
+idempotency, auditing, merchant-rule learning and cache invalidation are implemented
+exactly once.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from finance_core.clock import Clock
 from finance_core.dates import EARLIEST_ALLOWED_DATE
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
 from finance_core.ids import uuid7
+from finance_core.merchants.service import MerchantRuleService
 from finance_core.money import (
     SUPPORTED_CURRENCIES,
     MoneyError,
@@ -127,6 +129,7 @@ class TransactionService:
         self._clock = clock
         self._generation = generation
         self._categories = CategoryService(session)
+        self._merchant_rules = MerchantRuleService(session, clock=clock)
 
     # -- validation -----------------------------------------------------------------------
 
@@ -255,6 +258,10 @@ class TransactionService:
                     entity_type="transaction", entity_id=inserted_id,
                     data={**_audit_snapshot(new), "source": source}, request_id=request_id,
                 )  # fmt: skip
+                # Only a newly inserted row teaches: an idempotent replay learns nothing.
+                await self._merchant_rules.learn(
+                    ctx.user_id, type=new.type, merchant=new.merchant, category_id=new.category_id
+                )
                 results.append((inserted_id, True))
                 continue
             existing = await self._session.scalar(
@@ -344,6 +351,14 @@ class TransactionService:
             data={"before": before, "changes": changes}, request_id=request_id,
         )  # fmt: skip
         try:
+            if "category_id" in changes or "merchant" in changes:
+                # Inside the try: learning's first query flushes the row's version check.
+                await self._merchant_rules.learn(
+                    ctx.user_id,
+                    type=resolved.type,
+                    merchant=resolved.merchant,
+                    category_id=resolved.category_id,
+                )
             await self._session.commit()
         except StaleDataError:
             await self._session.rollback()
