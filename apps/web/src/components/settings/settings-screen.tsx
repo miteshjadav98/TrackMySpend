@@ -1,3 +1,4 @@
+import { AccountsSection } from "@/components/settings/accounts-section";
 import { ProfileSection } from "@/components/settings/profile-section";
 import { SecuritySection } from "@/components/settings/security-section";
 
@@ -15,6 +16,7 @@ export function SettingsScreen() {
         <h1 className="display text-[1.9rem] leading-tight font-semibold">Settings</h1>
         <div className="mt-8 flex flex-col gap-10">
           <ProfileSection />
+          <AccountsSection />
           <SecuritySection />
         </div>
       </div>

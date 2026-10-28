@@ -1,4 +1,5 @@
 from finance_api.routes import (
+    accounts,
     auth,
     categories,
     conversations,
@@ -13,6 +14,7 @@ ROUTERS = (
     auth.router,
     profile.router,
     categories.router,
+    accounts.router,
     transactions.router,
     reports.router,
     conversations.router,
