@@ -85,6 +85,7 @@ source_modules = [
   "finance_core.transactions",
   "finance_core.reports",
   "finance_core.categories",
+  "finance_core.merchants",
   "finance_core.users",
   "finance_core.auth",
   "finance_core.conversations",
