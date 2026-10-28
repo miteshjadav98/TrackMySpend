@@ -611,7 +611,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12" },
     { name = "pydantic-settings", specifier = ">=2.11" },
     { name = "redis", specifier = ">=6.4" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.44" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.1.6" },
     { name = "tzdata", specifier = ">=2025.2" },
 ]
 
