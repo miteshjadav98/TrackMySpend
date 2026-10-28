@@ -40,7 +40,13 @@ export function ProfileSection() {
 function ProfileForm({ me }: { me: MeView }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const zones = useMemo(() => timezones(), []);
+  // Browsers list some zones under older names (Chrome and Edge say "Asia/Calcutta", not
+  // "Asia/Kolkata"). Without the saved zone in the list, the picker would show the first zone
+  // and "Save" would silently move the user to it.
+  const zones = useMemo(() => {
+    const all = timezones();
+    return all.includes(me.profile.timezone) ? all : [me.profile.timezone, ...all];
+  }, [me.profile.timezone]);
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
 

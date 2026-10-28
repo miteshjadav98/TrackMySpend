@@ -17,6 +17,12 @@
   --color-lavender-deep: #5b4ba0;
   --color-lavender-ink: #463a80;
   --color-lavender-wash: #eeeaf8;
+  /* Fills that carry white text (buttons, your chat bubbles). Kept separate from
+     lavender-deep, which is also a text colour and must turn light in dark mode. */
+  --color-lavender-fill: #5b4ba0;
+  --color-lavender-press: #463a80;
+  /* Always-dark surfaces under white text: the sign-in panel, toasts, overlays. */
+  --color-night: #1e1b3a;
   --color-turmeric: #e8a317;
   --color-turmeric-ink: #7a5300;
   --color-turmeric-wash: #fdf3dc;
@@ -30,6 +36,41 @@
 
   --radius-card: 14px;
   --shadow-card: 0 1px 0 rgb(30 27 58 / 0.04), 0 6px 20px -12px rgb(30 27 58 / 0.18);
+}
+
+/*
+ * Dark theme: the same banknote palette at night. The paper is deep indigo ink rather than
+ * black, and text, lines and accents are lifted so they keep their contrast. The theme
+ * script in the root layout sets data-theme before the first paint (see lib/theme.ts).
+ */
+:root {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #12101f;
+  --color-surface: #1b1830;
+  --color-ink: #ece9f7;
+  --color-ink-soft: #c3bfd8;
+  --color-ink-faint: #9792b0;
+  --color-line: #2c2845;
+  --color-line-strong: #3e395f;
+  --color-lavender: #a594dc;
+  --color-lavender-deep: #b9acee;
+  --color-lavender-ink: #d6cdf6;
+  --color-lavender-wash: #2a2450;
+  --color-lavender-fill: #6a59b8;
+  --color-lavender-press: #7b6bc9;
+  --color-turmeric: #f0b43a;
+  --color-turmeric-ink: #f6cd72;
+  --color-turmeric-wash: #3a2e12;
+  --color-income: #4cc29f;
+  --color-income-wash: #12352d;
+  --color-danger: #e8635b;
+  --color-danger-wash: #3d1a19;
+  --color-night: #0b0a16;
+  --shadow-card: 0 1px 0 rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.6);
 }
 
 html {

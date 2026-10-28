@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Anek_Latin, Hind } from "next/font/google";
 
 import { Providers } from "@/components/providers";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 import "./globals.css";
 
@@ -26,12 +27,20 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f6f5f9",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f5f9" },
+    { media: "(prefers-color-scheme: dark)", color: "#12101f" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-IN" className={`${anek.variable} ${hind.variable}`}>
+    // The theme script sets data-theme on <html> before React loads, so the server's HTML and
+    // the browser's differ there on purpose; suppressHydrationWarning covers that one attribute.
+    <html lang="en-IN" className={`${anek.variable} ${hind.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>
