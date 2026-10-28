@@ -22,6 +22,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
+from finance_core.accounts.models import Account
+from finance_core.accounts.service import AccountService
 from finance_core.audit.service import Actor, record_audit
 from finance_core.cache.primitives import UserDataGeneration
 from finance_core.categories.models import Category
@@ -41,6 +43,7 @@ from finance_core.money import (
 )
 from finance_core.transactions.models import Transaction
 from finance_core.transactions.schemas import (
+    AccountRef,
     CategoryRef,
     NewTransaction,
     TransactionCreate,
@@ -55,7 +58,12 @@ MAX_PAGE_SIZE = 100
 MAX_BATCH = 20
 
 
-def to_view(row: Transaction, category: Category | None, locale: str = "en-IN") -> TransactionView:
+def to_view(
+    row: Transaction,
+    category: Category | None,
+    account: Account | None,
+    locale: str = "en-IN",
+) -> TransactionView:
     return TransactionView(
         id=row.id,
         type=row.type,
@@ -68,6 +76,9 @@ def to_view(row: Transaction, category: Category | None, locale: str = "en-IN") 
             CategoryRef(id=category.id, slug=category.slug, name=category.name, icon=category.icon)
             if category
             else None
+        ),
+        account=(
+            AccountRef(id=account.id, name=account.name, kind=account.kind) if account else None
         ),
         description=row.description,
         merchant=row.merchant,
@@ -114,6 +125,7 @@ def _audit_snapshot(row: Transaction | NewTransaction) -> dict[str, Any]:
         "currency": row.currency,
         "occurredOn": row.occurred_on.isoformat(),
         "categoryId": str(row.category_id) if row.category_id else None,
+        "accountId": str(row.account_id) if row.account_id else None,
     }
 
 
@@ -129,6 +141,7 @@ class TransactionService:
         self._clock = clock
         self._generation = generation
         self._categories = CategoryService(session)
+        self._accounts = AccountService(session)
         self._merchant_rules = MerchantRuleService(session, clock=clock)
 
     # -- validation -----------------------------------------------------------------------
@@ -170,6 +183,13 @@ class TransactionService:
                 )
             category_id = category.id
 
+        account_id: uuid.UUID | None = None
+        if data.account_id is not None:
+            account = await self._accounts.pick_for_transaction(
+                ctx, data.account_id, field="accountId"
+            )
+            account_id = account.id
+
         return NewTransaction(
             type=data.type,
             amount_minor=amount_minor,
@@ -180,6 +200,7 @@ class TransactionService:
             merchant=_clean_text(data.merchant),
             payment_method=data.payment_method,
             notes=_clean_text(data.notes),
+            account_id=account_id,
         )
 
     # -- writes ---------------------------------------------------------------------------
@@ -240,6 +261,7 @@ class TransactionService:
                     currency=new.currency,
                     occurred_on=new.occurred_on,
                     category_id=new.category_id,
+                    account_id=new.account_id,
                     description=new.description,
                     merchant=new.merchant,
                     payment_method=new.payment_method,
@@ -319,6 +341,7 @@ class TransactionService:
                 else row.occurred_on
             ),
             category_id=patch.category_id if "category_id" in fields else row.category_id,
+            account_id=patch.account_id if "account_id" in fields else row.account_id,
             description=patch.description if "description" in fields else row.description,
             merchant=patch.merchant if "merchant" in fields else row.merchant,
             payment_method=(
@@ -335,7 +358,8 @@ class TransactionService:
         before = _audit_snapshot(row)
         changes: dict[str, list[Any]] = {}
         for attr in ("type", "amount_minor", "currency", "occurred_on", "category_id",
-                     "description", "merchant", "payment_method", "notes"):  # fmt: skip
+                     "account_id", "description", "merchant", "payment_method",
+                     "notes"):  # fmt: skip
             old, new = getattr(row, attr), getattr(resolved, attr)
             if old != new:
                 changes[attr] = [
@@ -373,12 +397,21 @@ class TransactionService:
     async def _resolve_for_update(
         self, ctx: UserContext, merged: TransactionCreate, row: Transaction
     ) -> NewTransaction:
-        # An edit may legitimately keep an existing future-dated or old row's date
-        # (e.g. after a timezone change); only re-validate the date when it changes.
+        """Validate an edit, re-checking the date and the account only when they change.
+
+        An edit may legitimately keep values that a new transaction could not have: a date
+        that is now in the future (e.g. after a timezone change), or an account archived
+        since it was picked. Archiving an account must not lock its old transactions.
+        """
+        kept: dict[str, Any] = {}
         if merged.occurred_on == row.occurred_on:
-            resolved = await self.resolve(ctx, merged.model_copy(update={"occurred_on": None}))
-            return dataclasses.replace(resolved, occurred_on=row.occurred_on)
-        return await self.resolve(ctx, merged)
+            kept["occurred_on"] = row.occurred_on
+        if merged.account_id == row.account_id:
+            kept["account_id"] = row.account_id
+        # Resolve with the kept values blanked, so their checks are skipped, then restore them.
+        blanked = merged.model_copy(update={field: None for field in kept})
+        resolved = await self.resolve(ctx, blanked)
+        return dataclasses.replace(resolved, **kept)
 
     async def delete(
         self,
@@ -451,14 +484,19 @@ class TransactionService:
     async def search(self, ctx: UserContext, query: TransactionQuery) -> TransactionPage:
         limit = max(1, min(query.limit, MAX_PAGE_SIZE))
         stmt = (
-            select(Transaction, Category)
+            select(Transaction, Category, Account)
             .outerjoin(Category, Category.id == Transaction.category_id)
+            .outerjoin(Account, Account.id == Transaction.account_id)
             .where(Transaction.user_id == ctx.user_id, Transaction.deleted_at.is_(None))
         )
         if query.type:
             stmt = stmt.where(Transaction.type == query.type)
         if query.category_id:
             stmt = stmt.where(Transaction.category_id == query.category_id)
+        if query.account_id:
+            # Another user's account is a 404 here too, not an empty list.
+            await self._accounts.get(ctx, query.account_id, field="accountId")
+            stmt = stmt.where(Transaction.account_id == query.account_id)
         if query.date_from:
             stmt = stmt.where(Transaction.occurred_on >= query.date_from)
         if query.date_to:
@@ -500,7 +538,7 @@ class TransactionService:
         result = (await self._session.execute(stmt.limit(limit + 1))).all()
         has_more = len(result) > limit
         rows = list(result[:limit])
-        items = [to_view(row, category, ctx.locale) for row, category in rows]
+        items = [to_view(row, category, account, ctx.locale) for row, category, account in rows]
         next_cursor = None
         if has_more and query.sort == "recent" and rows:
             last = rows[-1][0]
@@ -529,9 +567,10 @@ class TransactionService:
             return {}
         rows = (
             await self._session.execute(
-                select(Transaction, Category)
+                select(Transaction, Category, Account)
                 .outerjoin(Category, Category.id == Transaction.category_id)
+                .outerjoin(Account, Account.id == Transaction.account_id)
                 .where(Transaction.id.in_(ids))
             )
         ).all()
-        return {row.id: to_view(row, category, locale) for row, category in rows}
+        return {row.id: to_view(row, category, account, locale) for row, category, account in rows}

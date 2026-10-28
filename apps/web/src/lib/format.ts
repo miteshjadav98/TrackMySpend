@@ -76,3 +76,8 @@ export function paymentLabel(value: string | null | undefined): string | null {
   if (!value) return null;
   return PAYMENT_METHODS.find((method) => method.value === value)?.label ?? value;
 }
+
+/** An account as a picker option: archived ones say so, since they can't be picked anew. */
+export function accountOptionLabel(account: { name: string; isArchived: boolean }): string {
+  return account.isArchived ? `${account.name} (archived)` : account.name;
+}

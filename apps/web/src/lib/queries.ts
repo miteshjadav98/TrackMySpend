@@ -95,14 +95,21 @@ export function useAccounts(includeArchived = false) {
   });
 }
 
-/** After any account change: refresh every account list (with and without archived ones). */
+/**
+ * After any account change: refresh every account list (with and without archived ones), and
+ * the transactions, which show each row's account name.
+ */
 export function invalidateAccounts(client: QueryClient): Promise<unknown> {
-  return client.invalidateQueries({ queryKey: ["accounts"] });
+  return Promise.all([
+    client.invalidateQueries({ queryKey: ["accounts"] }),
+    client.invalidateQueries({ queryKey: ["transactions"] }),
+  ]);
 }
 
 export interface TransactionFilters {
   type?: TransactionType;
   categoryId?: string;
+  accountId?: string;
   from?: string;
   to?: string;
   q?: string;
@@ -119,6 +126,7 @@ export function useTransactions(filters: TransactionFilters) {
             query: {
               type: filters.type,
               categoryId: filters.categoryId,
+              accountId: filters.accountId,
               from: filters.from,
               to: filters.to,
               q: filters.q || undefined,

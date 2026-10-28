@@ -565,6 +565,23 @@
             }
           },
           {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accountid"
+            }
+          },
+          {
             "name": "from",
             "in": "query",
             "required": false,
@@ -1596,6 +1613,38 @@
         ],
         "title": "AccountCreate",
         "description": "A new account. Without a currency it takes the user's base currency."
+      },
+      "AccountRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "credit_card",
+              "wallet",
+              "cash",
+              "other"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "title": "AccountRef",
+        "description": "The account a transaction was paid from or into, as it is shown on the transaction."
       },
       "AccountUpdate": {
         "properties": {
@@ -3237,6 +3286,18 @@
             ],
             "title": "Categoryid"
           },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
           "description": {
             "anyOf": [
               {
@@ -3457,6 +3518,18 @@
             ],
             "title": "Categoryid"
           },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
           "description": {
             "anyOf": [
               {
@@ -3578,6 +3651,16 @@
               }
             ]
           },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "description": {
             "anyOf": [
               {
@@ -3669,6 +3752,7 @@
           "amountFormatted",
           "occurredOn",
           "category",
+          "account",
           "description",
           "merchant",
           "paymentMethod",

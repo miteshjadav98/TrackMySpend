@@ -25,6 +25,7 @@ export type AccountView = S["AccountView"];
 export type AccountCreate = S["AccountCreate"];
 export type AccountUpdate = S["AccountUpdate"];
 export type AccountKind = AccountView["kind"];
+export type AccountRef = S["AccountRef"];
 
 export type CategoryView = S["CategoryView"];
 export type MoneyAmount = S["MoneyAmount"];

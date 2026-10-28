@@ -134,13 +134,37 @@ class AccountService:
         await self._session.refresh(account)  # the database set updated_at
         return to_view(account)
 
-    async def _owned_account(self, user_id: uuid.UUID, account_id: uuid.UUID) -> Account:
+    async def get(self, ctx: UserContext, account_id: uuid.UUID, *, field: str) -> AccountView:
+        """One of the user's accounts, archived or not (404 otherwise)."""
+        return to_view(await self._owned_account(ctx.user_id, account_id, field=field))
+
+    async def pick_for_transaction(
+        self, ctx: UserContext, account_id: uuid.UUID, *, field: str
+    ) -> AccountView:
+        """The account a transaction is being tagged with, if the user may pick it.
+
+        Two checks, in order: it is one of the user's own accounts (404 otherwise, exactly
+        like an id that does not exist), and it is active (422: archived accounts stay on old
+        transactions but are not picked for new ones). `field` is the request field that
+        named the account, so an error points at it.
+        """
+        account = await self._owned_account(ctx.user_id, account_id, field=field)
+        if account.is_archived:
+            raise ValidationFailedError(
+                f"'{account.name}' is archived. Unarchive it in Settings or pick another account.",
+                details={"field": field},
+            )
+        return to_view(account)
+
+    async def _owned_account(
+        self, user_id: uuid.UUID, account_id: uuid.UUID, *, field: str | None = None
+    ) -> Account:
         # Ownership is part of the WHERE clause: another user's id is simply "not found".
         account = await self._session.scalar(
             select(Account).where(Account.id == account_id, Account.user_id == user_id)
         )
         if account is None:
-            raise NotFoundError("Account not found")
+            raise NotFoundError("Account not found", details={"field": field} if field else None)
         return account
 
     # -- rules ----------------------------------------------------------------------------

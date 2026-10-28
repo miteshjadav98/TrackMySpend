@@ -397,6 +397,24 @@ export interface components {
             currency?: string | null;
         };
         /**
+         * AccountRef
+         * @description The account a transaction was paid from or into, as it is shown on the transaction.
+         */
+        AccountRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bank" | "credit_card" | "wallet" | "cash" | "other";
+        };
+        /**
          * AccountUpdate
          * @description Partial update: a field left out (or null) stays as it is.
          *
@@ -1021,6 +1039,8 @@ export interface components {
             occurredOn?: string | null;
             /** Categoryid */
             categoryId?: string | null;
+            /** Accountid */
+            accountId?: string | null;
             /** Description */
             description?: string | null;
             /** Merchant */
@@ -1077,6 +1097,8 @@ export interface components {
             occurredOn?: string | null;
             /** Categoryid */
             categoryId?: string | null;
+            /** Accountid */
+            accountId?: string | null;
             /** Description */
             description?: string | null;
             /** Merchant */
@@ -1112,6 +1134,7 @@ export interface components {
              */
             occurredOn: string;
             category: components["schemas"]["CategoryRef"] | null;
+            account: components["schemas"]["AccountRef"] | null;
             /** Description */
             description: string | null;
             /** Merchant */
@@ -1678,6 +1701,7 @@ export interface operations {
             query?: {
                 type?: ("expense" | "income") | null;
                 categoryId?: string | null;
+                accountId?: string | null;
                 from?: string | null;
                 to?: string | null;
                 q?: string | null;
