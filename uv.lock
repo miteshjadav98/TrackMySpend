@@ -607,7 +607,7 @@ requires-dist = [
     { name = "langchain-google-genai", specifier = ">=4.0" },
     { name = "langgraph", specifier = ">=1.0" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=3.0" },
-    { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2.12" },
+    { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.6" },
     { name = "pydantic", specifier = ">=2.12" },
     { name = "pydantic-settings", specifier = ">=2.11" },
     { name = "redis", specifier = ">=6.4" },
