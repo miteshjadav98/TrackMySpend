@@ -48,7 +48,7 @@ export function Sidebar({ me, open, onClose }: { me: MeView; open: boolean; onCl
   return (
     <>
       <div
-        className={`fixed inset-0 z-30 bg-ink/30 md:hidden ${open ? "block" : "hidden"}`}
+        className={`fixed inset-0 z-30 bg-night/30 md:hidden ${open ? "block" : "hidden"}`}
         onClick={onClose}
         aria-hidden
       />
