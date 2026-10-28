@@ -68,6 +68,13 @@ def period_phrase(label: str) -> str:
     )
 
 
+def _merchant_rule_note(tx: TransactionView) -> str:
+    """Why a merchant rule chose the category, e.g. "Filed under Office meals, as before for
+    Swiggy"."""
+    category = tx.category.name if tx.category else ""
+    return f"Filed under {category}, as before for {tx.merchant}."
+
+
 def compose_saved(
     saved: list[dict[str, Any]],
     *,
@@ -75,8 +82,10 @@ def compose_saved(
     locale: str,
     abandoned: bool,
     interaction_id: str,
+    filed_by_merchant_rule: frozenset[str] = frozenset(),
 ) -> tuple[str, list[Interaction]]:
     views = [TransactionView.model_validate(item) for item in saved]
+    by_rule = [tx for tx in views if str(tx.id) in filed_by_merchant_rule]
     totals: dict[str, int] = defaultdict(int)
     if len({view.type for view in views}) == 1:  # only total like with like
         for view in views:
@@ -84,7 +93,8 @@ def compose_saved(
     if len(views) == 1:
         tx = views[0]
         what = f" for {tx.description}" if tx.description else ""
-        category = f" under {tx.category.name}" if tx.category else ""
+        # A merchant rule's category is named in the note below, with the reason.
+        category = f" under {tx.category.name}" if tx.category and not by_rule else ""
         paid = (
             f", paid by {PAYMENT_METHOD_LABELS[tx.payment_method]}"
             if tx.payment_method and tx.type == "expense"
@@ -100,6 +110,8 @@ def compose_saved(
             for tx in views
         ]
         text = f"Saved {len(views)} transactions: {_join(items)}."
+    for tx in by_rule:
+        text += " " + _merchant_rule_note(tx)
     if abandoned:
         text = "I set aside the earlier unfinished entry. " + text
     total_amounts = (

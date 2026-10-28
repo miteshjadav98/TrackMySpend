@@ -15,7 +15,8 @@ from typing import Any
 from langgraph.runtime import Runtime
 from langgraph.types import Command, interrupt
 
-from finance_core.categories.defaults import FALLBACK_SLUG
+from finance_core.categories.defaults import FALLBACK_SLUG, FALLBACK_SLUGS
+from finance_core.categories.models import Category
 from finance_core.categories.schemas import CategoryCreate
 from finance_core.categories.service import CategoryService
 from finance_core.conversations.service import HistoryItem
@@ -31,10 +32,12 @@ from finance_core.llm.base import (
 )
 from finance_core.llm.rules import RulesLLMClient
 from finance_core.llm.schemas import PeriodSpec, SearchSpec
+from finance_core.merchants.service import MerchantRuleService
 from finance_core.reports.service import ReportService
-from finance_core.transactions.schemas import TransactionCreate, TransactionQuery
+from finance_core.transactions.schemas import TransactionCreate, TransactionQuery, TransactionView
 from finance_core.transactions.service import TransactionService
 from finance_core.workflows.answers import AnswerApplier, AnswerOutcome, pending_field
+from finance_core.workflows.category_choice import CategoryOption, choose_category
 from finance_core.workflows.drafts import TransactionDraft, draft_from_extraction, first_issue
 from finance_core.workflows.questions import build_question
 from finance_core.workflows.reconcile import reconcile
@@ -71,6 +74,7 @@ _TURN_RESET: dict[str, Any] = {
     "search": None,
     "outcome": None,
     "saved": [],
+    "filed_by_merchant_rule": [],
     "summary": None,
     "results": None,
     "reply": None,
@@ -88,6 +92,72 @@ def _dump(drafts: list[TransactionDraft]) -> list[dict[str, Any]]:
 def _history(entries: list[HistoryEntry], limit: int) -> list[HistoryItem]:
     items = [HistoryItem(role=e["role"], text=e["text"]) for e in entries if e.get("text")]
     return items[-limit:] if limit else []
+
+
+def _option(category: Category | None) -> CategoryOption | None:
+    if category is None:
+        return None
+    return CategoryOption(
+        id=str(category.id), name=category.name, is_fallback=category.slug in FALLBACK_SLUGS
+    )
+
+
+def _picked(draft: TransactionDraft) -> CategoryOption | None:
+    """The category the user picked in a clarification, if they did."""
+    if draft.category_source != "picked" or draft.category_id is None:
+        return None
+    return CategoryOption(id=draft.category_id, name=draft.category_name or "")
+
+
+async def _file_under_category(
+    draft: TransactionDraft,
+    user_id: uuid.UUID,
+    categories: CategoryService,
+    merchant_rules: MerchantRuleService,
+) -> TransactionDraft:
+    """The draft filed under the category the precedence chooses; unchanged if none applies.
+
+    Worked out again on every pass, so a pick from a clarification stands because it
+    outranks everything else.
+    """
+    # The type comes first; a typed new category or a skipped question is already the
+    # user's answer.
+    if draft.type is None or draft.category_text or draft.category_skipped:
+        return draft
+    suggested = (
+        await categories.by_slug(user_id, draft.category_slug, draft.type)
+        if draft.category_slug
+        else None
+    )
+    rule = await merchant_rules.category_for(user_id, type=draft.type, merchant=draft.merchant)
+    choice = choose_category(
+        draft.source_text,
+        picked=_picked(draft),
+        suggested=_option(suggested),
+        merchant_rule=_option(rule),
+    )
+    if choice is None:
+        return draft
+    return draft.model_copy(
+        update={
+            "category_id": choice.category.id,
+            "category_name": choice.category.name,
+            "category_source": choice.source,
+        }
+    )
+
+
+def _filed_by_merchant_rule(
+    drafts: list[TransactionDraft], views: list[TransactionView]
+) -> list[str]:
+    """Ids of the saved transactions whose category a merchant rule chose, for the reply."""
+    if len(drafts) != len(views):
+        return []  # a replayed save that no longer lines up with its drafts: skip the note
+    return [
+        str(view.id)
+        for draft, view in zip(drafts, views, strict=True)
+        if draft.category_source == "merchant_rule"
+    ]
 
 
 class FinanceNodes:
@@ -247,19 +317,11 @@ class FinanceNodes:
 
         async with self._deps.session_factory() as session:
             categories = CategoryService(session)
+            merchant_rules = MerchantRuleService(session, clock=self._deps.clock)
             for index, draft in enumerate(drafts):
-                if (
-                    draft.category_id
-                    or not draft.category_slug
-                    or not draft.type
-                    or draft.category_text
-                ):
-                    continue
-                category = await categories.by_slug(ctx.user_id, draft.category_slug, draft.type)
-                if category is not None:
-                    drafts[index] = draft.model_copy(
-                        update={"category_id": str(category.id), "category_name": category.name}
-                    )
+                drafts[index] = await _file_under_category(
+                    draft, ctx.user_id, categories, merchant_rules
+                )
 
             for index, draft in enumerate(drafts):
                 issue = first_issue(draft, base_currency=ctx.base_currency, today=ctx.today)
@@ -445,6 +507,7 @@ class FinanceNodes:
                 views = [view for view, _ in results]
         return {
             "saved": [view.model_dump(mode="json", by_alias=True) for view in views],
+            "filed_by_merchant_rule": _filed_by_merchant_rule(drafts, views),
             "drafts": [],
             "outcome": "saved",
         }
@@ -543,6 +606,7 @@ class FinanceNodes:
                 today=ctx.today,
                 locale=ctx.locale,
                 abandoned=bool(state.get("abandoned")),
+                filed_by_merchant_rule=frozenset(state.get("filed_by_merchant_rule") or []),
                 interaction_id=f"{base_id}-saved",
             )
         elif outcome == "summary" and state.get("summary"):

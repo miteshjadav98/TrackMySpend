@@ -63,6 +63,7 @@ class FinanceState(TypedDict, total=False):
     # results
     outcome: str | None
     saved: list[dict[str, Any]]
+    filed_by_merchant_rule: list[str]  # ids of saved transactions a merchant rule filed
     summary: dict[str, Any] | None
     results: dict[str, Any] | None
     reply: dict[str, Any] | None  # {"text": str, "ui": [interaction, ...]}
