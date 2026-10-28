@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  AccountView,
   CategoryView,
   ConversationDetail,
   ConversationPage,
@@ -25,6 +26,7 @@ export const keys = {
   conversation: (id: string) => ["conversation", id] as const,
   summary: (period: string) => ["summary", period] as const,
   categories: ["categories"] as const,
+  accounts: (includeArchived: boolean) => ["accounts", { includeArchived }] as const,
   transactions: (filters: TransactionFilters) => ["transactions", filters] as const,
   merchantRules: (search: string) => ["merchant-rules", search] as const,
 };
@@ -86,6 +88,20 @@ export function useCategories() {
     queryFn: () => unwrap<CategoryView[]>(api.GET("/api/v1/categories")),
     staleTime: 10 * 60_000,
   });
+}
+
+/** The user's accounts, active first: only active ones unless `includeArchived` is set. */
+export function useAccounts(includeArchived = false) {
+  return useQuery({
+    queryKey: keys.accounts(includeArchived),
+    queryFn: () =>
+      unwrap<AccountView[]>(api.GET("/api/v1/accounts", { params: { query: { includeArchived } } })),
+  });
+}
+
+/** After any account change: refresh every account list (with and without archived ones). */
+export function invalidateAccounts(client: QueryClient): Promise<unknown> {
+  return client.invalidateQueries({ queryKey: ["accounts"] });
 }
 
 export interface TransactionFilters {

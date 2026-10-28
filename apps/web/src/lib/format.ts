@@ -47,6 +47,18 @@ export function currencySymbol(currency: string, locale = "en-IN"): string {
   }
 }
 
+/** The currencies the settings forms offer, as [ISO code, name]. */
+export const CURRENCIES = [
+  ["INR", "Indian rupee"],
+  ["USD", "US dollar"],
+  ["EUR", "Euro"],
+  ["GBP", "British pound"],
+  ["AED", "UAE dirham"],
+  ["SGD", "Singapore dollar"],
+  ["AUD", "Australian dollar"],
+  ["CAD", "Canadian dollar"],
+] as const;
+
 export const PAYMENT_METHODS: { value: string; label: string }[] = [
   { value: "upi", label: "UPI" },
   { value: "cash", label: "Cash" },
