@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import base64
 import binascii
-import dataclasses
 import json
 import uuid
 from collections.abc import Sequence
@@ -20,10 +19,11 @@ from typing import Any, Literal
 from sqlalchemy import and_, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 from sqlalchemy.orm.exc import StaleDataError
 
 from finance_core.accounts.models import Account
-from finance_core.accounts.schemas import AccountRef
+from finance_core.accounts.schemas import AccountRef, AccountView
 from finance_core.accounts.service import AccountService
 from finance_core.audit.service import Actor, record_audit
 from finance_core.cache.primitives import UserDataGeneration
@@ -62,6 +62,7 @@ def to_view(
     row: Transaction,
     category: Category | None,
     account: Account | None,
+    to_account: Account | None = None,
     locale: str = "en-IN",
 ) -> TransactionView:
     return TransactionView(
@@ -79,6 +80,11 @@ def to_view(
         ),
         account=(
             AccountRef(id=account.id, name=account.name, kind=account.kind) if account else None
+        ),
+        to_account=(
+            AccountRef(id=to_account.id, name=to_account.name, kind=to_account.kind)
+            if to_account
+            else None
         ),
         description=row.description,
         merchant=row.merchant,
@@ -126,6 +132,7 @@ def _audit_snapshot(row: Transaction | NewTransaction) -> dict[str, Any]:
         "occurredOn": row.occurred_on.isoformat(),
         "categoryId": str(row.category_id) if row.category_id else None,
         "accountId": str(row.account_id) if row.account_id else None,
+        "toAccountId": str(row.to_account_id) if row.to_account_id else None,
     }
 
 
@@ -146,13 +153,34 @@ class TransactionService:
 
     # -- validation -----------------------------------------------------------------------
 
-    async def resolve(self, ctx: UserContext, data: TransactionCreate) -> NewTransaction:
+    async def resolve(
+        self,
+        ctx: UserContext,
+        data: TransactionCreate,
+        *,
+        unchanged_from: Transaction | None = None,
+    ) -> NewTransaction:
         """Validate and normalise input into a persistable transaction.
 
         Raises `ValidationFailedError` with `details.field` set, which the agent turns
         into a focused clarification question instead of a generic error.
+
+        `unchanged_from` is the stored row when this is an edit: its date and accounts are
+        accepted as they are, even if a new transaction could not have them (a date now in
+        the future after a timezone change, an account archived since it was picked).
         """
-        currency = (data.currency or ctx.base_currency).upper()
+        if data.type != "transfer" and data.to_account_id is not None:
+            raise ValidationFailedError(
+                "Only a transfer has a destination account.", details={"field": "toAccountId"}
+            )
+        from_account: AccountView | None = None
+        to_account: AccountView | None = None
+        if data.type == "transfer":
+            from_account, to_account = await self._transfer_accounts(ctx, data, unchanged_from)
+            # A transfer lives in its accounts' currency, so that is the default.
+            currency = (data.currency or from_account.currency).upper()
+        else:
+            currency = (data.currency or ctx.base_currency).upper()
         if currency not in SUPPORTED_CURRENCIES:
             raise ValidationFailedError(
                 f"Unsupported currency: {currency}", details={"field": "currency"}
@@ -164,17 +192,22 @@ class TransactionService:
 
         today = ctx.today(self._clock)
         occurred_on = data.occurred_on or today
-        if occurred_on > today:
-            raise ValidationFailedError(
-                "The date can't be in the future.", details={"field": "occurredOn"}
-            )
-        if occurred_on < EARLIEST_ALLOWED_DATE:
-            raise ValidationFailedError(
-                "That date is too far in the past.", details={"field": "occurredOn"}
-            )
+        if unchanged_from is None or occurred_on != unchanged_from.occurred_on:
+            if occurred_on > today:
+                raise ValidationFailedError(
+                    "The date can't be in the future.", details={"field": "occurredOn"}
+                )
+            if occurred_on < EARLIEST_ALLOWED_DATE:
+                raise ValidationFailedError(
+                    "That date is too far in the past.", details={"field": "occurredOn"}
+                )
 
         category_id: uuid.UUID | None = None
         if data.category_id is not None:
+            if data.type == "transfer":
+                raise ValidationFailedError(
+                    "A transfer has no category.", details={"field": "categoryId"}
+                )
             category = await self._categories.get_visible(ctx.user_id, data.category_id)
             if category.kind != data.type:
                 raise ValidationFailedError(
@@ -183,12 +216,19 @@ class TransactionService:
                 )
             category_id = category.id
 
-        account_id: uuid.UUID | None = None
-        if data.account_id is not None:
-            account = await self._accounts.pick_for_transaction(
-                ctx, data.account_id, field="accountId"
-            )
-            account_id = account.id
+        if from_account is not None and to_account is not None:
+            for account in (from_account, to_account):
+                if account.currency != currency:
+                    raise ValidationFailedError(
+                        f"'{account.name}' is in {account.currency}, not {currency}. "
+                        "Transfers between currencies are not supported.",
+                        details={"field": "currency"},
+                    )
+        elif data.account_id is not None:
+            from_account = await self._pick_account(
+                ctx, data.account_id, "accountId",
+                current=unchanged_from.account_id if unchanged_from else None,
+            )  # fmt: skip
 
         return NewTransaction(
             type=data.type,
@@ -200,8 +240,44 @@ class TransactionService:
             merchant=_clean_text(data.merchant),
             payment_method=data.payment_method,
             notes=_clean_text(data.notes),
-            account_id=account_id,
+            account_id=from_account.id if from_account else None,
+            to_account_id=to_account.id if to_account else None,
         )
+
+    async def _transfer_accounts(
+        self, ctx: UserContext, data: TransactionCreate, unchanged_from: Transaction | None
+    ) -> tuple[AccountView, AccountView]:
+        """The two accounts of a transfer: both present, different, and pickable."""
+        if data.account_id is None:
+            raise ValidationFailedError(
+                "A transfer needs the account the money leaves.", details={"field": "accountId"}
+            )
+        if data.to_account_id is None:
+            raise ValidationFailedError(
+                "A transfer needs the account the money goes to.",
+                details={"field": "toAccountId"},
+            )
+        if data.account_id == data.to_account_id:
+            raise ValidationFailedError(
+                "A transfer needs two different accounts.", details={"field": "toAccountId"}
+            )
+        source = await self._pick_account(
+            ctx, data.account_id, "accountId",
+            current=unchanged_from.account_id if unchanged_from else None,
+        )  # fmt: skip
+        target = await self._pick_account(
+            ctx, data.to_account_id, "toAccountId",
+            current=unchanged_from.to_account_id if unchanged_from else None,
+        )  # fmt: skip
+        return source, target
+
+    async def _pick_account(
+        self, ctx: UserContext, account_id: uuid.UUID, field: str, *, current: uuid.UUID | None
+    ) -> AccountView:
+        """An account for this field: the one already on the row, or an active one."""
+        if account_id == current:
+            return await self._accounts.get(ctx, account_id, field=field)
+        return await self._accounts.pick_for_transaction(ctx, account_id, field=field)
 
     # -- writes ---------------------------------------------------------------------------
 
@@ -262,6 +338,7 @@ class TransactionService:
                     occurred_on=new.occurred_on,
                     category_id=new.category_id,
                     account_id=new.account_id,
+                    to_account_id=new.to_account_id,
                     description=new.description,
                     merchant=new.merchant,
                     payment_method=new.payment_method,
@@ -342,6 +419,7 @@ class TransactionService:
             ),
             category_id=patch.category_id if "category_id" in fields else row.category_id,
             account_id=patch.account_id if "account_id" in fields else row.account_id,
+            to_account_id=(patch.to_account_id if "to_account_id" in fields else row.to_account_id),
             description=patch.description if "description" in fields else row.description,
             merchant=patch.merchant if "merchant" in fields else row.merchant,
             payment_method=(
@@ -349,17 +427,21 @@ class TransactionService:
             ),
             notes=patch.notes if "notes" in fields else row.notes,
         )
-        if merged.type != row.type and "category_id" not in fields:
-            merged = merged.model_copy(
-                update={"category_id": None}
-            )  # old category is the wrong kind
-        resolved = await self._resolve_for_update(ctx, merged, row)
+        if merged.type != row.type:
+            # Fields that don't apply to the new type are dropped, not left to fail the edit.
+            dropped: dict[str, None] = {}
+            if "category_id" not in fields:
+                dropped["category_id"] = None  # the old category is the wrong kind (or a transfer)
+            if merged.type != "transfer" and "to_account_id" not in fields:
+                dropped["to_account_id"] = None
+            merged = merged.model_copy(update=dropped)
+        resolved = await self.resolve(ctx, merged, unchanged_from=row)
 
         before = _audit_snapshot(row)
         changes: dict[str, list[Any]] = {}
         for attr in ("type", "amount_minor", "currency", "occurred_on", "category_id",
-                     "account_id", "description", "merchant", "payment_method",
-                     "notes"):  # fmt: skip
+                     "account_id", "to_account_id", "description", "merchant",
+                     "payment_method", "notes"):  # fmt: skip
             old, new = getattr(row, attr), getattr(resolved, attr)
             if old != new:
                 changes[attr] = [
@@ -393,25 +475,6 @@ class TransactionService:
         if self._generation is not None:
             await self._generation.bump(ctx.user_id)
         return (await self._views([row.id], ctx.locale))[row.id]
-
-    async def _resolve_for_update(
-        self, ctx: UserContext, merged: TransactionCreate, row: Transaction
-    ) -> NewTransaction:
-        """Validate an edit, re-checking the date and the account only when they change.
-
-        An edit may legitimately keep values that a new transaction could not have: a date
-        that is now in the future (e.g. after a timezone change), or an account archived
-        since it was picked. Archiving an account must not lock its old transactions.
-        """
-        kept: dict[str, Any] = {}
-        if merged.occurred_on == row.occurred_on:
-            kept["occurred_on"] = row.occurred_on
-        if merged.account_id == row.account_id:
-            kept["account_id"] = row.account_id
-        # Resolve with the kept values blanked, so their checks are skipped, then restore them.
-        blanked = merged.model_copy(update={field: None for field in kept})
-        resolved = await self.resolve(ctx, blanked)
-        return dataclasses.replace(resolved, **kept)
 
     async def delete(
         self,
@@ -483,10 +546,12 @@ class TransactionService:
 
     async def search(self, ctx: UserContext, query: TransactionQuery) -> TransactionPage:
         limit = max(1, min(query.limit, MAX_PAGE_SIZE))
+        to_account = aliased(Account)
         stmt = (
-            select(Transaction, Category, Account)
+            select(Transaction, Category, Account, to_account)
             .outerjoin(Category, Category.id == Transaction.category_id)
             .outerjoin(Account, Account.id == Transaction.account_id)
+            .outerjoin(to_account, to_account.id == Transaction.to_account_id)
             .where(Transaction.user_id == ctx.user_id, Transaction.deleted_at.is_(None))
         )
         if query.type:
@@ -496,7 +561,12 @@ class TransactionService:
         if query.account_id:
             # Another user's account is a 404 here too, not an empty list.
             await self._accounts.get(ctx, query.account_id, field="accountId")
-            stmt = stmt.where(Transaction.account_id == query.account_id)
+            stmt = stmt.where(
+                or_(
+                    Transaction.account_id == query.account_id,
+                    Transaction.to_account_id == query.account_id,
+                )
+            )
         if query.date_from:
             stmt = stmt.where(Transaction.occurred_on >= query.date_from)
         if query.date_to:
@@ -538,7 +608,10 @@ class TransactionService:
         result = (await self._session.execute(stmt.limit(limit + 1))).all()
         has_more = len(result) > limit
         rows = list(result[:limit])
-        items = [to_view(row, category, account, ctx.locale) for row, category, account in rows]
+        items = [
+            to_view(row, category, account, target, ctx.locale)
+            for row, category, account, target in rows
+        ]
         next_cursor = None
         if has_more and query.sort == "recent" and rows:
             last = rows[-1][0]
@@ -565,12 +638,17 @@ class TransactionService:
     async def _views(self, ids: list[uuid.UUID], locale: str) -> dict[uuid.UUID, TransactionView]:
         if not ids:
             return {}
+        to_account = aliased(Account)
         rows = (
             await self._session.execute(
-                select(Transaction, Category, Account)
+                select(Transaction, Category, Account, to_account)
                 .outerjoin(Category, Category.id == Transaction.category_id)
                 .outerjoin(Account, Account.id == Transaction.account_id)
+                .outerjoin(to_account, to_account.id == Transaction.to_account_id)
                 .where(Transaction.id.in_(ids))
             )
         ).all()
-        return {row.id: to_view(row, category, account, locale) for row, category, account in rows}
+        return {
+            row.id: to_view(row, category, account, target, locale)
+            for row, category, account, target in rows
+        }

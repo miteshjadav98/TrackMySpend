@@ -1194,7 +1194,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "expense" | "income";
+            type: "expense" | "income" | "transfer";
             /** Amount */
             amount: number | string;
             /** Currency */
@@ -1205,6 +1205,8 @@ export interface components {
             categoryId?: string | null;
             /** Accountid */
             accountId?: string | null;
+            /** Toaccountid */
+            toAccountId?: string | null;
             /** Description */
             description?: string | null;
             /** Merchant */
@@ -1252,7 +1254,7 @@ export interface components {
             /** Version */
             version: number;
             /** Type */
-            type?: ("expense" | "income") | null;
+            type?: ("expense" | "income" | "transfer") | null;
             /** Amount */
             amount?: number | string | null;
             /** Currency */
@@ -1263,6 +1265,8 @@ export interface components {
             categoryId?: string | null;
             /** Accountid */
             accountId?: string | null;
+            /** Toaccountid */
+            toAccountId?: string | null;
             /** Description */
             description?: string | null;
             /** Merchant */
@@ -1283,7 +1287,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "expense" | "income";
+            type: "expense" | "income" | "transfer";
             /** Amount */
             amount: number | string;
             /** Amountminor */
@@ -1299,6 +1303,7 @@ export interface components {
             occurredOn: string;
             category: components["schemas"]["CategoryRef"] | null;
             account: components["schemas"]["AccountRef"] | null;
+            toAccount: components["schemas"]["AccountRef"] | null;
             /** Description */
             description: string | null;
             /** Merchant */
@@ -2026,7 +2031,7 @@ export interface operations {
     list_transactions_api_v1_transactions_get: {
         parameters: {
             query?: {
-                type?: ("expense" | "income") | null;
+                type?: ("expense" | "income" | "transfer") | null;
                 categoryId?: string | null;
                 accountId?: string | null;
                 from?: string | null;

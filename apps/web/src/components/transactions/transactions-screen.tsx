@@ -8,12 +8,19 @@ import { TransactionDialog } from "@/components/transactions/transaction-dialog"
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { NamedIcon } from "@/components/ui/icons";
-import { accountOptionLabel, formatDay, paymentLabel } from "@/lib/format";
+import { accountOptionLabel, formatDay, paymentLabel, transferRoute } from "@/lib/format";
 import { type TransactionFilters, useAccounts, useCategories, useTransactions } from "@/lib/queries";
 
 /** Where the money went from or came into: the account, then the payment method. */
 function paidWith(tx: TransactionView): string | null {
+  if (tx.type === "transfer") return null; // the route is already the row's title
   return [tx.account?.name, paymentLabel(tx.paymentMethod)].filter(Boolean).join(" · ") || null;
+}
+
+/** Income is green, expenses plain, and a transfer neutral: it only moves money around. */
+function amountTone(type: TransactionView["type"]): string {
+  if (type === "income") return "text-income";
+  return type === "transfer" ? "text-ink-soft" : "text-ink";
 }
 
 export function TransactionsScreen() {
@@ -93,11 +100,17 @@ export function TransactionsScreen() {
             <option value="">All types</option>
             <option value="expense">Expenses</option>
             <option value="income">Income</option>
+            <option value="transfer">Transfers</option>
           </Select>
           <label className="sr-only" htmlFor="tx-category">
             Category
           </label>
-          <Select id="tx-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+          <Select
+            id="tx-category"
+            value={categoryId}
+            disabled={type === "transfer"}
+            onChange={(event) => setCategoryId(event.target.value)}
+          >
             <option value="">All categories</option>
             {categoryOptions.map((category) => (
               <option key={category.id} value={category.id}>
@@ -158,7 +171,10 @@ export function TransactionsScreen() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {rows.map((tx) => (
+                {rows.map((tx) => {
+                  const isTransfer = tx.type === "transfer";
+                  const categoryName = isTransfer ? "Transfer" : (tx.category?.name ?? "Uncategorised");
+                  return (
                   <tr
                     key={tx.id}
                     className="cursor-pointer transition-colors hover:bg-lavender-wash/40"
@@ -174,30 +190,34 @@ export function TransactionsScreen() {
                           setDialog({ open: true, transaction: tx });
                         }}
                       >
-                        {tx.description ?? tx.category?.name ?? "Transaction"}
+                        {isTransfer ? transferRoute(tx) : (tx.description ?? tx.category?.name ?? "Transaction")}
                       </button>
                       <span className="block text-xs text-ink-faint">
-                        {[tx.merchant, tx.source === "chat" ? "from chat" : null].filter(Boolean).join(" · ") || " "}
+                        {[isTransfer ? tx.description : null, tx.merchant, tx.source === "chat" ? "from chat" : null].filter(Boolean).join(" · ") || " "}
                       </span>
                       <span className="block text-xs text-ink-faint md:hidden">
-                        {[formatDay(tx.occurredOn), tx.category?.name ?? "Uncategorised", tx.account?.name]
+                        {[formatDay(tx.occurredOn), categoryName, isTransfer ? null : tx.account?.name]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 md:table-cell">
                       <span className="inline-flex items-center gap-1.5 text-ink-soft">
-                        <NamedIcon name={tx.category?.icon} className="size-3.5 text-lavender-deep" />
-                        {tx.category?.name ?? "Uncategorised"}
+                        <NamedIcon
+                          name={isTransfer ? "arrow-left-right" : tx.category?.icon}
+                          className="size-3.5 text-lavender-deep"
+                        />
+                        {categoryName}
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 text-ink-soft md:table-cell">{paidWith(tx) ?? "—"}</td>
-                    <td className={`figure px-5 py-3 text-right text-base font-semibold whitespace-nowrap ${tx.type === "income" ? "text-income" : "text-ink"}`}>
+                    <td className={`figure px-5 py-3 text-right text-base font-semibold whitespace-nowrap ${amountTone(tx.type)}`}>
                       {tx.type === "income" ? "+" : ""}
                       {tx.amountFormatted}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}

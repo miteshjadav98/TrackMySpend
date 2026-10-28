@@ -77,6 +77,11 @@ export function paymentLabel(value: string | null | undefined): string | null {
   return PAYMENT_METHODS.find((method) => method.value === value)?.label ?? value;
 }
 
+/** A transfer's route as the lists show it: "HDFC → Paytm Wallet". */
+export function transferRoute(tx: { account?: { name: string } | null; toAccount?: { name: string } | null }): string {
+  return `${tx.account?.name ?? "?"} → ${tx.toAccount?.name ?? "?"}`;
+}
+
 /** An account as a picker option: archived ones say so, since they can't be picked anew. */
 export function accountOptionLabel(account: { name: string; isArchived: boolean }): string {
   return account.isArchived ? `${account.name} (archived)` : account.name;
