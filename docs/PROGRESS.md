@@ -83,7 +83,10 @@ Running: 06 (tag transactions with an account) and 07 (forgot password).
 
 1. Finish the Phase 2 tickets (frontier first; see the ticket statuses).
 2. Code review of the integration branch, fix findings, Phase 2 report.
-3. Push to a GitHub remote so CI runs (needs a repo URL from the user).
+3. Merge Phase 2 into `main` after the review. The code is on GitHub
+   (`miteshjadav98/TrackMySpend`): `main` holds Phase 1, `phase-2/integration` holds Phase 2.
+4. Phase 3: split expenses with friends (Splitwise-style). Start from
+   `.scratch/phase-3/brief.md`: grill the open questions, then write the spec and tickets.
 
 ## Resume
 

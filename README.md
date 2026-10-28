@@ -57,10 +57,11 @@ Status: Phase 1 is complete; Phase 2 is in progress (see [Roadmap](#roadmap)). S
 | --- | --- | --- |
 | 1 | Chat entry with clarifications, transaction history, exact summaries, auth and isolation, Gemini + offline parser, tests, containers, CI | Done |
 | 2 | Merchant rules, accounts, transfers, account security, dark mode | In progress |
-| 3 | Imports: CSV and Excel first, then receipts and PDF bank statements | Planned |
-| 4 | Charts and insights; a policy for totals across currencies | Planned |
-| 5 | MCP server over the same domain services (OAuth 2.1, confirmation before writes) | Planned |
-| 6 | Voice and Indian languages (Gujarati, Hinglish, lakh/crore), debt and credit-card bill tracking | Planned |
+| 3 | Split expenses with friends, Splitwise-style: "me and Jaymin spent 1000 on pizza, split it"; who owes whom, settling up, and the friend sees it in their own chat or home page | Planned (next) |
+| 4 | Imports: CSV and Excel first, then receipts and PDF bank statements | Planned |
+| 5 | Charts and insights; a policy for totals across currencies | Planned |
+| 6 | MCP server over the same domain services (OAuth 2.1, confirmation before writes) | Planned |
+| 7 | Voice and Indian languages (Gujarati, Hinglish, lakh/crore), debt and credit-card bill tracking | Planned |
 
 Phase 2 in detail:
 
@@ -74,6 +75,8 @@ Phase 2 in detail:
   data export and account deletion.
 
 The Phase 2 plan, its spec and tickets live in [`.scratch/phase-2/`](.scratch/phase-2/).
+The Phase 3 brief (what was asked for and the questions to settle) is
+[`.scratch/phase-3/brief.md`](.scratch/phase-3/brief.md).
 
 ---
 
