@@ -16,5 +16,5 @@ finance-api = "finance_api.serve:main"
 finance-core = { workspace = true }
 
 [build-system]
-requires = ["uv_build>=0.9,<0.13"]
+requires = ["uv_build>=0.13.5,<0.14"]
 build-backend = "uv_build"
