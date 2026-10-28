@@ -57,7 +57,8 @@ class AuthService:
         self._settings = settings
         self._clock = clock
 
-    def _check_password_policy(self, password: str, *, field: str = "password") -> None:
+    def check_password_policy(self, password: str, *, field: str = "password") -> None:
+        """The rules every new password follows, at registration, change and reset."""
         if len(password) < self._settings.password_min_length:
             raise ValidationFailedError(
                 f"Password must be at least {self._settings.password_min_length} characters.",
@@ -80,7 +81,7 @@ class AuthService:
 
     async def register(self, data: RegisterRequest, *, client: ClientInfo) -> AuthResult:
         password = data.password.get_secret_value()
-        self._check_password_policy(password)
+        self.check_password_policy(password)
         email = normalize_email(str(data.email))
 
         existing = await self._session.scalar(select(User.id).where(User.email == email))
@@ -286,7 +287,7 @@ class AuthService:
                 "Your current password is incorrect.", details={"field": "currentPassword"}
             )
         # 2. The new password follows the same rules as at registration, and must differ.
-        self._check_password_policy(new, field="newPassword")
+        self.check_password_policy(new, field="newPassword")
         if new == current:
             raise ValidationFailedError(
                 "Choose a new password that is different from your current one.",

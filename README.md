@@ -10,9 +10,70 @@ model's memory.
 - **Core:** domain services, Postgres, Redis, LangGraph workflow, Gemini on Vertex AI
   (`backend`, the `finance-core` library shared by the API and the future MCP server)
 
-Status: Phase 1 of the PRD is complete. See [docs/phase-1-report.md](docs/phase-1-report.md)
-for what was built and what comes next, and [docs/architecture.md](docs/architecture.md) for
-how it fits together.
+Status: Phase 1 is complete; Phase 2 is in progress (see [Roadmap](#roadmap)). See
+[docs/architecture.md](docs/architecture.md) for how it fits together and
+[docs/phase-1-report.md](docs/phase-1-report.md) for the Phase 1 report.
+
+## What you can do
+
+### Record and ask in chat
+
+- Log expenses and income in plain words, several in one message: "350 on dinner yesterday
+  via UPI and 120 for coffee".
+- When something is missing or unclear, the assistant asks one short question with options
+  (category, amount, date), and remembers the question across reloads.
+- Ask "how much did I spend this month?" or "show my largest expenses last month". Totals are
+  exact SQL sums in your timezone, never the model's arithmetic.
+- **Merchant rules:** MoneyMoney learns which category you use for each merchant and files the
+  next one the same way. A category you pick or name always wins: "If you pick or name a
+  category, I use it; otherwise I use what you used last time for that merchant; otherwise I
+  guess, or ask."
+
+### Manage your records
+
+- Transactions page: search, filter, edit (safe against two tabs editing at once), delete
+  and restore. A running monthly tally sits above the chat.
+- **Accounts:** add your bank accounts, credit cards, wallets and cash; rename, re-kind or
+  archive them.
+- **Merchant rules** in Settings: see what was learned, change a rule's category, or forget it.
+
+### Your login
+
+- **Security** in Settings: see every signed-in device, sign one out or all the others, and
+  change your password.
+- **Appearance:** light, dark, or follow your device.
+
+### Built to be trusted with money
+
+- Money is stored as exact integer minor units; amounts with more precision than a currency
+  allows are rejected, never rounded.
+- Retries never create duplicates, every change is audited, and one user can never see
+  another's data.
+- If Gemini is slow or down, the offline parser answers instead of failing the turn.
+
+## Roadmap
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| 1 | Chat entry with clarifications, transaction history, exact summaries, auth and isolation, Gemini + offline parser, tests, containers, CI | Done |
+| 2 | Merchant rules, accounts, transfers, account security, dark mode | In progress |
+| 3 | Imports: CSV and Excel first, then receipts and PDF bank statements | Planned |
+| 4 | Charts and insights; a policy for totals across currencies | Planned |
+| 5 | MCP server over the same domain services (OAuth 2.1, confirmation before writes) | Planned |
+| 6 | Voice and Indian languages (Gujarati, Hinglish, lakh/crore), debt and credit-card bill tracking | Planned |
+
+Phase 2 in detail:
+
+- Done: merchant rules (learn, apply, view/change/forget in Settings), accounts in Settings,
+  security settings, dark mode.
+- Built, being merged: tagging transactions with an account; "Forgot password?" with an
+  emailed reset link (printed in the API log until an email provider is chosen).
+- Next: transfers between your accounts, from the transactions page and in chat ("moved 5000
+  from HDFC to Paytm", "paid the credit card bill from HDFC"); tagging "paid from HDFC" in chat.
+- Deliberately later: account balances, transfers between currencies, two-factor sign-in,
+  data export and account deletion.
+
+The Phase 2 plan, its spec and tickets live in [`.scratch/phase-2/`](.scratch/phase-2/).
 
 ---
 
@@ -66,7 +127,7 @@ rules engine instead of failing, and the message metadata records `degraded: tru
 
 | Path | What lives there |
 | --- | --- |
-| `backend/src/finance_core/` | Domain services (auth, users, categories, transactions, reports, conversations, audit), database, Redis helpers, LLM layer, LangGraph workflow, agent runtime |
+| `backend/src/finance_core/` | Domain services (auth, users, accounts, categories, merchants, transactions, reports, conversations, audit), database, Redis helpers, LLM layer, LangGraph workflow, agent runtime |
 | `backend/migrations/` | Alembic migrations (the only place schema changes happen) |
 | `apps/api/src/finance_api/` | FastAPI app: routes, dependencies, security, error envelope, middleware |
 | `apps/web/` | Next.js app: chat, transactions, settings |
@@ -74,6 +135,8 @@ rules engine instead of failing, and the message metadata records `degraded: tru
 | `tests/` | `unit/`, `integration/` (real Postgres + Redis), `evals/` (LLM understanding cases) |
 | `infrastructure/local/` | Docker Compose init scripts |
 | `docs/` | Architecture, progress log, phase reports |
+| `.scratch/` | Feature specs and tickets (the local issue tracker) |
+| `CLAUDE.md`, `GLOSSARY.md` | Coding standards for contributors and agents; the domain vocabulary |
 
 ## Commands
 
@@ -104,6 +167,7 @@ ones you are most likely to touch:
 | `DATABASE_URL` | local compose Postgres | `postgresql://…`; the driver prefix is added for you |
 | `REDIS_URL` | local compose Redis | Cache, rate limits and locks only; the app keeps working without it |
 | `ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated. Used for CORS and the cookie-write origin check |
+| `WEB_BASE_URL` | `http://localhost:3000` | Where the web app is served; password reset links point here |
 | `COOKIE_SECURE` | `true` | Set `false` only for plain-http local dev |
 | `LLM_PROVIDER` | `rules` | `rules` (offline) or `gemini` |
 | `GCP_PROJECT`, `VERTEX_LOCATION` | –, `global` | Vertex AI project and endpoint |
@@ -148,12 +212,16 @@ docker compose up -d
 npm run test:api
 ```
 
-- **Unit:** money, dates and periods, reconciliation, workflow logic, error mapping. These
-  need no services.
+About 210 tests run today.
+
+- **Unit:** money, dates and periods, reconciliation, workflow logic, category precedence,
+  merchant keys, device labels, error mapping. These need no services.
 - **Integration:** run against a separate `moneymoney_test` database and Redis db 1. They
-  cover auth, user isolation, idempotency, optimistic locking, cache invalidation, a Redis
-  outage, clarify/resume, a restart mid-question, double-texting, a Gemini outage, crash
-  recovery and SSE. Locally they skip if the services are down; in CI they fail.
+  cover auth, sessions and password changes, user isolation, idempotency, optimistic locking,
+  cache invalidation, merchant rules, accounts, a Redis outage, clarify/resume, a restart
+  mid-question, double-texting, a Gemini outage, crash recovery and SSE. Locally they skip if
+  the services are down; in CI they fail. Point `TEST_DATABASE_URL` / `TEST_REDIS_URL`
+  elsewhere to run two suites side by side.
 - **LLM eval (opt-in, calls Gemini):**
   `RUN_LIVE_LLM=1 uv run pytest tests/unit/test_understanding_eval.py -s`. Use repeated
   runs when comparing models, because a single run is noisy.
