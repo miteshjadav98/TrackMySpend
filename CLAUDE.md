@@ -42,6 +42,9 @@ The owner walks other people through this code, so write it to be explained:
 - **Web**: `apps/web` runs a Next.js release newer than your training data; read
   `apps/web/AGENTS.md` before writing web code. Event streams need `Cache-Control:
   no-transform`; verify streaming against the built app, since `next dev` hides proxy buffering.
+  Pages stay alive between client-side navigations (React `<Activity>`): state and refs survive
+  and effects re-run when the page shows again, so a one-shot ref guard or reset-on-unmount
+  logic breaks the second visit.
 - **Commits on Windows**: write the message to a file and use `git commit -F <file>`.
 
 ## Agent skills
