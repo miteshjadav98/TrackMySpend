@@ -23,10 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.exc import StaleDataError
 
 from finance_core.accounts.models import Account
+from finance_core.accounts.schemas import AccountRef
 from finance_core.accounts.service import AccountService
 from finance_core.audit.service import Actor, record_audit
 from finance_core.cache.primitives import UserDataGeneration
 from finance_core.categories.models import Category
+from finance_core.categories.schemas import CategoryRef
 from finance_core.categories.service import CategoryService
 from finance_core.clock import Clock
 from finance_core.dates import EARLIEST_ALLOWED_DATE
@@ -43,8 +45,6 @@ from finance_core.money import (
 )
 from finance_core.transactions.models import Transaction
 from finance_core.transactions.schemas import (
-    AccountRef,
-    CategoryRef,
     NewTransaction,
     TransactionCreate,
     TransactionPage,

@@ -25,6 +25,14 @@ class AccountView(ApiModel):
     updated_at: datetime
 
 
+class AccountRef(ApiModel):
+    """A compact reference to an account, as transactions show it."""
+
+    id: uuid.UUID
+    name: str
+    kind: AccountKindField
+
+
 class AccountCreate(ApiInput):
     """A new account. Without a currency it takes the user's base currency."""
 
