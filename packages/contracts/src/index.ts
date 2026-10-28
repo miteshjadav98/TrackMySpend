@@ -17,6 +17,9 @@ export type ProfileView = S["ProfileView"];
 export type ProfileUpdate = S["ProfileUpdate"];
 export type RegisterRequest = S["RegisterRequest"];
 export type LoginRequest = S["LoginRequest"];
+export type SessionView = S["SessionView"];
+export type RevokedSessionsView = S["RevokedSessionsView"];
+export type PasswordChange = S["PasswordChange"];
 
 export type CategoryView = S["CategoryView"];
 export type MoneyAmount = S["MoneyAmount"];
