@@ -52,6 +52,15 @@ class Transaction(Base):
         CheckConstraint("currency ~ '^[A-Z]{3}$'", name="currency"),
         # Idempotency: one row per (user, key). NULL keys are allowed and never collide.
         Index("uq_transactions_user_idempotency", "user_id", "idempotency_key", unique=True),
+        # Only a transfer has a destination; a transfer has both ends, different, and no category.
+        CheckConstraint(
+            "type = 'transfer' OR to_account_id IS NULL", name="to_account_only_on_transfer"
+        ),
+        CheckConstraint(
+            "type <> 'transfer' OR (account_id IS NOT NULL AND to_account_id IS NOT NULL "
+            "AND account_id <> to_account_id AND category_id IS NULL)",
+            name="transfer_shape",
+        ),
         # Listing, date-range aggregation and keyset pagination for live rows.
         Index(
             "ix_transactions_user_live_date",
@@ -73,6 +82,13 @@ class Transaction(Base):
             "account_id",
             postgresql_where=text("account_id IS NOT NULL"),
         ),
+        # The account filter also matches the destination end of a transfer.
+        Index(
+            "ix_transactions_user_to_account",
+            "user_id",
+            "to_account_id",
+            postgresql_where=text("to_account_id IS NOT NULL"),
+        ),
         {"schema": SCHEMA_LEDGER},
     )
 
@@ -90,6 +106,10 @@ class Transaction(Base):
     # The account the money was paid from (or, for income, into). NO ACTION, like every
     # reference to an account: accounts are archived, never hard-deleted.
     account_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(f"{SCHEMA_LEDGER}.accounts.id"))
+    # Where a transfer's money went; NULL for expense and income.
+    to_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.accounts.id")
+    )
     description: Mapped[str | None] = mapped_column(String(500))
     merchant: Mapped[str | None] = mapped_column(String(200))
     payment_method: Mapped[str | None] = mapped_column(String(32))

@@ -1,5 +1,6 @@
 import {
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowUpRight,
   Briefcase,
   Calendar,
@@ -60,6 +61,7 @@ const ICONS: Record<string, LucideIcon> = {
   tag: Tag,
   plus: Plus,
   "arrow-down-left": ArrowDownLeft,
+  "arrow-left-right": ArrowLeftRight,
   "arrow-up-right": ArrowUpRight,
   "pie-chart": ChartPie,
   list: List,
