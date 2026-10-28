@@ -177,7 +177,7 @@ password, or get back in when I forget it.
 
 ## Out of Scope
 
-- Account balances and opening balances (deferred until most transactions carry an account: Phase 3 imports, Phase 6 debt).
+- Account balances and opening balances (deferred until most transactions carry an account: Phase 4 imports, Phase 7 debt).
 - Currency conversion, and transfers between accounts in different currencies.
 - A real email provider, email verification, and two-factor sign-in.
 - Data export, user deletion and transcript retention (data rights were not taken into this phase).
