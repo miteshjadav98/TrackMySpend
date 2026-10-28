@@ -23,6 +23,7 @@ import pytest
 
 from finance_core.clock import FixedClock
 from finance_core.config import Settings
+from finance_core.email_sender import EmailMessage
 from finance_core.llm.base import ReplyRequest, UnderstandRequest, UnderstandResult
 from finance_core.llm.rules import RulesLLMClient
 
@@ -70,6 +71,8 @@ def make_settings(**overrides: Any) -> Settings:
         "rate_limit_register_per_hour": 10_000,
         "rate_limit_chat_per_minute": 1000,
         "rate_limit_chat_per_day": 100_000,
+        "rate_limit_password_reset_per_email_per_hour": 1000,
+        "rate_limit_password_reset_per_ip_per_hour": 1000,
         "database_pool_size": 5,
         "database_max_overflow": 5,
     }
@@ -113,6 +116,24 @@ def _reset_llm(request: pytest.FixtureRequest) -> Iterator[None]:
     yield
     if "llm" in request.fixturenames:
         request.getfixturevalue("llm").delegate = RulesLLMClient()
+
+
+class Outbox:
+    """Captures every email the app sends, in place of the console sender."""
+
+    def __init__(self) -> None:
+        self.sent: list[EmailMessage] = []
+
+    async def send(self, message: EmailMessage) -> None:
+        self.sent.append(message)
+
+    def to(self, address: str) -> list[EmailMessage]:
+        return [message for message in self.sent if message.to == address]
+
+
+@pytest.fixture(scope="session")
+def outbox() -> Outbox:
+    return Outbox()
 
 
 # ---------------------------------------------------------------------------------------
@@ -169,11 +190,15 @@ def prepared_database(settings: Settings) -> None:
 
 @pytest.fixture(scope="session")
 async def app(
-    prepared_database: None, settings: Settings, llm: SwitchableLLM, clock: FixedClock
+    prepared_database: None,
+    settings: Settings,
+    llm: SwitchableLLM,
+    clock: FixedClock,
+    outbox: Outbox,
 ) -> AsyncIterator[Any]:
     from finance_api.main import create_app
 
-    application = create_app(settings, llm=llm, clock=clock)
+    application = create_app(settings, llm=llm, clock=clock, email_sender=outbox)
     async with application.router.lifespan_context(application):
         yield application
 
