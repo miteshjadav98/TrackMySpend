@@ -1,5 +1,6 @@
 import { AccountsSection } from "@/components/settings/accounts-section";
 import { ProfileSection } from "@/components/settings/profile-section";
+import { SecuritySection } from "@/components/settings/security-section";
 
 /**
  * The settings page: a stack of independent sections, in the order they appear.
@@ -16,6 +17,7 @@ export function SettingsScreen() {
         <div className="mt-8 flex flex-col gap-10">
           <ProfileSection />
           <AccountsSection />
+          <SecuritySection />
         </div>
       </div>
     </div>

@@ -102,6 +102,126 @@
         }
       }
     },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Sessions",
+        "description": "The caller's signed-in sessions, this one first.",
+        "operationId": "list_sessions_api_v1_auth_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionView"
+                  },
+                  "type": "array",
+                  "title": "Response List Sessions Api V1 Auth Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke Session",
+        "description": "Sign out one of the caller's devices. Another user's session id is a 404.",
+        "operationId": "revoke_session_api_v1_auth_sessions__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/revoke-others": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke Other Sessions",
+        "description": "Sign out every device except the one making this request.",
+        "operationId": "revoke_other_sessions_api_v1_auth_sessions_revoke_others_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokedSessionsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "description": "Change the caller's password; every other device is signed out, this one stays in.\n\nIt checks the current password, so it is rate-limited like login: a stolen session must\nnot become a way to guess the password.",
+        "operationId": "change_password_api_v1_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me": {
       "get": {
         "tags": [
@@ -2627,6 +2747,32 @@
         ],
         "title": "Option"
       },
+      "PasswordChange": {
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 128,
+            "format": "password",
+            "title": "Currentpassword",
+            "writeOnly": true
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 128,
+            "format": "password",
+            "title": "Newpassword",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "title": "PasswordChange",
+        "description": "A signed-in user replacing their password; the current one proves it is them."
+      },
       "PeriodView": {
         "properties": {
           "start": {
@@ -2773,6 +2919,20 @@
         ],
         "title": "RegisterRequest"
       },
+      "RevokedSessionsView": {
+        "properties": {
+          "revoked": {
+            "type": "integer",
+            "title": "Revoked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revoked"
+        ],
+        "title": "RevokedSessionsView",
+        "description": "How many sessions a \"sign out all other devices\" request signed out."
+      },
       "SendMessageRequest": {
         "properties": {
           "clientMessageId": {
@@ -2806,6 +2966,58 @@
           "input"
         ],
         "title": "SendMessageRequest"
+      },
+      "SessionView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "device": {
+            "type": "string",
+            "title": "Device",
+            "description": "Best guess from the User-Agent, e.g. \"Chrome on Windows\"."
+          },
+          "ipAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipaddress"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Lastseenat",
+            "description": "Refreshed at most once an hour."
+          },
+          "isCurrent": {
+            "type": "boolean",
+            "title": "Iscurrent",
+            "description": "True for the session making this request."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "device",
+          "ipAddress",
+          "createdAt",
+          "lastSeenAt",
+          "isCurrent"
+        ],
+        "title": "SessionView",
+        "description": "One signed-in browser or device, as the user sees it in Settings → Security."
       },
       "SpendingSummary": {
         "properties": {
