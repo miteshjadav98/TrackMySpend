@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from finance_core.accounts.schemas import AccountRef
 from finance_core.categories.schemas import CategoryRef
 from finance_core.schemas import ApiInput, ApiModel
 
@@ -35,6 +36,8 @@ class TransactionView(ApiModel):
     amount_formatted: str
     occurred_on: date
     category: CategoryRef | None
+    # Defaults to None so saved chat cards stored before accounts existed still load.
+    account: AccountRef | None = None
     description: str | None
     merchant: str | None
     payment_method: PaymentMethodField | None
@@ -51,6 +54,7 @@ class TransactionCreate(ApiInput):
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     occurred_on: date | None = None
     category_id: uuid.UUID | None = None
+    account_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=500)
     merchant: str | None = Field(default=None, max_length=200)
     payment_method: PaymentMethodField | None = None
@@ -70,6 +74,7 @@ class TransactionUpdate(ApiInput):
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     occurred_on: date | None = None
     category_id: uuid.UUID | None = None
+    account_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=500)
     merchant: str | None = Field(default=None, max_length=200)
     payment_method: PaymentMethodField | None = None
@@ -85,6 +90,7 @@ class TransactionPage(ApiModel):
 class TransactionQuery:
     type: TransactionTypeField | None = None
     category_id: uuid.UUID | None = None
+    account_id: uuid.UUID | None = None
     date_from: date | None = None
     date_to: date | None = None
     text: str | None = None
@@ -109,3 +115,4 @@ class NewTransaction:
     merchant: str | None
     payment_method: str | None
     notes: str | None = None
+    account_id: uuid.UUID | None = None

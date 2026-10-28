@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  AccountRef,
+  AccountView,
   CategoryView,
   TransactionCreate,
   TransactionType,
@@ -14,8 +16,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError, newKey, unwrap } from "@/lib/api";
-import { PAYMENT_METHODS, todayISO } from "@/lib/format";
-import { invalidateLedger, useCategories, useMe, useQueryClient } from "@/lib/queries";
+import { accountOptionLabel, PAYMENT_METHODS, todayISO } from "@/lib/format";
+import { invalidateLedger, useAccounts, useCategories, useMe, useQueryClient } from "@/lib/queries";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD", "JPY"];
 
@@ -24,7 +26,23 @@ const FIELD_FOR_ERROR: Record<string, string> = {
   occurredOn: "occurredOn",
   currency: "currency",
   categoryId: "categoryId",
+  accountId: "accountId",
 };
+
+/**
+ * The accounts the picker offers: every active account, plus the transaction's current one
+ * if it has since been archived (an edit may keep it, but nobody can pick it anew).
+ */
+function accountChoices(accounts: AccountView[], current: AccountRef | null): { id: string; label: string }[] {
+  const choices = accounts
+    .filter((account) => !account.isArchived || account.id === current?.id)
+    .map((account) => ({ id: account.id, label: accountOptionLabel(account) }));
+  // Until the list has loaded, still show the account the transaction already has.
+  if (current && !choices.some((choice) => choice.id === current.id)) {
+    choices.unshift({ id: current.id, label: current.name });
+  }
+  return choices;
+}
 
 /** Add or edit a transaction by hand. The same server validation as chat applies. */
 export function TransactionDialog({
@@ -57,11 +75,13 @@ function TransactionForm({
 }) {
   const me = useMe();
   const categories = useCategories();
+  const accounts = useAccounts(true);
   const queryClient = useQueryClient();
   const toast = useToast();
   const [idempotencyKey] = useState(newKey);
   const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
   const [categoryId, setCategoryId] = useState<string>(transaction?.category?.id ?? "");
+  const [accountId, setAccountId] = useState<string>(transaction?.account?.id ?? "");
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -69,6 +89,11 @@ function TransactionForm({
   const options = useMemo(
     () => (categories.data ?? []).filter((c: CategoryView) => c.kind === type),
     [categories.data, type],
+  );
+  const currentAccount = transaction?.account ?? null;
+  const accountOptions = useMemo(
+    () => accountChoices(accounts.data ?? [], currentAccount),
+    [accounts.data, currentAccount],
   );
   const baseCurrency = me.data?.profile.baseCurrency ?? "INR";
 
@@ -85,6 +110,7 @@ function TransactionForm({
       currency: String(form.get("currency") ?? baseCurrency),
       occurredOn: String(form.get("occurredOn") ?? todayISO()),
       categoryId: categoryId || null,
+      accountId: accountId || null,
       description: text("description"),
       merchant: text("merchant"),
       paymentMethod: (text("paymentMethod") as TransactionCreate["paymentMethod"]) ?? null,
@@ -251,16 +277,35 @@ function TransactionForm({
         )}
       </Field>
 
+      <Field label="Paid to / from">
+        {({ id }) => (
+          <Input
+            id={id}
+            name="merchant"
+            maxLength={200}
+            defaultValue={transaction?.merchant ?? ""}
+            placeholder="Swiggy"
+          />
+        )}
+      </Field>
+
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Paid to / from">
-          {({ id }) => (
-            <Input
+        <Field label={type === "income" ? "Into account" : "From account"} error={fieldError("accountId")}>
+          {({ id, invalid, describedBy }) => (
+            <Select
               id={id}
-              name="merchant"
-              maxLength={200}
-              defaultValue={transaction?.merchant ?? ""}
-              placeholder="Swiggy"
-            />
+              value={accountId}
+              onChange={(event) => setAccountId(event.target.value)}
+              aria-invalid={invalid}
+              aria-describedby={describedBy}
+            >
+              <option value="">No account</option>
+              {accountOptions.map((choice) => (
+                <option key={choice.id} value={choice.id}>
+                  {choice.label}
+                </option>
+              ))}
+            </Select>
           )}
         </Field>
         <Field label="Payment method">

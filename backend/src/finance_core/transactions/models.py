@@ -66,6 +66,13 @@ class Transaction(Base):
             "source_ref",
             postgresql_where=text("source_ref IS NOT NULL"),
         ),
+        # The account filter on the transaction list.
+        Index(
+            "ix_transactions_user_account",
+            "user_id",
+            "account_id",
+            postgresql_where=text("account_id IS NOT NULL"),
+        ),
         {"schema": SCHEMA_LEDGER},
     )
 
@@ -80,6 +87,9 @@ class Transaction(Base):
     category_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(f"{SCHEMA_LEDGER}.categories.id", ondelete="RESTRICT")
     )
+    # The account the money was paid from (or, for income, into). NO ACTION, like every
+    # reference to an account: accounts are archived, never hard-deleted.
+    account_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(f"{SCHEMA_LEDGER}.accounts.id"))
     description: Mapped[str | None] = mapped_column(String(500))
     merchant: Mapped[str | None] = mapped_column(String(200))
     payment_method: Mapped[str | None] = mapped_column(String(32))

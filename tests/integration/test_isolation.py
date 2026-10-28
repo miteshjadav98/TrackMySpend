@@ -83,3 +83,27 @@ async def test_accounts_are_private(make_client) -> None:  # type: ignore[no-unt
 
     [mine] = (await alice.get("/api/v1/accounts", params={"includeArchived": "true"})).json()
     assert (mine["id"], mine["name"], mine["isArchived"]) == (account["id"], "HDFC", False)
+
+
+async def test_another_users_account_cannot_tag_or_filter_my_transactions(make_client) -> None:  # type: ignore[no-untyped-def]
+    alice, bob = make_client(), make_client()
+    await register(alice)
+    await register(bob)
+    account = (await alice.post("/api/v1/accounts", json={"name": "HDFC", "kind": "bank"})).json()
+    tagged = await bob.post(
+        "/api/v1/transactions",
+        json={"type": "expense", "amount": "5", "accountId": account["id"]},
+    )
+    assert tagged.status_code == 404
+    assert tagged.json()["error"]["details"]["field"] == "accountId"
+
+    tx = (await bob.post("/api/v1/transactions", json={"type": "expense", "amount": "5"})).json()
+    retagged = await bob.patch(
+        f"/api/v1/transactions/{tx['id']}", json={"version": 1, "accountId": account["id"]}
+    )
+    assert retagged.status_code == 404
+    assert (await bob.get(f"/api/v1/transactions/{tx['id']}")).json()["account"] is None
+
+    filtered = await bob.get("/api/v1/transactions", params={"accountId": account["id"]})
+    assert filtered.status_code == 404
+    assert filtered.json()["error"]["details"]["field"] == "accountId"

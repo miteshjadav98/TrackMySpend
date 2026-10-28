@@ -8,13 +8,19 @@ import { TransactionDialog } from "@/components/transactions/transaction-dialog"
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { NamedIcon } from "@/components/ui/icons";
-import { formatDay, paymentLabel } from "@/lib/format";
-import { type TransactionFilters, useCategories, useTransactions } from "@/lib/queries";
+import { accountOptionLabel, formatDay, paymentLabel } from "@/lib/format";
+import { type TransactionFilters, useAccounts, useCategories, useTransactions } from "@/lib/queries";
+
+/** Where the money went from or came into: the account, then the payment method. */
+function paidWith(tx: TransactionView): string | null {
+  return [tx.account?.name, paymentLabel(tx.paymentMethod)].filter(Boolean).join(" · ") || null;
+}
 
 export function TransactionsScreen() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"" | TransactionType>("");
   const [categoryId, setCategoryId] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [dialog, setDialog] = useState<{ open: boolean; transaction: TransactionView | null }>({
@@ -23,20 +29,25 @@ export function TransactionsScreen() {
   });
   const deferredQuery = useDeferredValue(query.trim());
   const categories = useCategories();
+  // Archived accounts too: their past transactions are still worth finding.
+  const accounts = useAccounts(true);
 
   const filters: TransactionFilters = useMemo(
     () => ({
       q: deferredQuery || undefined,
       type: type || undefined,
       categoryId: categoryId || undefined,
+      accountId: accountId || undefined,
       from: from || undefined,
       to: to || undefined,
     }),
-    [deferredQuery, type, categoryId, from, to],
+    [deferredQuery, type, categoryId, accountId, from, to],
   );
   const transactions = useTransactions(filters);
   const rows = transactions.data?.pages.flatMap((page) => page.items) ?? [];
-  const filtered = Boolean(filters.q || filters.type || filters.categoryId || filters.from || filters.to);
+  const filtered = Boolean(
+    filters.q || filters.type || filters.categoryId || filters.accountId || filters.from || filters.to,
+  );
   const categoryOptions = (categories.data ?? []).filter((c) => !type || c.kind === type);
 
   return (
@@ -52,7 +63,7 @@ export function TransactionsScreen() {
           </Button>
         </header>
 
-        <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]">
+        <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,2fr)_repeat(5,minmax(0,1fr))]">
           <div className="relative col-span-2 md:col-span-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" aria-hidden />
             <label htmlFor="tx-search" className="sr-only">
@@ -91,6 +102,17 @@ export function TransactionsScreen() {
             {categoryOptions.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
+              </option>
+            ))}
+          </Select>
+          <label className="sr-only" htmlFor="tx-account">
+            Account
+          </label>
+          <Select id="tx-account" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+            <option value="">All accounts</option>
+            {(accounts.data ?? []).map((account) => (
+              <option key={account.id} value={account.id}>
+                {accountOptionLabel(account)}
               </option>
             ))}
           </Select>
@@ -158,7 +180,9 @@ export function TransactionsScreen() {
                         {[tx.merchant, tx.source === "chat" ? "from chat" : null].filter(Boolean).join(" · ") || " "}
                       </span>
                       <span className="block text-xs text-ink-faint md:hidden">
-                        {formatDay(tx.occurredOn)} · {tx.category?.name ?? "Uncategorised"}
+                        {[formatDay(tx.occurredOn), tx.category?.name ?? "Uncategorised", tx.account?.name]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 md:table-cell">
@@ -167,7 +191,7 @@ export function TransactionsScreen() {
                         {tx.category?.name ?? "Uncategorised"}
                       </span>
                     </td>
-                    <td className="hidden px-3 py-3 text-ink-soft md:table-cell">{paymentLabel(tx.paymentMethod) ?? "—"}</td>
+                    <td className="hidden px-3 py-3 text-ink-soft md:table-cell">{paidWith(tx) ?? "—"}</td>
                     <td className={`figure px-5 py-3 text-right text-base font-semibold whitespace-nowrap ${tx.type === "income" ? "text-income" : "text-ink"}`}>
                       {tx.type === "income" ? "+" : ""}
                       {tx.amountFormatted}
