@@ -1,5 +1,6 @@
 """Import every module's models so `Base.metadata` is complete (Alembic, tests)."""
 
+from finance_core.accounts.models import Account
 from finance_core.audit.models import AuditEvent
 from finance_core.auth.models import AuthSession, PasswordResetToken
 from finance_core.categories.models import Category
@@ -10,6 +11,7 @@ from finance_core.transactions.models import Transaction
 from finance_core.users.models import FinancialProfile, User
 
 __all__ = [
+    "Account",
     "AuditEvent",
     "AuthSession",
     "Base",

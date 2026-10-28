@@ -1,9 +1,11 @@
 "use client";
 
 import type {
+  AccountView,
   CategoryView,
   ConversationDetail,
   ConversationPage,
+  MerchantRulePage,
   MeView,
   SpendingSummary,
   TransactionPage,
@@ -24,7 +26,9 @@ export const keys = {
   conversation: (id: string) => ["conversation", id] as const,
   summary: (period: string) => ["summary", period] as const,
   categories: ["categories"] as const,
+  accounts: (includeArchived: boolean) => ["accounts", { includeArchived }] as const,
   transactions: (filters: TransactionFilters) => ["transactions", filters] as const,
+  merchantRules: (search: string) => ["merchant-rules", search] as const,
 };
 
 /** Anything that changes money: refresh every view that shows totals or rows. */
@@ -33,6 +37,8 @@ export function invalidateLedger(client: QueryClient): Promise<unknown> {
     client.invalidateQueries({ queryKey: ["summary"] }),
     client.invalidateQueries({ queryKey: ["transactions"] }),
     client.invalidateQueries({ queryKey: keys.categories }),
+    // Every save can teach or use a merchant rule.
+    client.invalidateQueries({ queryKey: ["merchant-rules"] }),
   ]);
 }
 
@@ -84,6 +90,20 @@ export function useCategories() {
   });
 }
 
+/** The user's accounts, active first: only active ones unless `includeArchived` is set. */
+export function useAccounts(includeArchived = false) {
+  return useQuery({
+    queryKey: keys.accounts(includeArchived),
+    queryFn: () =>
+      unwrap<AccountView[]>(api.GET("/api/v1/accounts", { params: { query: { includeArchived } } })),
+  });
+}
+
+/** After any account change: refresh every account list (with and without archived ones). */
+export function invalidateAccounts(client: QueryClient): Promise<unknown> {
+  return client.invalidateQueries({ queryKey: ["accounts"] });
+}
+
 export interface TransactionFilters {
   type?: TransactionType;
   categoryId?: string;
@@ -110,6 +130,21 @@ export function useTransactions(filters: TransactionFilters) {
               cursor: pageParam,
             },
           },
+        }),
+      ),
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}
+
+/** The merchant rules MoneyMoney has learned, most recently used first. */
+export function useMerchantRules(search: string) {
+  return useInfiniteQuery({
+    queryKey: keys.merchantRules(search),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) =>
+      unwrap<MerchantRulePage>(
+        api.GET("/api/v1/merchant-rules", {
+          params: { query: { q: search || undefined, limit: 50, cursor: pageParam } },
         }),
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,

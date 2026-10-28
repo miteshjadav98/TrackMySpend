@@ -8,18 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError, unwrap } from "@/lib/api";
+import { CURRENCIES } from "@/lib/format";
 import { invalidateLedger, keys, useMe, useQueryClient } from "@/lib/queries";
-
-const CURRENCIES = [
-  ["INR", "Indian rupee"],
-  ["USD", "US dollar"],
-  ["EUR", "Euro"],
-  ["GBP", "British pound"],
-  ["AED", "UAE dirham"],
-  ["SGD", "Singapore dollar"],
-  ["AUD", "Australian dollar"],
-  ["CAD", "Canadian dollar"],
-] as const;
 
 const LOCALES = [
   ["en-IN", "English (India): 1,23,456.00"],

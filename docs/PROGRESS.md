@@ -74,6 +74,11 @@ Plan: `.scratch/phase-2/spec.md` and 11 tickets in `.scratch/phase-2/issues/`. E
 implementers in worktrees (one test database each), merged one at a time into
 `phase-2/integration`, then one code review over the whole branch.
 
+Checkpoint 2026-10-28: tickets 01–05 merged (settings sections, merchant rules learn and
+apply, accounts, security settings, merchant rules in Settings), plus a fix for `/chat`
+hanging on a second visit (Next.js keeps pages alive in React `<Activity>`). 211 tests pass.
+Running: 06 (tag transactions with an account) and 07 (forgot password).
+
 ## Next
 
 1. Finish the Phase 2 tickets (frontier first; see the ticket statuses).

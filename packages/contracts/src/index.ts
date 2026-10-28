@@ -23,6 +23,11 @@ export type PasswordChange = S["PasswordChange"];
 export type PasswordResetRequest = S["PasswordResetRequest"];
 export type PasswordResetConfirm = S["PasswordResetConfirm"];
 
+export type AccountView = S["AccountView"];
+export type AccountCreate = S["AccountCreate"];
+export type AccountUpdate = S["AccountUpdate"];
+export type AccountKind = AccountView["kind"];
+
 export type CategoryView = S["CategoryView"];
 export type MoneyAmount = S["MoneyAmount"];
 export type TransactionView = S["TransactionView"];
@@ -31,6 +36,9 @@ export type TransactionCreate = S["TransactionCreate"];
 export type TransactionUpdate = S["TransactionUpdate"];
 export type TransactionType = TransactionView["type"];
 export type PaymentMethod = NonNullable<TransactionView["paymentMethod"]>;
+
+export type MerchantRuleView = S["MerchantRuleView"];
+export type MerchantRulePage = S["MerchantRulePage"];
 
 export type SpendingSummary = S["SpendingSummary"];
 export type CurrencySummary = S["CurrencySummary"];
