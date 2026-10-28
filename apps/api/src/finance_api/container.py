@@ -19,6 +19,7 @@ from finance_core.cache import DistributedLock, RateLimiter, RedisClient, UserDa
 from finance_core.clock import Clock, SystemClock
 from finance_core.config import Settings
 from finance_core.database import create_engine, create_session_factory
+from finance_core.email_sender import ConsoleEmailSender, EmailSender
 from finance_core.llm import LLMClient, build_llm_client
 from finance_core.workflows.state import AgentDeps
 
@@ -42,6 +43,7 @@ class AppContainer:
     lock: DistributedLock
     rate_limiter: RateLimiter
     llm: LLMClient
+    email_sender: EmailSender
     agent: FinanceAgent
     chat: ChatService
     background: set[asyncio.Task[Any]] = field(default_factory=set)
@@ -71,6 +73,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     redis = RedisClient.from_settings(settings)
     generation = UserDataGeneration(redis)
     llm: LLMClient = getattr(app.state, "llm_override", None) or build_llm_client(settings)
+    email_sender: EmailSender = getattr(app.state, "email_sender", None) or ConsoleEmailSender(
+        settings.environment
+    )
     try:
         async with open_checkpointer(settings) as checkpointer:
             deps = AgentDeps(
@@ -94,6 +99,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 lock=lock,
                 rate_limiter=rate_limiter,
                 llm=llm,
+                email_sender=email_sender,
                 agent=agent,
                 chat=ChatService(deps, agent, lock=lock, rate_limiter=rate_limiter),
             )

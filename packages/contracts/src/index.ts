@@ -20,6 +20,8 @@ export type LoginRequest = S["LoginRequest"];
 export type SessionView = S["SessionView"];
 export type RevokedSessionsView = S["RevokedSessionsView"];
 export type PasswordChange = S["PasswordChange"];
+export type PasswordResetRequest = S["PasswordResetRequest"];
+export type PasswordResetConfirm = S["PasswordResetConfirm"];
 
 export type AccountView = S["AccountView"];
 export type AccountCreate = S["AccountCreate"];

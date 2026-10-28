@@ -167,6 +167,7 @@ ones you are most likely to touch:
 | `DATABASE_URL` | local compose Postgres | `postgresql://…`; the driver prefix is added for you |
 | `REDIS_URL` | local compose Redis | Cache, rate limits and locks only; the app keeps working without it |
 | `ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated. Used for CORS and the cookie-write origin check |
+| `WEB_BASE_URL` | `http://localhost:3000` | Where the web app is served; password reset links point here |
 | `COOKIE_SECURE` | `true` | Set `false` only for plain-http local dev |
 | `LLM_PROVIDER` | `rules` | `rules` (offline) or `gemini` |
 | `GCP_PROJECT`, `VERTEX_LOCATION` | –, `global` | Vertex AI project and endpoint |

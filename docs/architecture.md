@@ -72,7 +72,7 @@ Five Postgres schemas, each owned by one module:
 
 | Schema | Tables | Notes |
 | --- | --- | --- |
-| `identity` | `users`, `financial_profiles`, `auth_sessions` | Profile holds base currency, timezone and locale. Sessions store a SHA-256 of the token, never the token itself |
+| `identity` | `users`, `financial_profiles`, `auth_sessions`, `password_reset_tokens` | Profile holds base currency, timezone and locale. Sessions and reset links store a SHA-256 of the token, never the token itself |
 | `ledger` | `categories`, `transactions` | 23 system categories are seeded with deterministic ids. Users can add their own |
 | `chat` | `conversations`, `messages` | The transcript, including the structured UI each assistant message rendered |
 | `audit` | `audit_events` | Written in the same database transaction as the change it records |
@@ -270,6 +270,18 @@ A circuit breaker stops the app from waiting on a dead Redis, and socket timeout
   - Logging out revokes the session server-side, so it stops working immediately.
 - **Passwords** use Argon2id, hashed in a worker thread behind a semaphore so that login
   bursts cannot starve the event loop.
+- **Password reset** (`auth/password_reset.py`) emails a link to
+  `<WEB_BASE_URL>/reset-password#token=…`; the token sits in the URL fragment, so it never
+  reaches a server log or a Referer header.
+  - The request always gets the same 202, and the account lookup and email happen after
+    the reply, so neither its body nor its timing shows whether an account exists. It is
+    rate-limited per email (hashed) and per IP.
+  - Only the token's SHA-256 is stored. A link works once, for 30 minutes, and a newer
+    link replaces it. One atomic UPDATE checks and claims it, so two uses cannot both win.
+  - Using it sets the password and signs out every session in one transaction.
+  - Email goes through `EmailSender` (`email_sender.py`). Until a provider is chosen the
+    console sender prints the email locally and, in production, sends nothing and never
+    logs the link.
 - **Origin check.** Writes authenticated by cookie must come from an allowed origin. This is
   the CSRF defence alongside SameSite.
 - **User isolation:** every query is scoped by the authenticated `user_id`. Integration
@@ -345,6 +357,7 @@ specification for it.
 Settings that must be right in production:
 
 - **`ALLOWED_ORIGINS`** must be the public origin, or every cookie write is rejected.
+- **`WEB_BASE_URL`** must be the public web origin, or reset links point elsewhere.
 - **The connection budget.** Each API instance uses at most
   `DATABASE_POOL_SIZE + DATABASE_MAX_OVERFLOW + CHECKPOINT_POOL_MAX_SIZE` connections
   (10 + 5 + 5 = 20 by default). Cloud Run `max-instances × 20` must stay below Cloud SQL's

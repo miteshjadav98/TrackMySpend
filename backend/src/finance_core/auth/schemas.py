@@ -52,6 +52,26 @@ class PasswordChange(ApiInput):
     new_password: SecretStr = Field(max_length=MAX_PASSWORD_LENGTH)
 
 
+class PasswordResetRequest(ApiInput):
+    """A signed-out user asking for a link to reset a forgotten password."""
+
+    email: EmailStr
+
+
+class PasswordResetRequested(ApiModel):
+    """The reply to every reset request. It is the same whether or not the email has an
+    account, so nobody can use it to find out who is registered."""
+
+    message: str
+
+
+class PasswordResetConfirm(ApiInput):
+    """A new password, set with the token from an emailed reset link."""
+
+    token: SecretStr = Field(max_length=128)
+    new_password: SecretStr = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
 class SessionView(ApiModel):
     """One signed-in browser or device, as the user sees it in Settings → Security."""
 
