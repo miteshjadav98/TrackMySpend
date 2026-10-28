@@ -208,7 +208,7 @@ function InvalidResetLink() {
       </p>
       <Link
         href="/forgot-password"
-        className="mt-8 inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-lavender-deep px-4 text-[15px] font-medium text-white shadow-sm hover:bg-lavender-ink"
+        className="mt-8 inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-lavender-fill px-4 text-[15px] font-medium text-white shadow-sm hover:bg-lavender-press"
       >
         Request a new link
       </Link>
