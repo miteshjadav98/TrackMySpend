@@ -18,6 +18,7 @@ from finance_core.database.base import (
 )
 
 ACCOUNT_KINDS = ("bank", "credit_card", "wallet", "cash", "other")
+ACTIVE_NAME_INDEX = "uq_accounts_user_active_name"
 
 
 class Account(Base):
@@ -32,7 +33,7 @@ class Account(Base):
         # Active names are unique per user, ignoring case. Archived accounts keep their names,
         # so a retired "HDFC" does not block a new one.
         Index(
-            "uq_accounts_user_active_name",
+            ACTIVE_NAME_INDEX,
             "user_id",
             text("lower(name)"),
             unique=True,

@@ -1,7 +1,7 @@
 """Accounts: where a user's money is held.
 
-Revision ID: 0002
-Revises: 0001
+Revision ID: 0003
+Revises: 0002
 Create Date: 2026-10-27
 """
 
@@ -10,8 +10,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0002"
-down_revision: str | None = "0001"
+revision: str = "0003"
+down_revision: str | None = "0002"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -26,10 +26,16 @@ def upgrade() -> None:
         sa.Column("currency", sa.String(length=3), nullable=False),
         sa.Column("is_archived", sa.Boolean(), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
         ),
         sa.CheckConstraint(
             "kind IN ('bank', 'credit_card', 'wallet', 'cash', 'other')",

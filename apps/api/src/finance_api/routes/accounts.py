@@ -1,3 +1,5 @@
+"""Accounts over HTTP: list, add and change. There is no delete: retired accounts are archived."""
+
 from __future__ import annotations
 
 import uuid

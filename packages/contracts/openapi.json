@@ -260,6 +260,145 @@
         }
       }
     },
+    "/api/v1/accounts": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "List Accounts",
+        "operationId": "list_accounts_api_v1_accounts_get",
+        "parameters": [
+          {
+            "name": "includeArchived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Includearchived"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountView"
+                  },
+                  "title": "Response List Accounts Api V1 Accounts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Create Account",
+        "operationId": "create_account_api_v1_accounts_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}": {
+      "patch": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Update Account",
+        "operationId": "update_account_api_v1_accounts__account_id__patch",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/transactions": {
       "get": {
         "tags": [
@@ -1296,6 +1435,152 @@
   },
   "components": {
     "schemas": {
+      "AccountCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "credit_card",
+              "wallet",
+              "cash",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "AccountCreate",
+        "description": "A new account. Without a currency it takes the user's base currency."
+      },
+      "AccountUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "bank",
+                  "credit_card",
+                  "wallet",
+                  "cash",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "isArchived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isarchived"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AccountUpdate",
+        "description": "Partial update: a field left out (or null) stays as it is.\n\nThere is no `currency`: an account's currency is fixed when it is created, so sending\none is rejected like any other unknown field."
+      },
+      "AccountView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "credit_card",
+              "wallet",
+              "cash",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "isArchived": {
+            "type": "boolean",
+            "title": "Isarchived"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "currency",
+          "isArchived",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "AccountView",
+        "description": "An account as clients see it. An archived account stays on past transactions."
+      },
       "CategoryCreate": {
         "properties": {
           "name": {

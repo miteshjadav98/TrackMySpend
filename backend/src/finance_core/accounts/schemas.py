@@ -14,6 +14,8 @@ AccountKindField = Literal["bank", "credit_card", "wallet", "cash", "other"]
 
 
 class AccountView(ApiModel):
+    """An account as clients see it. An archived account stays on past transactions."""
+
     id: uuid.UUID
     name: str
     kind: AccountKindField

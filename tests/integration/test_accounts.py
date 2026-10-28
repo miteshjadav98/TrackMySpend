@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -48,6 +49,18 @@ async def test_two_active_accounts_cannot_share_a_name_ignoring_case(
     assert duplicate.status_code == 409
     assert duplicate.json()["error"]["code"] == "account_exists"
     assert len((await client.get(ACCOUNTS)).json()) == 1
+
+
+async def test_a_double_submitted_new_account_is_saved_once(client: httpx.AsyncClient) -> None:
+    await register(client)
+    body = {"name": "Paytm", "kind": "wallet"}
+    first, second = await asyncio.gather(
+        client.post(ACCOUNTS, json=body), client.post(ACCOUNTS, json=body)
+    )
+    assert sorted([first.status_code, second.status_code]) == [201, 409]
+    loser = first if first.status_code == 409 else second
+    assert loser.json()["error"]["code"] == "account_exists"
+    assert names(await client.get(ACCOUNTS)) == ["Paytm"]
 
 
 async def test_an_account_needs_a_supported_currency_and_a_sensible_name(
@@ -185,4 +198,3 @@ async def test_every_account_change_is_audited(app: Any, client: httpx.AsyncClie
     ]
     assert events[0].data == {"name": "SBI", "kind": "bank", "currency": "INR"}
     assert events[1].data == {"changes": {"name": ["SBI", "SBI Salary"]}}
-

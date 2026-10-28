@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from finance_core.accounts.models import Account
+from finance_core.accounts.models import ACTIVE_NAME_INDEX, Account
 from finance_core.accounts.schemas import AccountCreate, AccountUpdate, AccountView
 from finance_core.audit.service import record_audit
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
@@ -42,6 +42,12 @@ def _name_taken() -> ConflictError:
     )
 
 
+def _violated_constraint(error: IntegrityError) -> str | None:
+    """The name of the constraint or unique index Postgres reported, if it named one."""
+    diagnostics = getattr(error.orig, "diag", None)
+    return getattr(diagnostics, "constraint_name", None)
+
+
 def _currency_for_new_account(requested: str | None, ctx: UserContext) -> str:
     currency = (requested or ctx.base_currency).upper()
     if currency not in SUPPORTED_CURRENCIES:
@@ -52,6 +58,8 @@ def _currency_for_new_account(requested: str | None, ctx: UserContext) -> str:
 
 
 class AccountService:
+    """Lists, adds, renames, re-kinds, archives and unarchives one user's accounts."""
+
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -182,6 +190,8 @@ class AccountService:
         # `_ensure_name_is_free` still cannot both save, and the loser gets the same 409.
         try:
             await self._session.commit()
-        except IntegrityError:
+        except IntegrityError as error:
             await self._session.rollback()
-            raise _name_taken() from None
+            if _violated_constraint(error) == ACTIVE_NAME_INDEX:
+                raise _name_taken() from None
+            raise
