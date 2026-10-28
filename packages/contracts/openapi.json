@@ -519,6 +519,194 @@
         }
       }
     },
+    "/api/v1/merchant-rules": {
+      "get": {
+        "tags": [
+          "merchant rules"
+        ],
+        "summary": "List Merchant Rules",
+        "operationId": "list_merchant_rules_api_v1_merchant_rules_get",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "expense",
+                    "income"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Part of a merchant name",
+              "title": "Q"
+            },
+            "description": "Part of a merchant name"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantRulePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/merchant-rules/{rule_id}": {
+      "patch": {
+        "tags": [
+          "merchant rules"
+        ],
+        "summary": "Change Merchant Rule",
+        "operationId": "change_merchant_rule_api_v1_merchant_rules__rule_id__patch",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantRuleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantRuleView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "merchant rules"
+        ],
+        "summary": "Forget Merchant Rule",
+        "operationId": "forget_merchant_rule_api_v1_merchant_rules__rule_id__delete",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/transactions": {
       "get": {
         "tags": [
@@ -1772,7 +1960,8 @@
           "name",
           "icon"
         ],
-        "title": "CategoryRef"
+        "title": "CategoryRef",
+        "description": "A compact reference to a category, as transactions and merchant rules show it."
       },
       "CategoryTotal": {
         "properties": {
@@ -2536,6 +2725,94 @@
           "profile"
         ],
         "title": "MeView"
+      },
+      "MerchantRulePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MerchantRuleView"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "MerchantRulePage"
+      },
+      "MerchantRuleUpdate": {
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Categoryid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "categoryId"
+        ],
+        "title": "MerchantRuleUpdate",
+        "description": "A change to a rule: the category its merchant is filed under from now on."
+      },
+      "MerchantRuleView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "merchant": {
+            "type": "string",
+            "title": "Merchant"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ],
+            "title": "Type"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "timesUsed": {
+            "type": "integer",
+            "title": "Timesused"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Lastusedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "merchant",
+          "type",
+          "category",
+          "timesUsed",
+          "lastUsedAt"
+        ],
+        "title": "MerchantRuleView",
+        "description": "One learned rule: the merchant, the category it files them under, and how often."
       },
       "MessagePage": {
         "properties": {

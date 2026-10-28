@@ -5,7 +5,16 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from finance_core.database.base import (
@@ -30,6 +39,13 @@ class MerchantRule(Base):
         CheckConstraint("type IN ('expense', 'income')", name="type"),
         CheckConstraint("times_used > 0", name="times_used"),
         UniqueConstraint("user_id", "type", "merchant_key"),
+        # Settings lists a user's rules most recently used first, a page at a time.
+        Index(
+            "ix_merchant_rules_user_last_used",
+            "user_id",
+            text("last_used_at DESC"),
+            text("id DESC"),
+        ),
         {"schema": SCHEMA_LEDGER},
     )
 
