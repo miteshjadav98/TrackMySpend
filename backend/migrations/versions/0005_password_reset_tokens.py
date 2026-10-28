@@ -1,7 +1,7 @@
 """Password reset tokens: one row per emailed reset link, holding only the token's SHA-256.
 
-Revision ID: 0003
-Revises: 0002
+Revision ID: 0005
+Revises: 0004
 Create Date: 2026-10-28
 """
 
@@ -10,8 +10,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0003"
-down_revision: str | None = "0002"
+revision: str = "0005"
+down_revision: str | None = "0004"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

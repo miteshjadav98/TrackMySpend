@@ -92,6 +92,7 @@ export interface paths {
          * @description Set a new password with the token from an emailed reset link.
          *
          *     Every session of the user is signed out, so this browser drops any cookie it still has.
+         *     No rate limit is needed here: a token is 256 random bits, so it cannot be guessed.
          */
         post: operations["reset_password_api_v1_auth_password_reset_confirm_post"];
         delete?: never;
