@@ -1,3 +1,4 @@
+import { MerchantRulesSection } from "@/components/settings/merchant-rules-section";
 import { ProfileSection } from "@/components/settings/profile-section";
 
 /**
@@ -14,6 +15,7 @@ export function SettingsScreen() {
         <h1 className="display text-[1.9rem] leading-tight font-semibold">Settings</h1>
         <div className="mt-8 flex flex-col gap-10">
           <ProfileSection />
+          <MerchantRulesSection />
         </div>
       </div>
     </div>

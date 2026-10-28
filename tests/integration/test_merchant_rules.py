@@ -3,21 +3,25 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 import httpx
 import pytest
+from sqlalchemy import select
 
+from finance_core.audit.models import AuditEvent
+from finance_core.clock import FixedClock
 from finance_core.errors import ConflictError
-from finance_core.merchants.models import MerchantRule
-from finance_core.merchants.service import MerchantRuleService
 from finance_core.transactions.schemas import TransactionCreate
 from finance_core.transactions.service import TransactionService
 from finance_core.users.context import UserContext
-from tests.conftest import new_conversation, register, say
+from tests.conftest import NOW, new_conversation, register, say
 
 TX = "/api/v1/transactions"
+RULES = "/api/v1/merchant-rules"
 
 
 def _saved(result: dict[str, Any]) -> dict[str, Any]:
@@ -43,18 +47,24 @@ async def _category_id(client: httpx.AsyncClient, slug: str) -> str:
     return next(c["id"] for c in categories if c["slug"] == slug)  # type: ignore[no-any-return]
 
 
-async def _rule(app: Any, me: dict[str, Any], merchant: str) -> MerchantRule | None:
-    """Read an expense rule through the merchants service (no REST view until ticket 05)."""
-    container = app.state.container
-    async with container.session_factory() as session:
-        return await MerchantRuleService(session, clock=container.clock).find(
-            uuid.UUID(me["user"]["id"]), type="expense", merchant=merchant
-        )
+async def _rules(client: httpx.AsyncClient, **params: Any) -> list[dict[str, Any]]:
+    """The merchant rules Settings shows, read through the API."""
+    response = await client.get(RULES, params=params)
+    assert response.status_code == 200, response.text
+    return response.json()["items"]  # type: ignore[no-any-return]
 
 
-async def _teach(client: httpx.AsyncClient, *, merchant: str, category_id: str) -> None:
-    """Save an expense through the API, which teaches its merchant rule."""
-    body = {"type": "expense", "amount": "100", "merchant": merchant, "categoryId": category_id}
+async def _rule(client: httpx.AsyncClient, merchant: str) -> dict[str, Any] | None:
+    """This user's expense rule for exactly this merchant, or None."""
+    found = await _rules(client, type="expense", q=merchant)
+    return next((rule for rule in found if rule["merchant"] == merchant), None)
+
+
+async def _teach(
+    client: httpx.AsyncClient, *, merchant: str, category_id: str, type: str = "expense"
+) -> None:
+    """Save a transaction through the API, which teaches its merchant rule."""
+    body = {"type": type, "amount": "100", "merchant": merchant, "categoryId": category_id}
     created = await client.post(TX, json=body)
     assert created.status_code == 201, created.text
 
@@ -206,19 +216,17 @@ async def test_a_skipped_category_question_teaches_nothing(
     assert again is not None and again["field"] == "category"
 
 
-async def test_a_retried_save_does_not_count_as_another_use(
-    app: Any, client: httpx.AsyncClient
-) -> None:
-    me = await register(client)
+async def test_a_retried_save_does_not_count_as_another_use(client: httpx.AsyncClient) -> None:
+    await register(client)
     food = await _category_id(client, "food")
     retry = {"Idempotency-Key": "swiggy-order-1"}
     body = {"type": "expense", "amount": "300", "merchant": "Swiggy", "categoryId": food}
     assert (await client.post(TX, json=body, headers=retry)).status_code == 201
     assert (await client.post(TX, json=body, headers=retry)).status_code == 200  # a replay
-    assert (await _rule(app, me, "Swiggy")).times_used == 1
+    assert (await _rule(client, "Swiggy") or {}).get("timesUsed") == 1
 
     assert (await client.post(TX, json=body)).status_code == 201
-    assert (await _rule(app, me, "Swiggy")).times_used == 2
+    assert (await _rule(client, "Swiggy") or {}).get("timesUsed") == 2
 
 
 async def test_a_save_that_rolls_back_leaves_no_rule_behind(
@@ -254,7 +262,7 @@ async def test_a_save_that_rolls_back_leaves_no_rule_behind(
                 strict_idempotency=True,
             )
 
-    assert await _rule(app, me, "Swiggy") is None
+    assert await _rule(client, "Swiggy") is None
     assert len((await client.get(TX)).json()["items"]) == 1
 
 
@@ -269,3 +277,168 @@ async def test_another_users_rules_never_file_my_transactions(make_client: Any) 
     result = await say(bob, await new_conversation(bob), "swiggy 250")
     assert _saved(result)["category"]["name"] == "Food & Dining"
     assert "as before" not in _reply(result)
+
+
+# ---------------------------------------------------------------------------------------
+# Settings → Merchant rules: list, change and forget them through the API
+# ---------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def moving_clock(clock: FixedClock) -> Iterator[FixedClock]:
+    """The app's clock, which this test may move forward; it goes back to NOW afterwards."""
+    yield clock
+    clock.set(NOW)
+
+
+async def test_rules_are_listed_most_recently_used_first(
+    client: httpx.AsyncClient, moving_clock: FixedClock
+) -> None:
+    await register(client)
+    food = await _category_id(client, "food")
+    await _teach(client, merchant="Swiggy", category_id=food)
+    moving_clock.set(NOW + timedelta(minutes=1))
+    await _teach(client, merchant="Zomato", category_id=food)
+    moving_clock.set(NOW + timedelta(minutes=2))
+    await _teach(client, merchant="Uber", category_id=await _category_id(client, "transport"))
+    moving_clock.set(NOW + timedelta(minutes=3))
+    await _teach(client, merchant="swiggy!", category_id=food)
+
+    rules = await _rules(client)
+
+    assert [rule["merchant"] for rule in rules] == ["swiggy!", "Uber", "Zomato"]
+    swiggy = rules[0]
+    assert swiggy["type"] == "expense"
+    assert swiggy["category"]["name"] == "Food & Dining"
+    assert swiggy["timesUsed"] == 2
+    assert datetime.fromisoformat(swiggy["lastUsedAt"]) == NOW + timedelta(minutes=3)
+
+
+async def test_rules_can_be_filtered_by_type_and_searched_by_merchant(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    food = await _category_id(client, "food")
+    await _teach(client, merchant="Swiggy", category_id=food)
+    await _teach(client, merchant="Swiggy Instamart", category_id=food)
+    await _teach(client, merchant="Amazon", category_id=await _category_id(client, "shopping"))
+    refund = await _category_id(client, "refund")
+    await _teach(client, merchant="Amazon", category_id=refund, type="income")
+
+    swiggy = await _rules(client, q="swig")
+    assert sorted(rule["merchant"] for rule in swiggy) == ["Swiggy", "Swiggy Instamart"]
+    income = await _rules(client, type="income")
+    assert [(rule["merchant"], rule["category"]["name"]) for rule in income] == [
+        ("Amazon", "Refunds & Cashback")
+    ]
+    # Searched the way merchants are matched: case and punctuation don't matter.
+    amazon = await _rules(client, q="AMAZON!", type="expense")
+    assert [(rule["merchant"], rule["type"]) for rule in amazon] == [("Amazon", "expense")]
+
+
+async def test_rules_are_listed_a_page_at_a_time(
+    client: httpx.AsyncClient, moving_clock: FixedClock
+) -> None:
+    await register(client)
+    food = await _category_id(client, "food")
+    for minute, merchant in enumerate(["Swiggy", "Zomato", "Dominos"]):
+        moving_clock.set(NOW + timedelta(minutes=minute))
+        await _teach(client, merchant=merchant, category_id=food)
+
+    first = (await client.get(RULES, params={"limit": 2})).json()
+    assert [rule["merchant"] for rule in first["items"]] == ["Dominos", "Zomato"]
+    rest = (await client.get(RULES, params={"limit": 2, "cursor": first["nextCursor"]})).json()
+    assert [rule["merchant"] for rule in rest["items"]] == ["Swiggy"]
+    assert rest["nextCursor"] is None
+
+    broken = await client.get(RULES, params={"cursor": "not-a-cursor"})
+    assert broken.status_code == 422
+
+
+async def test_a_changed_rule_files_the_merchants_next_transaction(
+    client: httpx.AsyncClient, chat: str
+) -> None:
+    await say(client, chat, "swiggy 300")
+    [swiggy] = await _rules(client, q="swiggy")
+    office_meals = await _create_category(client, "Office meals")
+
+    changed = await client.patch(f"{RULES}/{swiggy['id']}", json={"categoryId": office_meals})
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["category"]["name"] == "Office meals"
+    assert changed.json()["timesUsed"] == 1  # changing a rule is not using it
+
+    result = await say(client, chat, "swiggy 250")
+    assert _saved(result)["category"]["name"] == "Office meals"
+    assert "Filed under Office meals, as before for Swiggy." in _reply(result)
+
+
+async def test_a_rule_only_changes_to_a_real_category_of_its_own_type(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    await _teach(client, merchant="Swiggy", category_id=await _category_id(client, "food"))
+    [swiggy] = await _rules(client)
+    path = f"{RULES}/{swiggy['id']}"
+
+    income = await client.patch(path, json={"categoryId": await _category_id(client, "salary")})
+    assert income.status_code == 422
+    assert income.json()["error"]["details"]["field"] == "categoryId"
+    unknown = await client.patch(path, json={"categoryId": str(uuid.uuid4())})
+    assert unknown.status_code == 404
+    # "Other" means "I don't know", which never becomes a rule.
+    other = await client.patch(path, json={"categoryId": await _category_id(client, "other")})
+    assert other.status_code == 422
+    assert other.json()["error"]["details"]["field"] == "categoryId"
+
+    [unchanged] = await _rules(client)
+    assert unchanged["category"]["name"] == "Food & Dining"
+
+
+async def test_a_forgotten_rule_is_learned_again_from_the_next_save(
+    client: httpx.AsyncClient, chat: str
+) -> None:
+    office_meals = await _create_category(client, "Office meals")
+    await _teach(client, merchant="Swiggy", category_id=office_meals)
+    [swiggy] = await _rules(client)
+
+    forgotten = await client.delete(f"{RULES}/{swiggy['id']}")
+    assert forgotten.status_code == 204
+    assert await _rules(client) == []
+
+    result = await say(client, chat, "swiggy 250")
+    assert _saved(result)["category"]["name"] == "Food & Dining"  # the model's guess
+    assert "as before" not in _reply(result)
+    [relearned] = await _rules(client)
+    assert (relearned["category"]["name"], relearned["timesUsed"]) == ("Food & Dining", 1)
+
+
+async def test_changing_and_forgetting_a_rule_are_audited(
+    app: Any, client: httpx.AsyncClient
+) -> None:
+    me = await register(client)
+    food, groceries = await _category_id(client, "food"), await _category_id(client, "groceries")
+    await _teach(client, merchant="Swiggy", category_id=food)
+    [swiggy] = await _rules(client)
+
+    await client.patch(f"{RULES}/{swiggy['id']}", json={"categoryId": groceries})
+    await client.delete(f"{RULES}/{swiggy['id']}")
+
+    async with app.state.container.session_factory() as session:
+        events = (
+            await session.scalars(
+                select(AuditEvent)
+                .where(AuditEvent.user_id == me["user"]["id"], AuditEvent.entity_id == swiggy["id"])
+                .order_by(AuditEvent.created_at, AuditEvent.id)
+            )
+        ).all()
+    assert [event.action for event in events] == [
+        "merchant_rule.changed",
+        "merchant_rule.forgotten",
+    ]
+    changed, forgotten = events
+    assert changed.data == {
+        "merchant": "Swiggy",
+        "type": "expense",
+        "categoryId": [food, groceries],
+    }
+    assert forgotten.data == {"merchant": "Swiggy", "type": "expense", "categoryId": groceries}

@@ -27,6 +27,9 @@ export type TransactionUpdate = S["TransactionUpdate"];
 export type TransactionType = TransactionView["type"];
 export type PaymentMethod = NonNullable<TransactionView["paymentMethod"]>;
 
+export type MerchantRuleView = S["MerchantRuleView"];
+export type MerchantRulePage = S["MerchantRulePage"];
+
 export type SpendingSummary = S["SpendingSummary"];
 export type CurrencySummary = S["CurrencySummary"];
 export type CategoryTotal = S["CategoryTotal"];

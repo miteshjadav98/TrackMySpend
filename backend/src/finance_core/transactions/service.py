@@ -25,6 +25,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from finance_core.audit.service import Actor, record_audit
 from finance_core.cache.primitives import UserDataGeneration
 from finance_core.categories.models import Category
+from finance_core.categories.schemas import CategoryRef
 from finance_core.categories.service import CategoryService
 from finance_core.clock import Clock
 from finance_core.dates import EARLIEST_ALLOWED_DATE
@@ -41,7 +42,6 @@ from finance_core.money import (
 )
 from finance_core.transactions.models import Transaction
 from finance_core.transactions.schemas import (
-    CategoryRef,
     NewTransaction,
     TransactionCreate,
     TransactionPage,

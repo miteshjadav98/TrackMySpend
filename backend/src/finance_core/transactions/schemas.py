@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from finance_core.categories.schemas import CategoryRef
 from finance_core.schemas import ApiInput, ApiModel
 
 TransactionTypeField = Literal["expense", "income"]
@@ -23,13 +24,6 @@ PAYMENT_METHOD_LABELS: dict[str, str] = {
     "card": "Card", "net_banking": "Net banking", "wallet": "Wallet",
     "bank_transfer": "Bank transfer", "cheque": "Cheque", "other": "Other",
 }  # fmt: skip
-
-
-class CategoryRef(ApiModel):
-    id: uuid.UUID
-    slug: str
-    name: str
-    icon: str | None
 
 
 class TransactionView(ApiModel):

@@ -107,6 +107,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/merchant-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Merchant Rules */
+        get: operations["list_merchant_rules_api_v1_merchant_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Forget Merchant Rule */
+        delete: operations["forget_merchant_rule_api_v1_merchant_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        /** Change Merchant Rule */
+        patch: operations["change_merchant_rule_api_v1_merchant_rules__rule_id__patch"];
+        trace?: never;
+    };
     "/api/v1/transactions": {
         parameters: {
             query?: never;
@@ -275,7 +310,10 @@ export interface components {
             /** Icon */
             icon?: string | null;
         };
-        /** CategoryRef */
+        /**
+         * CategoryRef
+         * @description A compact reference to a category, as transactions and merchant rules show it.
+         */
         CategoryRef: {
             /**
              * Id
@@ -556,6 +594,50 @@ export interface components {
         MeView: {
             user: components["schemas"]["UserView"];
             profile: components["schemas"]["ProfileView"];
+        };
+        /** MerchantRulePage */
+        MerchantRulePage: {
+            /** Items */
+            items: components["schemas"]["MerchantRuleView"][];
+            /** Nextcursor */
+            nextCursor: string | null;
+        };
+        /**
+         * MerchantRuleUpdate
+         * @description A change to a rule: the category its merchant is filed under from now on.
+         */
+        MerchantRuleUpdate: {
+            /**
+             * Categoryid
+             * Format: uuid
+             */
+            categoryId: string;
+        };
+        /**
+         * MerchantRuleView
+         * @description One learned rule: the merchant, the category it files them under, and how often.
+         */
+        MerchantRuleView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Merchant */
+            merchant: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "expense" | "income";
+            category: components["schemas"]["CategoryRef"];
+            /** Timesused */
+            timesUsed: number;
+            /**
+             * Lastusedat
+             * Format: date-time
+             */
+            lastUsedAt: string;
         };
         /** MessagePage */
         MessagePage: {
@@ -1223,6 +1305,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CategoryView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_merchant_rules_api_v1_merchant_rules_get: {
+        parameters: {
+            query?: {
+                type?: ("expense" | "income") | null;
+                /** @description Part of a merchant name */
+                q?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantRulePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_merchant_rule_api_v1_merchant_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_merchant_rule_api_v1_merchant_rules__rule_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MerchantRuleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantRuleView"];
                 };
             };
             /** @description Validation Error */
