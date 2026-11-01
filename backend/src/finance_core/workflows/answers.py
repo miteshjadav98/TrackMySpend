@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
 
+from finance_core.accounts.names import resolve_account_name
+from finance_core.accounts.schemas import AccountView
 from finance_core.categories.service import CategoryService
 from finance_core.dates import day_first_for_locale, parse_iso_date, resolve_date_expression
 from finance_core.llm.rules import classify
@@ -34,6 +37,12 @@ _CANCEL_ALL = re.compile(
 _EXPENSE = re.compile(r"\b(expense|spent|spend|paid|out|outgoing|debit|debited)\b", _I)
 _INCOME = re.compile(r"\b(income|received|earned|in|incoming|credit|credited)\b", _I)
 _NAME_LIKE = re.compile(r"^[A-Za-z][A-Za-z &'\-]{0,39}$")
+# Replies that say "I can't answer" and must never become an account or category name.
+NON_ANSWERS = frozenset({
+    "idk", "dk", "dunno", "skip", "not sure", "unsure", "dont know", "no idea", "none",
+    "nothing", "whatever", "no clue",
+})  # fmt: skip
+_ACCOUNT_NAME_LIKE = re.compile(r"^[A-Za-z][\w &'.\-]{0,59}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +60,11 @@ def _applied(draft: TransactionDraft, **changes: Any) -> AnswerOutcome:
     return AnswerOutcome("applied", draft=draft.model_copy(update=changes))
 
 
+def _with_type(draft: TransactionDraft, kind: str) -> AnswerOutcome:
+    # A category belongs to one type, so the draft's category is worked out again.
+    return _applied(draft, type=kind, category_id=None, category_name=None, category_source=None)
+
+
 def _invalid(notice: str) -> AnswerOutcome:
     return AnswerOutcome("invalid", notice=notice)
 
@@ -59,10 +73,21 @@ def _plain(value: Any) -> str:
     return format(value.normalize(), "f")
 
 
+def is_a_non_answer(text: str) -> bool:
+    """True for "idk", "don't know", "?" and the like, however they are cased or punctuated."""
+    plain = " ".join(re.sub(r"[^\w\s]", "", text.replace("'", "")).casefold().split())
+    return plain in NON_ANSWERS or not plain
+
+
 def _looks_like_category_name(text: str) -> bool:
+    return _looks_like_a_name(text, _NAME_LIKE)
+
+
+def _looks_like_a_name(text: str, pattern: re.Pattern[str]) -> bool:
+    """Free text that is a short name ("Hobbies", "Axis Bank"), not a request or a yes/no."""
     stripped = text.strip()
     return (
-        bool(_NAME_LIKE.match(stripped))
+        bool(pattern.match(stripped))
         and len(stripped.split()) <= 3
         and not find_amounts(stripped)
         and classify(stripped) in ("help", "smalltalk")
@@ -73,9 +98,16 @@ def _looks_like_category_name(text: str) -> bool:
 
 class AnswerApplier:
     def __init__(
-        self, categories: CategoryService, *, user_id: uuid.UUID, today: date, locale: str
+        self,
+        categories: CategoryService,
+        *,
+        user_id: uuid.UUID,
+        today: date,
+        locale: str,
+        accounts: Sequence[AccountView] = (),
     ) -> None:
         self._categories = categories
+        self._accounts = accounts  # the user's active accounts, for account answers
         self._user_id = user_id
         self._today = today
         self._locale = locale
@@ -129,9 +161,13 @@ class AnswerApplier:
             if _YES.match(text):
                 return _applied(draft, amount_confirmed=True)
             return AnswerOutcome("not_an_answer")
-        outcome = await self.apply_value(
-            field, text, draft, allow_custom=field == "category" and _looks_like_category_name(text)
+        allow_custom = (field == "category" and _looks_like_category_name(text)) or (
+            field in ("account", "to_account") and _looks_like_a_name(text, _ACCOUNT_NAME_LIKE)
         )
+        if field in ("category", "account", "to_account") and is_a_non_answer(text):
+            # Not a new request either: ask the same question again.
+            return await self.apply_value(field, text, draft, allow_custom=True)
+        outcome = await self.apply_value(field, text, draft, allow_custom=allow_custom)
         # Free text that does not parse as an answer is more likely a new request.
         return outcome if outcome.kind == "applied" else AnswerOutcome("not_an_answer")
 
@@ -160,26 +196,31 @@ class AnswerApplier:
         if field == "type":
             lowered = text.lower()
             if lowered in ("expense", "income"):
-                return _applied(draft, type=lowered, category_id=None, category_name=None)
+                return _with_type(draft, lowered)
             if _EXPENSE.search(text) and not _INCOME.search(text):
-                return _applied(draft, type="expense", category_id=None, category_name=None)
+                return _with_type(draft, "expense")
             if _INCOME.search(text) and not _EXPENSE.search(text):
-                return _applied(draft, type="income", category_id=None, category_name=None)
+                return _with_type(draft, "income")
             return _invalid("Was it money out (expense) or money in (income)?")
         if field == "category":
-            kind = draft.type or "expense"
+            kind: Literal["expense", "income"] = "income" if draft.type == "income" else "expense"
             category = await self._categories.match(self._user_id, text, kind)
             if category is not None:
                 return _applied(
                     draft,
                     category_id=str(category.id),
                     category_name=category.name,
+                    category_source="picked",  # the user's own pick outranks everything
                     category_text=None,
                     category_skipped=False,
                 )
+            if allow_custom and is_a_non_answer(text):
+                return _invalid("Tell me a category name, or tap Skip.")
             if allow_custom and _NAME_LIKE.match(text):
                 return _applied(draft, category_text=text.title()[:64], category_skipped=False)
             return _invalid("I couldn't match that to a category.")
+        if field in ("account", "to_account"):
+            return self._apply_account(field, text, draft, allow_custom=allow_custom)
         if field == "date":
             occurred = parse_iso_date(text) or resolve_date_expression(
                 text, self._today, day_first=day_first_for_locale(self._locale)
@@ -190,3 +231,24 @@ class AnswerApplier:
                 return _invalid("That date is in the future.")
             return _applied(draft, date=occurred.isoformat(), date_assumed=False)
         return _invalid("Sorry, I didn't follow that.")
+
+    def _apply_account(
+        self, field: str, text: str, draft: TransactionDraft, *, allow_custom: bool
+    ) -> AnswerOutcome:
+        """A tapped account (its id), one of the user's accounts by name, or a new name."""
+        account = next((a for a in self._accounts if str(a.id) == text), None)
+        account = account or resolve_account_name(text, self._accounts)
+        prefix = "account" if field == "account" else "to_account"
+        if account is not None:
+            return _applied(draft, **{
+                f"{prefix}_id": str(account.id), f"{prefix}_name": account.name,
+                f"{prefix}_new": False,
+            })  # fmt: skip
+        if allow_custom and is_a_non_answer(text):
+            return _invalid("Tell me which account, or type a new account name.")
+        if allow_custom and _ACCOUNT_NAME_LIKE.match(text):
+            # Created at save, so a question abandoned halfway leaves no stray account.
+            return _applied(draft, **{
+                f"{prefix}_id": None, f"{prefix}_name": text[:60], f"{prefix}_new": True,
+            })  # fmt: skip
+        return _invalid("I couldn't match that to one of your accounts.")

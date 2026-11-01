@@ -19,7 +19,7 @@ saves must be idempotent, every change needs an audit trail, and one user must n
 another user's data. Those requirements shape most of the decisions below.
 
 The seams for growth are already in place. Domain services know nothing about HTTP or the
-LLM, so an MCP server (Phase 5) or a background worker can reuse them unchanged.
+LLM, so an MCP server (Phase 6) or a background worker can reuse them unchanged.
 
 ## Components
 
@@ -31,7 +31,7 @@ flowchart LR
     core --> pg[("PostgreSQL<br/>identity · ledger · chat · audit · agent")]
     core --> redis[("Redis<br/>cache · rate limits · locks")]
     core --> gemini["Gemini on Vertex AI"]
-    mcp["MCP server (Phase 5)"] -.-> core
+    mcp["MCP server (Phase 6)"] -.-> core
     jobs["Jobs: migrate, prune-checkpoints"] --> core
 ```
 
@@ -51,8 +51,9 @@ backend/finance_core
   ├── agents/               chat turn lifecycle, LangGraph runtime, checkpointer, retention
   ├── workflows/            the graph: nodes, state, drafts, questions, reconciliation
   ├── llm/                  provider-neutral client, Gemini, rules engine, resilience
-  ├── transactions/ reports/ categories/ users/ auth/ conversations/ audit/
+  ├── transactions/ accounts/ merchants/ reports/ categories/ users/ auth/ conversations/ audit/
   │                         domain services (no HTTP, no LLM, no LangGraph)
+  ├── email_sender.py       the EmailSender interface and the console sender
   ├── cache/ database/ observability/
   └── money.py dates.py ids.py clock.py errors.py config.py
 ```
@@ -72,8 +73,8 @@ Five Postgres schemas, each owned by one module:
 
 | Schema | Tables | Notes |
 | --- | --- | --- |
-| `identity` | `users`, `financial_profiles`, `auth_sessions` | Profile holds base currency, timezone and locale. Sessions store a SHA-256 of the token, never the token itself |
-| `ledger` | `categories`, `transactions` | 23 system categories are seeded with deterministic ids. Users can add their own |
+| `identity` | `users`, `financial_profiles`, `auth_sessions`, `password_reset_tokens` | Profile holds base currency, timezone and locale. Sessions and reset links store a SHA-256 of the token, never the token itself |
+| `ledger` | `categories`, `transactions`, `accounts`, `merchant_rules` | 23 system categories are seeded with deterministic ids. Users can add their own. See [Merchant rules](#merchant-rules) and [Accounts and transfers](#accounts-and-transfers) |
 | `chat` | `conversations`, `messages` | The transcript, including the structured UI each assistant message rendered |
 | `audit` | `audit_events` | Written in the same database transaction as the change it records |
 | `agent` | LangGraph checkpoint tables | Working memory for unfinished turns. Safe to prune |
@@ -93,6 +94,24 @@ Conventions:
   (`deleted_at`) and can be restored. It carries an optimistic-lock `version`, a `source`
   (chat, manual, import or api) and an optional `source_ref` pointing at the chat message
   that created it.
+- **Accounts:** an `accounts` row has a name (1-60 characters), a kind (`bank`,
+  `credit_card`, `wallet`, `cash`, `other`), a currency that is fixed after creation, and an
+  archived flag. Names are unique per user, ignoring case, among active accounts only (a
+  partial unique index), and a user has at most 50 active accounts. Accounts are archived,
+  never deleted.
+- **Transaction accounts:** `transactions.account_id` is optional on an expense or income
+  (where the money left, or arrived) and `to_account_id` is set only on a transfer. Check
+  constraints in the database hold the rules: a destination account only on a transfer, and
+  a transfer has both accounts, different from each other, and no category. These two
+  columns and the category reference use the default `NO ACTION`, so a later cascading user
+  deletion still works.
+- **Merchant rules:** one `merchant_rules` row per (user, type, merchant key): the
+  merchant's latest spelling, the category, a use count and when it was last used. The
+  merchant key is the name case-folded, with punctuation removed and spaces collapsed, so
+  "SWIGGY" and "Swiggy!" are one rule. Expense and income rules are kept apart.
+- **Reset tokens:** `identity.password_reset_tokens` holds the SHA-256 of a reset token, its
+  expiry (30 minutes), when it was used and the requesting IP. The token itself is never
+  stored.
 - **Idempotency:** `UNIQUE (user_id, idempotency_key)` with
   `INSERT … ON CONFLICT DO NOTHING`, then the existing row is returned. A retry returns
   200 with the original row instead of creating a duplicate.
@@ -202,13 +221,96 @@ being silently guessed.
 `chat.messages` and the money is in the ledger. `manage prune-checkpoints` drops threads
 inactive for 30 days, and should be scheduled daily.
 
+## Merchant rules
+
+MoneyMoney remembers the category you use for each merchant (`merchants/`).
+
+- **Learning** happens in `TransactionService`, in the same database transaction as the
+  save, so every path teaches: a chat save, `POST /transactions`, and a `PATCH` that
+  changes the category or the merchant. It upserts the rule for (type, merchant key) and
+  bumps its use count. Only a newly inserted row teaches, so an idempotent replay teaches
+  nothing. Nothing is learned from a transaction with no merchant, from a transfer, or from
+  the fallback categories ("Other", "Other income"), so "I don't know" never becomes a rule.
+- **Category precedence** for a chat draft (`workflows/category_choice.py`), highest first:
+  1. a category you picked in a clarification;
+  2. a category you named in the message (the model's suggested category counts as named
+     when its name, or a distinctive word of it, appears as a whole word in your message);
+  3. the merchant rule;
+  4. the model's suggested category;
+  5. otherwise, a clarification.
+
+  In one sentence: if you pick or name a category, I use it; otherwise I use what you used
+  last time for that merchant; otherwise I guess, or ask. The draft records which level
+  chose the category (`category_source`), so the reply can say "Filed under Office meals, as
+  before for Swiggy." A rule whose category is archived is ignored.
+- **A guess is learned only for a new merchant.** A rule outranks the model's guess, so a
+  guess can only become a rule for a merchant that had none, and a correction always wins.
+- **Settings** use `GET /api/v1/merchant-rules` (filters `type` and `q`, most recently used
+  first, keyset pagination), `PATCH /api/v1/merchant-rules/{id}` to change the category (not
+  to "Other" or "Other income": forget the rule instead) and `DELETE` to forget it. Forgetting
+  does not switch learning off: the next save for that merchant teaches a new rule. Changing
+  and forgetting are audited (`merchant_rule.changed`, `merchant_rule.forgotten`); automatic
+  learning is not, because the save that caused it already is.
+
+## Accounts and transfers
+
+- **Accounts** are managed with `GET`, `POST` and `PATCH /api/v1/accounts`. The list is not
+  paginated (50 active accounts at most), shows active accounts first and then by name, and
+  `includeArchived=true` adds the archived ones. A duplicate active name is 409
+  `account_exists`; the limit or an unsupported currency is 422. There is no delete. An
+  archived account stays on its past transactions but cannot be picked for new ones.
+- **Tagging.** An expense or income may carry an account, even one in another currency (a
+  card used abroad). The transactions list filters on `accountId`, which matches either end
+  of a transfer.
+- **Transfers** are `type: "transfer"` on the normal transaction endpoints. `accountId`
+  (from) and `toAccountId` (to) are required and must differ, there is no category, and the
+  amount's currency must equal both accounts' currency. There is no currency conversion.
+  Errors name the field: `accountId`, `toAccountId`, `categoryId` or `currency`. Changing a
+  transaction's type clears the fields that no longer apply, and the result must satisfy
+  the new type's rules or the edit is a 422.
+- **Reports.** Summaries, category totals and the monthly tally leave transfers out of
+  income and expense; tests pin that.
+
+### Accounts and transfers in chat
+
+- The understanding schema has `transfer` as a type and two fields on each transaction:
+  `account` (the user's own account the money left, or arrived in for income, as they named
+  it) and `toAccount` (for a transfer, where it went). The user's active account names go
+  into the request beside the categories. This is `understand_v2.md`; v1 stays in the
+  folder.
+- **The offline parser** reads "transfer/transferred/moved X from A to B", "withdrew X (from
+  A)" (to the cash account) and "paid X credit card bill (from A)" (to the credit card).
+  "sent X from A to B" is a transfer only when both ends are named: "sent 500 to Ramesh"
+  stays an expense, and an ordinary bill ("electricity bill 1200") stays an expense.
+- **Names resolve** against the user's active accounts (`accounts/names.py`): an exact
+  name, ignoring case, wins; otherwise the one account whose words contain the name's words
+  or are contained in them ("HDFC" and "HDFC Savings"); a bare kind ("cash") means the only
+  account of that kind. Several matches, or none, lead to a clarification.
+- **A transfer draft** has no category, merchant or payment method. Its clarifications come
+  in this order: amount, amount confirmation, currency, from account, to account, date. The
+  account questions offer the user's active accounts, most used first, and accept a typed
+  new name. A new account is created at save, in the base currency, with its kind guessed
+  from the name: "cash" is cash; "credit" or "card" is a credit card ("debit" is a bank);
+  Paytm, PhonePe, GPay, Amazon Pay, MobiKwik and "wallet" are wallets; anything else is a
+  bank. Choosing the same account for both ends asks again.
+- **Expenses and income** are tagged with an account only when the user names one that
+  resolves to exactly one active account. The assistant never asks about accounts for them.
+  A name that matches none or several is left untagged, and the reply says "I couldn't
+  match “X” to one of your accounts, so I saved it without an account." A "from X" or
+  "into X" phrase that names one of the user's accounts is the account, not the merchant
+  (reconciliation repairs this after the model); "from Nike" stays a merchant.
+- **Replies** show "HDFC → Paytm Wallet" for a transfer and "from HDFC" ("into HDFC" for
+  income) for a tagged transaction. Chat search accepts transfers as a type, and chat
+  summaries keep leaving them out.
+
 ## Understanding messages (LLM layer)
 
 - `LLMClient` is a two-method protocol: `understand()` returns structured output, and
   `stream_reply()` returns text. Gemini and the offline rules engine both implement it.
 - **Gemini:** `gemini-3.5-flash-lite` with thinking level `low`, using JSON-schema
-  structured output. Prompts are versioned files (`llm/prompts/*_v1.md`), and the version
-  is logged with every call.
+  structured output. Prompts are versioned files (`llm/prompts/`), and the version is
+  logged with every call. The understand prompt is `understand_v2` (transfers and
+  accounts); `understand_v1` stays beside it.
 - **Reconciliation** (`workflows/reconcile.py`): the model's output is merged with the
   deterministic rules parse. This step:
   - fills gaps
@@ -234,13 +336,18 @@ inactive for 30 days, and should be scheduled daily.
   Prompt context must stay at the top of the prompt: moving it last made the model return
   nulls.
 
+  `understand_v2` was measured the same way, over repeated live runs, and stayed at Phase 1
+  accuracy with no latency regression (see the [Phase 2 report](phase-2-report.md)). One
+  request proves nothing, so a prompt change is always judged over several runs.
+
 The LLM interprets intent. It never calculates. Every total comes from SQL.
 
 ## Financial correctness
 
 - **Totals are SQL sums** over live rows, grouped by currency, inside the period resolved
   in the user's timezone. Different currencies are never added together (there is no FX
-  conversion yet). Transfers are excluded from income and expense.
+  conversion yet). Transfers are excluded from income and expense, so paying a
+  credit card bill from a bank account is not counted twice.
 - **Every summary states its period and label** ("October 2026", 1–26 Oct), so the user can
   see exactly what was counted.
 - **Edits use optimistic locking.** A stale `version` gets a 409, never a silent overwrite.
@@ -268,8 +375,38 @@ A circuit breaker stops the app from waiting on a dead Redis, and socket timeout
   - Only its SHA-256 is stored.
   - Expiry slides to 30 days with activity, capped at 90 days absolute.
   - Logging out revokes the session server-side, so it stops working immediately.
+- **Signed-in devices** (Settings → Security). `GET /api/v1/auth/sessions` lists the user's
+  active sessions with a device label ("Chrome on Windows", "API client"), IP address, last
+  activity and `isCurrent`. `DELETE /api/v1/auth/sessions/{id}` signs one out (revoking the
+  current one is a logout) and `POST /api/v1/auth/sessions/revoke-others` signs out all the
+  rest. Another user's session id is a 404. The label comes from a small user-agent reader
+  (`auth/devices.py`) with no extra dependency.
+- **Changing the password** (`POST /api/v1/auth/password`) checks the current password and
+  the password policy, and that the new one differs. It rehashes with Argon2id, signs out
+  every other session and keeps this one. It is rate-limited like login, so a stolen
+  session cannot be used to guess the password.
 - **Passwords** use Argon2id, hashed in a worker thread behind a semaphore so that login
   bursts cannot starve the event loop.
+- **Password reset** (`auth/password_reset.py`) emails a link to
+  `<WEB_BASE_URL>/reset-password#token=…`; the token sits in the URL fragment, so it never
+  reaches a server log or a Referer header.
+  - The request always gets the same 202, and the account lookup and email happen after
+    the reply, so neither its body nor its timing shows whether an account exists. It is
+    rate-limited per email (hashed) and per IP.
+  - Only the token's SHA-256 is stored. A link works once, for 30 minutes, and a newer
+    link replaces it. One atomic UPDATE checks and claims it, so two uses cannot both win.
+  - Using it (`POST /api/v1/auth/password-reset/confirm`) sets the password and signs out
+    every session in one transaction. An unknown, used or expired link is 422
+    `reset_link_invalid`.
+  - Requests are `POST /api/v1/auth/password-reset`. The limits are
+    `RATE_LIMIT_PASSWORD_RESET_PER_EMAIL_PER_HOUR` (5) and
+    `RATE_LIMIT_PASSWORD_RESET_PER_IP_PER_HOUR` (20).
+  - Email goes through `EmailSender` (`email_sender.py`). Until a provider is chosen the
+    console sender prints the email locally and, in production, sends nothing and never
+    logs the link.
+- **Audit.** Security events are audited: `auth.session_revoked`,
+  `auth.other_sessions_revoked`, `auth.password_changed`, `auth.password_reset_requested`
+  (only for existing accounts) and `auth.password_reset`.
 - **Origin check.** Writes authenticated by cookie must come from an allowed origin. This is
   the CSRF defence alongside SameSite.
 - **User isolation:** every query is scoped by the authenticated `user_id`. Integration
@@ -305,6 +442,11 @@ A circuit breaker stops the app from waiting on a dead Redis, and socket timeout
   contract change shows up as a compile error.
 - `proxy.ts` only routes optimistically (signed-out visitors go to `/login`). The API
   remains the authority on every request.
+- Settings is a stack of independent sections sharing one frame: Profile, Appearance,
+  Accounts, Merchant rules and Security. The signed-out pages `/forgot-password` and
+  `/reset-password` serve the reset flow.
+- The transactions page has an account filter and a type filter that includes transfers. Its
+  add/edit dialog shows From account and To account when the type is Transfer.
 - The chat view consumes the SSE stream and renders typed interaction cards. A running
   "tally" strip shows this month's totals and refreshes after each save.
 
@@ -345,6 +487,7 @@ specification for it.
 Settings that must be right in production:
 
 - **`ALLOWED_ORIGINS`** must be the public origin, or every cookie write is rejected.
+- **`WEB_BASE_URL`** must be the public web origin, or reset links point elsewhere.
 - **The connection budget.** Each API instance uses at most
   `DATABASE_POOL_SIZE + DATABASE_MAX_OVERFLOW + CHECKPOINT_POOL_MAX_SIZE` connections
   (10 + 5 + 5 = 20 by default). Cloud Run `max-instances × 20` must stay below Cloud SQL's
@@ -381,9 +524,14 @@ Where the system bends first, and what to do about it:
 | Not doing | Why | Trigger to revisit |
 | --- | --- | --- |
 | Microservices | One team, one deployable; distribution adds failure modes | Separate teams needing independent deploys, or one part needing very different scaling |
-| Message queue / event bus | No asynchronous work yet | Phase 3 imports (long-running parsing), scheduled summaries |
+| Message queue / event bus | No asynchronous work yet | Phase 4 imports (long-running parsing), scheduled summaries |
 | FX conversion | Totals per currency are exact; conversion needs a rate source and a policy | Users with multi-currency spending asking for a single total |
 | Read replicas | One primary handles the load | Primary CPU above about 60% sustained, or summary queries above about 30% of load |
 | Multi-region | 99.9% single-region is the target | Contractual availability above 99.95%, or users across continents |
-| Long-term memory store | The profile covers timezone, currency and locale | Phase 2/4 preferences: merchant → category mappings, reporting preferences |
+| Account balances | Most transactions carry no account yet, so a balance would be wrong. Opening balances come with it | Imports (Phase 4) and debt tracking (Phase 7) put an account on most transactions |
+| Cross-currency transfers | They need an exchange rate and a rule for which rate. Both accounts and the amount must share one currency | A decision on the multi-currency policy (Phase 5) |
+| Email provider | Only the console sender exists: it prints the email in the API log outside production and sends nothing in production | Before real users need "Forgot password?" to work |
+| Two-factor sign-in | Out of scope for Phase 2; sessions and password reset came first | After an email provider exists, or an authenticator-app option is chosen |
+| Hand-made merchant rules | Rules are only learned from saves; there is no "never learn this merchant" switch | Users asking to teach or block a merchant |
+| Other long-term memory | The profile covers timezone, currency and locale, and merchant rules cover categories | Reporting preferences or other learned habits |
 | Infrastructure as code | No cloud environment yet | First staging deployment (Terraform in `infrastructure/gcp/`) |

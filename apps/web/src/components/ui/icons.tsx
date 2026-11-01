@@ -1,6 +1,8 @@
 import {
   ArrowDownLeft,
+  ArrowLeftRight,
   ArrowUpRight,
+  Banknote,
   Briefcase,
   Calendar,
   Car,
@@ -9,6 +11,7 @@ import {
   CircleHelp,
   CirclePlus,
   Clapperboard,
+  CreditCard,
   Gift,
   GraduationCap,
   HeartPulse,
@@ -30,6 +33,7 @@ import {
   TrendingUp,
   Undo2,
   Utensils,
+  Wallet,
 } from "lucide-react";
 
 // The API sends icon *names* (data), never markup; only names in this map render.
@@ -60,10 +64,14 @@ const ICONS: Record<string, LucideIcon> = {
   tag: Tag,
   plus: Plus,
   "arrow-down-left": ArrowDownLeft,
+  "arrow-left-right": ArrowLeftRight,
   "arrow-up-right": ArrowUpRight,
   "pie-chart": ChartPie,
   list: List,
   calendar: Calendar,
+  banknote: Banknote,
+  "credit-card": CreditCard,
+  wallet: Wallet,
 };
 
 export function NamedIcon({ name, className = "size-4" }: { name?: string | null; className?: string }) {

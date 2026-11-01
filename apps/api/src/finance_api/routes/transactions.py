@@ -42,6 +42,7 @@ async def list_transactions(
     container: ContainerDep,
     type: Annotated[TransactionTypeField | None, Query()] = None,
     category_id: Annotated[uuid.UUID | None, Query(alias="categoryId")] = None,
+    account_id: Annotated[uuid.UUID | None, Query(alias="accountId")] = None,
     date_from: Annotated[date | None, Query(alias="from")] = None,
     date_to: Annotated[date | None, Query(alias="to")] = None,
     q: Annotated[str | None, Query(max_length=100)] = None,
@@ -57,6 +58,7 @@ async def list_transactions(
         TransactionQuery(
             type=type,
             category_id=category_id,
+            account_id=account_id,
             date_from=date_from,
             date_to=date_to,
             text=q,

@@ -15,7 +15,7 @@ import { TransactionDialog } from "@/components/transactions/transaction-dialog"
 import { NamedIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { api, unwrap } from "@/lib/api";
-import { formatDay, paymentLabel } from "@/lib/format";
+import { accountPhrase, formatDay, paymentLabel, transferRoute } from "@/lib/format";
 import { invalidateLedger, useQueryClient } from "@/lib/queries";
 
 function Amount({ tx, className = "" }: { tx: TransactionView; className?: string }) {
@@ -71,17 +71,23 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
       <ul className="divide-y divide-dashed divide-line">
         {interaction.transactions.map((tx) => {
           const gone = removed.has(tx.id);
-          const meta = [tx.category?.name ?? "Uncategorised", formatDay(tx.occurredOn), paymentLabel(tx.paymentMethod)]
+          const isTransfer = tx.type === "transfer";
+          const meta = [
+            isTransfer ? "Transfer" : (tx.category?.name ?? "Uncategorised"),
+            formatDay(tx.occurredOn),
+            paymentLabel(tx.paymentMethod),
+            accountPhrase(tx),
+          ]
             .filter(Boolean)
             .join(" · ");
           return (
             <li key={tx.id} className={`flex items-center gap-3 px-4 py-3 ${gone ? "opacity-55" : ""}`}>
               <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-lavender-wash text-lavender-ink">
-                <NamedIcon name={tx.category?.icon} />
+                <NamedIcon name={isTransfer ? "arrow-left-right" : tx.category?.icon} />
               </span>
               <div className="min-w-0 flex-1">
                 <p className={`truncate font-medium ${gone ? "line-through" : ""}`}>
-                  {tx.description ?? tx.category?.name ?? "Transaction"}
+                  {isTransfer ? transferRoute(tx) : (tx.description ?? tx.category?.name ?? "Transaction")}
                 </p>
                 <p className="truncate text-xs text-ink-faint">{gone ? "Removed from your books" : meta}</p>
               </div>
@@ -233,7 +239,9 @@ export function TransactionListCard({ interaction }: { interaction: TransactionL
             <li key={tx.id} className="flex items-center gap-3 px-4 py-2.5">
               <span className="w-24 shrink-0 text-xs text-ink-faint">{formatDay(tx.occurredOn)}</span>
               <span className="min-w-0 flex-1 truncate text-sm">
-                {tx.description ?? tx.category?.name ?? "Transaction"}
+                {tx.type === "transfer"
+                  ? transferRoute(tx)
+                  : (tx.description ?? tx.category?.name ?? "Transaction")}
               </span>
               <Amount tx={tx} />
             </li>

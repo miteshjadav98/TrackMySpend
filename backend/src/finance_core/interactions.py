@@ -23,8 +23,9 @@ from finance_core.transactions.schemas import TransactionView
 INTERACTION_VERSION = 1
 
 ClarifiableField = Literal[
-    "type", "amount", "currency", "category", "date", "description", "payment_method"
-]
+    "type", "amount", "currency", "category", "date", "description", "payment_method",
+    "account", "to_account",
+]  # fmt: skip
 InputKind = Literal["single_select", "multi_select", "text", "amount", "date"]
 
 
@@ -47,9 +48,11 @@ class SuggestedPrompt(ApiModel):
 class DraftPreview(ApiModel):
     """What the assistant has understood so far, shown next to a question."""
 
-    type: Literal["expense", "income"] | None = None
+    type: Literal["expense", "income", "transfer"] | None = None
     amount: MoneyAmount | None = None
     category: str | None = None
+    account: str | None = None  # a transfer's ends, by name
+    to_account: str | None = None
     occurred_on: date | None = None
     occurred_on_label: str | None = None
     description: str | None = None

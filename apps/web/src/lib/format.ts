@@ -47,6 +47,18 @@ export function currencySymbol(currency: string, locale = "en-IN"): string {
   }
 }
 
+/** The currencies the settings forms offer, as [ISO code, name]. */
+export const CURRENCIES = [
+  ["INR", "Indian rupee"],
+  ["USD", "US dollar"],
+  ["EUR", "Euro"],
+  ["GBP", "British pound"],
+  ["AED", "UAE dirham"],
+  ["SGD", "Singapore dollar"],
+  ["AUD", "Australian dollar"],
+  ["CAD", "Canadian dollar"],
+] as const;
+
 export const PAYMENT_METHODS: { value: string; label: string }[] = [
   { value: "upi", label: "UPI" },
   { value: "cash", label: "Cash" },
@@ -63,4 +75,20 @@ export const PAYMENT_METHODS: { value: string; label: string }[] = [
 export function paymentLabel(value: string | null | undefined): string | null {
   if (!value) return null;
   return PAYMENT_METHODS.find((method) => method.value === value)?.label ?? value;
+}
+
+/** A transfer's route as the lists show it: "HDFC → Paytm Wallet". */
+export function transferRoute(tx: { account?: { name: string } | null; toAccount?: { name: string } | null }): string {
+  return `${tx.account?.name ?? "?"} → ${tx.toAccount?.name ?? "?"}`;
+}
+
+/** Where an expense came from or income went: "from HDFC" / "into HDFC"; empty when untagged. */
+export function accountPhrase(tx: { type: string; account?: { name: string } | null }): string {
+  if (!tx.account || tx.type === "transfer") return "";
+  return `${tx.type === "income" ? "into" : "from"} ${tx.account.name}`;
+}
+
+/** An account as a picker option: archived ones say so, since they can't be picked anew. */
+export function accountOptionLabel(account: { name: string; isArchived: boolean }): string {
+  return account.isArchived ? `${account.name} (archived)` : account.name;
 }

@@ -19,6 +19,7 @@ from finance_api.routes import ROUTERS
 from finance_core.agents.events import TurnEvent
 from finance_core.clock import Clock
 from finance_core.config import Settings, get_settings
+from finance_core.email_sender import EmailSender
 from finance_core.llm import LLMClient
 from finance_core.observability import configure_logging
 from finance_core.schemas import response_model_names
@@ -64,6 +65,7 @@ def create_app(
     *,
     llm: LLMClient | None = None,
     clock: Clock | None = None,
+    email_sender: EmailSender | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, json_output=settings.log_json)
@@ -82,6 +84,8 @@ def create_app(
         app.state.llm_override = llm
     if clock is not None:
         app.state.clock = clock
+    if email_sender is not None:
+        app.state.email_sender = email_sender
 
     register_exception_handlers(app)
     app.add_middleware(

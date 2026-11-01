@@ -85,7 +85,7 @@ export function Composer({
           <button
             type="submit"
             disabled={!value.trim()}
-            className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-lavender-deep text-white transition-colors hover:bg-lavender-ink disabled:bg-line-strong"
+            className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-lavender-fill text-white transition-colors hover:bg-lavender-press disabled:bg-line-strong"
             aria-label="Send"
           >
             <SendHorizontal className="size-4" aria-hidden />

@@ -15,7 +15,11 @@ from typing import Any
 from langgraph.runtime import Runtime
 from langgraph.types import Command, interrupt
 
-from finance_core.categories.defaults import FALLBACK_SLUG
+from finance_core.accounts.names import infer_account_kind, resolve_account_name
+from finance_core.accounts.schemas import AccountCreate, AccountView
+from finance_core.accounts.service import AccountService
+from finance_core.categories.defaults import FALLBACK_SLUG, FALLBACK_SLUGS
+from finance_core.categories.models import Category
 from finance_core.categories.schemas import CategoryCreate
 from finance_core.categories.service import CategoryService
 from finance_core.conversations.service import HistoryItem
@@ -31,10 +35,12 @@ from finance_core.llm.base import (
 )
 from finance_core.llm.rules import RulesLLMClient
 from finance_core.llm.schemas import PeriodSpec, SearchSpec
+from finance_core.merchants.service import MerchantRuleService
 from finance_core.reports.service import ReportService
-from finance_core.transactions.schemas import TransactionCreate, TransactionQuery
+from finance_core.transactions.schemas import TransactionCreate, TransactionQuery, TransactionView
 from finance_core.transactions.service import TransactionService
 from finance_core.workflows.answers import AnswerApplier, AnswerOutcome, pending_field
+from finance_core.workflows.category_choice import CategoryOption, choose_category
 from finance_core.workflows.drafts import TransactionDraft, draft_from_extraction, first_issue
 from finance_core.workflows.questions import build_question
 from finance_core.workflows.reconcile import reconcile
@@ -71,6 +77,8 @@ _TURN_RESET: dict[str, Any] = {
     "search": None,
     "outcome": None,
     "saved": [],
+    "filed_by_merchant_rule": [],
+    "unmatched_accounts": [],
     "summary": None,
     "results": None,
     "reply": None,
@@ -88,6 +96,173 @@ def _dump(drafts: list[TransactionDraft]) -> list[dict[str, Any]]:
 def _history(entries: list[HistoryEntry], limit: int) -> list[HistoryItem]:
     items = [HistoryItem(role=e["role"], text=e["text"]) for e in entries if e.get("text")]
     return items[-limit:] if limit else []
+
+
+def _option(category: Category | None) -> CategoryOption | None:
+    if category is None:
+        return None
+    return CategoryOption(
+        id=str(category.id), name=category.name, is_fallback=category.slug in FALLBACK_SLUGS
+    )
+
+
+def _picked(draft: TransactionDraft) -> CategoryOption | None:
+    """The category the user picked in a clarification, if they did."""
+    if draft.category_source != "picked" or draft.category_id is None:
+        return None
+    return CategoryOption(id=draft.category_id, name=draft.category_name or "")
+
+
+async def _file_under_category(
+    draft: TransactionDraft,
+    user_id: uuid.UUID,
+    categories: CategoryService,
+    merchant_rules: MerchantRuleService,
+) -> TransactionDraft:
+    """The draft filed under the category the precedence chooses; unchanged if none applies.
+
+    Worked out again on every pass, so a pick from a clarification stands because it
+    outranks everything else.
+    """
+    # The type comes first; a typed new category or a skipped question is already the
+    # user's answer.
+    # A transfer has no category, and no merchant to look a rule up by.
+    if (
+        draft.type is None
+        or draft.type == "transfer"
+        or draft.category_text
+        or draft.category_skipped
+    ):
+        return draft
+    suggested = (
+        await categories.by_slug(user_id, draft.category_slug, draft.type)
+        if draft.category_slug
+        else None
+    )
+    rule = await merchant_rules.category_for(user_id, type=draft.type, merchant=draft.merchant)
+    choice = choose_category(
+        draft.item_text or draft.source_text,
+        picked=_picked(draft),
+        suggested=_option(suggested),
+        merchant_rule=_option(rule),
+        merchant=draft.merchant,
+    )
+    if choice is None:
+        return draft
+    return draft.model_copy(
+        update={
+            "category_id": choice.category.id,
+            "category_name": choice.category.name,
+            "category_source": choice.source,
+        }
+    )
+
+
+def _with_accounts_resolved(
+    draft: TransactionDraft, accounts: list[AccountView]
+) -> TransactionDraft:
+    """The account names the user said, matched to their active accounts.
+
+    A transfer whose name matches none or several is left alone, so the draft asks which one
+    is meant. An expense or income is only tagged when the name means exactly one account;
+    otherwise it is saved untagged and the reply says so, because the chat never asks.
+    An end the user already answered (picked, or typed as a new account) is never touched.
+    """
+    if draft.type != "transfer":
+        found = resolve_account_name(draft.account, accounts) if draft.account else None
+        if found is None or draft.account_id:
+            return draft
+        return draft.model_copy(update={"account_id": str(found.id), "account_name": found.name})
+    updates: dict[str, Any] = {}
+    for prefix, said in (("account", draft.account), ("to_account", draft.to_account)):
+        answered = getattr(draft, f"{prefix}_id") or getattr(draft, f"{prefix}_new")
+        found = resolve_account_name(said, accounts) if said and not answered else None
+        if found is not None:
+            updates[f"{prefix}_id"] = str(found.id)
+            updates[f"{prefix}_name"] = found.name
+    return draft.model_copy(update=updates) if updates else draft
+
+
+class _CannotSave(Exception):
+    """A transfer that cannot be saved, with the reply outcome that explains why."""
+
+    def __init__(self, outcome: str) -> None:
+        super().__init__(outcome)
+        self.outcome = outcome
+
+
+def _currency_for_new_ends(draft: TransactionDraft, active: dict[str, AccountView]) -> str | None:
+    """The currency a transfer's new account takes, checking the existing ends agree with it.
+
+    A new end follows the existing one, so "moved $100 from Wise to Revolut" opens Revolut in
+    USD. None means the user's base currency. Raises before anything is created, so a transfer
+    that cannot be saved leaves no account behind.
+    """
+    existing = [
+        active[account_id]
+        for account_id in (draft.account_id, draft.to_account_id)
+        if account_id and account_id in active
+    ]
+    wanted = draft.currency.upper() if draft.currency else None
+    if wanted is None and existing:
+        wanted = existing[0].currency
+    if any(account.currency != wanted for account in existing):
+        raise _CannotSave("transfer_currency_mismatch")
+    return wanted
+
+
+async def _account_for_save(
+    accounts: AccountService,
+    ctx: TurnContext,
+    account_id: str | None,
+    new_name: str | None,
+    currency: str | None,
+) -> uuid.UUID | None:
+    """The account a transfer end points at, creating the one the user typed if it is new.
+
+    The new account is only flushed, so it commits (or rolls back) together with the transfer.
+    """
+    if account_id:
+        return uuid.UUID(account_id)
+    if not new_name:
+        return None
+    try:
+        created = await accounts.create(
+            ctx.user,
+            AccountCreate(name=new_name, kind=infer_account_kind(new_name), currency=currency),
+            request_id=ctx.request_id,
+            commit=False,
+        )
+        return created.id
+    except ConflictError:
+        # Created meanwhile, or the same name was typed twice: use the one that exists.
+        existing = resolve_account_name(new_name, await accounts.list_accounts(ctx.user))
+        return existing.id if existing else None
+    except ValidationFailedError:
+        # The currency is already known to be supported, so what is left is the account limit.
+        raise _CannotSave("account_limit") from None
+
+
+def _unmatched_accounts(drafts: list[TransactionDraft]) -> list[str]:
+    """Account names the user said for an expense or income that matched none of their accounts."""
+    return [
+        draft.account
+        for draft in drafts
+        if draft.type != "transfer" and draft.account and not draft.account_id
+    ]
+
+
+def _filed_by_merchant_rule(
+    drafts: list[TransactionDraft], views: list[TransactionView]
+) -> list[str]:
+    """Ids of the saved transactions whose category a merchant rule chose, for the reply."""
+    if len(drafts) != len(views):
+        return []  # a replayed save that no longer lines up with its drafts: skip the note
+    return [
+        str(view.id)
+        for draft, view in zip(drafts, views, strict=True)
+        if draft.category_source == "merchant_rule"
+    ]
 
 
 class FinanceNodes:
@@ -112,6 +287,7 @@ class FinanceNodes:
 
         async with self._deps.session_factory() as session:
             categories = await CategoryService(session).list_visible(ctx.user_id)
+            accounts = await AccountService(session).list_accounts(ctx.user)
         request = UnderstandRequest(
             text=text,
             today=ctx.today,
@@ -119,6 +295,7 @@ class FinanceNodes:
             base_currency=ctx.base_currency,
             locale=ctx.locale,
             categories=[CategoryHint(c.slug, c.name, c.kind) for c in categories],
+            accounts=[account.name for account in accounts],
             history=_history(history, settings.agent_history_window),
             pending=(
                 PendingQuestion(
@@ -144,7 +321,13 @@ class FinanceNodes:
             )
         understanding = result.understanding
         if result.source != "rules":
-            understanding = reconcile(understanding, text, today=ctx.today, locale=ctx.locale)
+            understanding = reconcile(
+                understanding,
+                text,
+                today=ctx.today,
+                locale=ctx.locale,
+                account_names=request.accounts,
+            )
         meta = {
             "intent": understanding.intent,
             "source": result.source,
@@ -227,7 +410,11 @@ class FinanceNodes:
             )
         async with self._deps.session_factory() as session:
             applier = AnswerApplier(
-                CategoryService(session), user_id=ctx.user_id, today=ctx.today, locale=ctx.locale
+                CategoryService(session),
+                user_id=ctx.user_id,
+                today=ctx.today,
+                locale=ctx.locale,
+                accounts=await AccountService(session).list_accounts(ctx.user),
             )
             return await applier.apply_value(
                 field, value, draft, allow_custom=bool(followup.get("allowCustom"))
@@ -247,19 +434,16 @@ class FinanceNodes:
 
         async with self._deps.session_factory() as session:
             categories = CategoryService(session)
+            merchant_rules = MerchantRuleService(session, clock=self._deps.clock)
+            account_service = AccountService(session)
+            active_accounts = await account_service.list_accounts(ctx.user)
             for index, draft in enumerate(drafts):
-                if (
-                    draft.category_id
-                    or not draft.category_slug
-                    or not draft.type
-                    or draft.category_text
-                ):
-                    continue
-                category = await categories.by_slug(ctx.user_id, draft.category_slug, draft.type)
-                if category is not None:
-                    drafts[index] = draft.model_copy(
-                        update={"category_id": str(category.id), "category_name": category.name}
-                    )
+                drafts[index] = await _file_under_category(
+                    _with_accounts_resolved(draft, active_accounts),
+                    ctx.user_id,
+                    categories,
+                    merchant_rules,
+                )
 
             for index, draft in enumerate(drafts):
                 issue = first_issue(draft, base_currency=ctx.base_currency, today=ctx.today)
@@ -271,7 +455,7 @@ class FinanceNodes:
                     )
                 options = (
                     await categories.ranked_for_choice(
-                        ctx.user_id, draft.type or "expense", ctx.today
+                        ctx.user_id, "income" if draft.type == "income" else "expense", ctx.today
                     )
                     if issue.field == "category"
                     else []
@@ -286,6 +470,11 @@ class FinanceNodes:
                     locale=ctx.locale,
                     today=ctx.today,
                     category_options=options,
+                    account_options=(
+                        await account_service.ranked_for_choice(ctx.user)
+                        if issue.field in ("account", "to_account")
+                        else None
+                    ),
                     notice=state.get("notice"),
                 )
                 return Command(
@@ -320,7 +509,11 @@ class FinanceNodes:
 
         async with self._deps.session_factory() as session:
             applier = AnswerApplier(
-                CategoryService(session), user_id=ctx.user_id, today=ctx.today, locale=ctx.locale
+                CategoryService(session),
+                user_id=ctx.user_id,
+                today=ctx.today,
+                locale=ctx.locale,
+                accounts=await AccountService(session).list_accounts(ctx.user),
             )
             if payload.get("kind") == "text":
                 outcome = await applier.from_text(
@@ -394,38 +587,33 @@ class FinanceNodes:
                 views = existing
             else:
                 categories = CategoryService(session)
+                accounts = AccountService(session)
                 items = []
+                active = {str(a.id): a for a in await accounts.list_accounts(ctx.user)}
                 for draft in drafts:
                     assert draft.type is not None and draft.amount is not None and draft.date
-                    category_id = uuid.UUID(draft.category_id) if draft.category_id else None
-                    if category_id is None and draft.category_text:
+                    if draft.type == "transfer":
                         try:
-                            created = await categories.create(
-                                ctx.user_id,
-                                CategoryCreate(name=draft.category_text, kind=draft.type),
-                                request_id=ctx.request_id,
-                            )
-                            category_id = created.id
-                        except (ConflictError, ValidationFailedError):
-                            matched = await categories.match(
-                                ctx.user_id, draft.category_text, draft.type
-                            )
-                            category_id = matched.id if matched else None
-                    if category_id is None:
-                        fallback = await categories.by_slug(
-                            ctx.user_id, FALLBACK_SLUG[draft.type], draft.type
-                        )
-                        category_id = fallback.id if fallback else None
-                    data = TransactionCreate(
-                        type=draft.type,
-                        amount=Decimal(draft.amount),
-                        currency=draft.currency,
-                        occurred_on=date.fromisoformat(draft.date),
-                        category_id=category_id,
-                        description=draft.description,
-                        merchant=draft.merchant,
-                        payment_method=draft.payment_method,
-                    )
+                            new_end_currency = _currency_for_new_ends(draft, active)
+                            data = TransactionCreate(
+                                type="transfer",
+                                amount=Decimal(draft.amount),
+                                currency=draft.currency,
+                                occurred_on=date.fromisoformat(draft.date),
+                                description=draft.description,
+                                account_id=await _account_for_save(
+                                    accounts, ctx, draft.account_id, draft.account_name,
+                                    new_end_currency,
+                                ),
+                                to_account_id=await _account_for_save(
+                                    accounts, ctx, draft.to_account_id, draft.to_account_name,
+                                    new_end_currency,
+                                ),
+                            )  # fmt: skip
+                        except _CannotSave as stop:
+                            return {"outcome": stop.outcome, "drafts": []}
+                    else:
+                        data = await self._expense_or_income(ctx, categories, draft)
                     try:
                         resolved = await transactions.resolve(ctx.user, data)
                     except ValidationFailedError:
@@ -445,9 +633,43 @@ class FinanceNodes:
                 views = [view for view, _ in results]
         return {
             "saved": [view.model_dump(mode="json", by_alias=True) for view in views],
+            "filed_by_merchant_rule": _filed_by_merchant_rule(drafts, views),
+            "unmatched_accounts": _unmatched_accounts(drafts),
             "drafts": [],
             "outcome": "saved",
         }
+
+    async def _expense_or_income(
+        self, ctx: TurnContext, categories: CategoryService, draft: TransactionDraft
+    ) -> TransactionCreate:
+        """The create request for an expense or income, with its category settled."""
+        assert draft.type in ("expense", "income") and draft.amount is not None and draft.date
+        category_id = uuid.UUID(draft.category_id) if draft.category_id else None
+        if category_id is None and draft.category_text:
+            try:
+                created = await categories.create(
+                    ctx.user_id,
+                    CategoryCreate(name=draft.category_text, kind=draft.type),
+                    request_id=ctx.request_id,
+                )
+                category_id = created.id
+            except (ConflictError, ValidationFailedError):
+                matched = await categories.match(ctx.user_id, draft.category_text, draft.type)
+                category_id = matched.id if matched else None
+        if category_id is None:
+            fallback = await categories.by_slug(ctx.user_id, FALLBACK_SLUG[draft.type], draft.type)
+            category_id = fallback.id if fallback else None
+        return TransactionCreate(
+            type=draft.type,
+            amount=Decimal(draft.amount),
+            currency=draft.currency,
+            occurred_on=date.fromisoformat(draft.date),
+            category_id=category_id,
+            account_id=uuid.UUID(draft.account_id) if draft.account_id else None,
+            description=draft.description,
+            merchant=draft.merchant,
+            payment_method=draft.payment_method,
+        )
 
     # -- insights -------------------------------------------------------------------------
 
@@ -487,7 +709,7 @@ class FinanceNodes:
         async with self._deps.session_factory() as session:
             category_id = None
             category_name = None
-            if spec.category:
+            if spec.category and spec.type != "transfer":
                 categories = CategoryService(session)
                 for kind in [spec.type] if spec.type else ["expense", "income"]:
                     category = await categories.by_slug(ctx.user_id, spec.category, kind)  # type: ignore[arg-type]
@@ -506,7 +728,7 @@ class FinanceNodes:
                     limit=min(spec.limit or 10, MAX_SEARCH_RESULTS),
                 ),
             )
-        noun = {"expense": "expenses", "income": "income entries"}.get(
+        noun = {"expense": "expenses", "income": "income entries", "transfer": "transfers"}.get(
             spec.type or "", "transactions"
         )
         if category_name:
@@ -543,6 +765,8 @@ class FinanceNodes:
                 today=ctx.today,
                 locale=ctx.locale,
                 abandoned=bool(state.get("abandoned")),
+                filed_by_merchant_rule=frozenset(state.get("filed_by_merchant_rule") or []),
+                unmatched_accounts=state.get("unmatched_accounts") or [],
                 interaction_id=f"{base_id}-saved",
             )
         elif outcome == "summary" and state.get("summary"):

@@ -52,13 +52,14 @@ def render_understand_prompt(request: UnderstandRequest) -> str:
             field=request.pending.field,
             options_line=f"Options offered: {options}." if options else "",
         )
-    return prompts.load("understand_v1").format(
+    return prompts.load(prompts.UNDERSTAND_PROMPT_VERSION).format(
         today_long=request.today.strftime("%A, %d %B %Y"),
         today_iso=request.today.isoformat(),
         timezone=request.timezone,
         base_currency=request.base_currency,
         expense_categories=expense or "(none)",
         income_categories=income or "(none)",
+        accounts=", ".join(request.accounts) or "(none yet)",
         pending_block=pending_block,
     )
 

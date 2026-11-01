@@ -111,6 +111,7 @@ SYSTEM_CATEGORIES: tuple[CategoryDefinition, ...] = (
 )  # fmt: skip
 
 FALLBACK_SLUG: dict[CategoryKind, str] = {"expense": "other", "income": "other_income"}
+FALLBACK_SLUGS = frozenset(FALLBACK_SLUG.values())
 
 
 @lru_cache(maxsize=1)

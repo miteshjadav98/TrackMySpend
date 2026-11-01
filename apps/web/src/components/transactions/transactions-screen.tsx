@@ -8,13 +8,26 @@ import { TransactionDialog } from "@/components/transactions/transaction-dialog"
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { NamedIcon } from "@/components/ui/icons";
-import { formatDay, paymentLabel } from "@/lib/format";
-import { type TransactionFilters, useCategories, useTransactions } from "@/lib/queries";
+import { accountOptionLabel, formatDay, paymentLabel, transferRoute } from "@/lib/format";
+import { type TransactionFilters, useAccounts, useCategories, useTransactions } from "@/lib/queries";
+
+/** Where the money went from or came into: the account, then the payment method. */
+function paidWith(tx: TransactionView): string | null {
+  if (tx.type === "transfer") return null; // the route is already the row's title
+  return [tx.account?.name, paymentLabel(tx.paymentMethod)].filter(Boolean).join(" · ") || null;
+}
+
+/** Income is green, expenses plain, and a transfer neutral: it only moves money around. */
+function amountTone(type: TransactionView["type"]): string {
+  if (type === "income") return "text-income";
+  return type === "transfer" ? "text-ink-soft" : "text-ink";
+}
 
 export function TransactionsScreen() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState<"" | TransactionType>("");
   const [categoryId, setCategoryId] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [dialog, setDialog] = useState<{ open: boolean; transaction: TransactionView | null }>({
@@ -23,20 +36,25 @@ export function TransactionsScreen() {
   });
   const deferredQuery = useDeferredValue(query.trim());
   const categories = useCategories();
+  // Archived accounts too: their past transactions are still worth finding.
+  const accounts = useAccounts(true);
 
   const filters: TransactionFilters = useMemo(
     () => ({
       q: deferredQuery || undefined,
       type: type || undefined,
       categoryId: categoryId || undefined,
+      accountId: accountId || undefined,
       from: from || undefined,
       to: to || undefined,
     }),
-    [deferredQuery, type, categoryId, from, to],
+    [deferredQuery, type, categoryId, accountId, from, to],
   );
   const transactions = useTransactions(filters);
   const rows = transactions.data?.pages.flatMap((page) => page.items) ?? [];
-  const filtered = Boolean(filters.q || filters.type || filters.categoryId || filters.from || filters.to);
+  const filtered = Boolean(
+    filters.q || filters.type || filters.categoryId || filters.accountId || filters.from || filters.to,
+  );
   const categoryOptions = (categories.data ?? []).filter((c) => !type || c.kind === type);
 
   return (
@@ -52,7 +70,7 @@ export function TransactionsScreen() {
           </Button>
         </header>
 
-        <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))]">
+        <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,2fr)_repeat(5,minmax(0,1fr))]">
           <div className="relative col-span-2 md:col-span-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" aria-hidden />
             <label htmlFor="tx-search" className="sr-only">
@@ -82,15 +100,32 @@ export function TransactionsScreen() {
             <option value="">All types</option>
             <option value="expense">Expenses</option>
             <option value="income">Income</option>
+            <option value="transfer">Transfers</option>
           </Select>
           <label className="sr-only" htmlFor="tx-category">
             Category
           </label>
-          <Select id="tx-category" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+          <Select
+            id="tx-category"
+            value={categoryId}
+            disabled={type === "transfer"}
+            onChange={(event) => setCategoryId(event.target.value)}
+          >
             <option value="">All categories</option>
             {categoryOptions.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
+              </option>
+            ))}
+          </Select>
+          <label className="sr-only" htmlFor="tx-account">
+            Account
+          </label>
+          <Select id="tx-account" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+            <option value="">All accounts</option>
+            {(accounts.data ?? []).map((account) => (
+              <option key={account.id} value={account.id}>
+                {accountOptionLabel(account)}
               </option>
             ))}
           </Select>
@@ -136,7 +171,10 @@ export function TransactionsScreen() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
-                {rows.map((tx) => (
+                {rows.map((tx) => {
+                  const isTransfer = tx.type === "transfer";
+                  const categoryName = isTransfer ? "Transfer" : (tx.category?.name ?? "Uncategorised");
+                  return (
                   <tr
                     key={tx.id}
                     className="cursor-pointer transition-colors hover:bg-lavender-wash/40"
@@ -152,28 +190,34 @@ export function TransactionsScreen() {
                           setDialog({ open: true, transaction: tx });
                         }}
                       >
-                        {tx.description ?? tx.category?.name ?? "Transaction"}
+                        {isTransfer ? transferRoute(tx) : (tx.description ?? tx.category?.name ?? "Transaction")}
                       </button>
                       <span className="block text-xs text-ink-faint">
-                        {[tx.merchant, tx.source === "chat" ? "from chat" : null].filter(Boolean).join(" · ") || " "}
+                        {[isTransfer ? tx.description : null, tx.merchant, tx.source === "chat" ? "from chat" : null].filter(Boolean).join(" · ") || " "}
                       </span>
                       <span className="block text-xs text-ink-faint md:hidden">
-                        {formatDay(tx.occurredOn)} · {tx.category?.name ?? "Uncategorised"}
+                        {[formatDay(tx.occurredOn), categoryName, isTransfer ? null : tx.account?.name]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 md:table-cell">
                       <span className="inline-flex items-center gap-1.5 text-ink-soft">
-                        <NamedIcon name={tx.category?.icon} className="size-3.5 text-lavender-deep" />
-                        {tx.category?.name ?? "Uncategorised"}
+                        <NamedIcon
+                          name={isTransfer ? "arrow-left-right" : tx.category?.icon}
+                          className="size-3.5 text-lavender-deep"
+                        />
+                        {categoryName}
                       </span>
                     </td>
-                    <td className="hidden px-3 py-3 text-ink-soft md:table-cell">{paymentLabel(tx.paymentMethod) ?? "—"}</td>
-                    <td className={`figure px-5 py-3 text-right text-base font-semibold whitespace-nowrap ${tx.type === "income" ? "text-income" : "text-ink"}`}>
+                    <td className="hidden px-3 py-3 text-ink-soft md:table-cell">{paidWith(tx) ?? "—"}</td>
+                    <td className={`figure px-5 py-3 text-right text-base font-semibold whitespace-nowrap ${amountTone(tx.type)}`}>
                       {tx.type === "income" ? "+" : ""}
                       {tx.amountFormatted}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}

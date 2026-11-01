@@ -40,7 +40,7 @@ export function Dialog({
         onClose();
       }}
       aria-labelledby="dialog-title"
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-line bg-surface p-0 text-ink shadow-[var(--shadow-card)] backdrop:bg-ink/35 backdrop:backdrop-blur-[2px]"
+      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-[var(--radius-card)] border border-line bg-surface p-0 text-ink shadow-[var(--shadow-card)] backdrop:bg-night/35 backdrop:backdrop-blur-[2px]"
     >
       {open ? (
         <div className="flex max-h-[85dvh] flex-col">

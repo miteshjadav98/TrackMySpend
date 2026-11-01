@@ -19,6 +19,15 @@ class CategoryView(ApiModel):
     is_system: bool
 
 
+class CategoryRef(ApiModel):
+    """A compact reference to a category, as transactions and merchant rules show it."""
+
+    id: uuid.UUID
+    slug: str
+    name: str
+    icon: str | None
+
+
 class CategoryCreate(ApiInput):
     name: str = Field(min_length=1, max_length=64)
     kind: CategoryKindField

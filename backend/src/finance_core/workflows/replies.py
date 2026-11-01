@@ -8,6 +8,7 @@ never disagree with the database.
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -68,6 +69,32 @@ def period_phrase(label: str) -> str:
     )
 
 
+def _merchant_rule_note(tx: TransactionView) -> str:
+    """Why a merchant rule chose the category, e.g. "Filed under Office meals, as before for
+    Swiggy"."""
+    category = tx.category.name if tx.category else ""
+    return f"Filed under {category}, as before for {tx.merchant}."
+
+
+def _route(tx: TransactionView) -> str:
+    """ "HDFC → Paytm" for a transfer, from the two accounts it saved with."""
+    source = tx.account.name if tx.account else "?"
+    target = tx.to_account.name if tx.to_account else "?"
+    return f"{source} → {target}"
+
+
+def _via_account(tx: TransactionView) -> str:
+    """ " from HDFC" for a tagged expense, " into HDFC" for tagged income, else nothing."""
+    if tx.account is None:
+        return ""
+    return f" {'from' if tx.type == 'expense' else 'into'} {tx.account.name}"
+
+
+def _unmatched_account_note(names: Sequence[str]) -> str:
+    quoted = _join([f"“{name}”" for name in names])
+    return f"I couldn't match {quoted} to one of your accounts, so I saved it without an account."
+
+
 def compose_saved(
     saved: list[dict[str, Any]],
     *,
@@ -75,8 +102,11 @@ def compose_saved(
     locale: str,
     abandoned: bool,
     interaction_id: str,
+    filed_by_merchant_rule: frozenset[str] = frozenset(),
+    unmatched_accounts: Sequence[str] = (),
 ) -> tuple[str, list[Interaction]]:
     views = [TransactionView.model_validate(item) for item in saved]
+    by_rule = [tx for tx in views if str(tx.id) in filed_by_merchant_rule]
     totals: dict[str, int] = defaultdict(int)
     if len({view.type for view in views}) == 1:  # only total like with like
         for view in views:
@@ -84,22 +114,32 @@ def compose_saved(
     if len(views) == 1:
         tx = views[0]
         what = f" for {tx.description}" if tx.description else ""
-        category = f" under {tx.category.name}" if tx.category else ""
+        # A merchant rule's category is named in the note below, with the reason.
+        category = f" under {tx.category.name}" if tx.category and not by_rule else ""
         paid = (
             f", paid by {PAYMENT_METHOD_LABELS[tx.payment_method]}"
             if tx.payment_method and tx.type == "expense"
             else ""
         )
-        noun = "expense" if tx.type == "expense" else "income"
         day = format_day(tx.occurred_on, today)
         when = day if day in ("today", "yesterday") else f"on {day}"
-        text = f"Saved {tx.amount_formatted} {noun}{what}{category} {when}{paid}."
+        if tx.type == "transfer":
+            source = tx.account.name if tx.account else "?"
+            target = tx.to_account.name if tx.to_account else "?"
+            text = f"Saved {tx.amount_formatted} transfer from {source} to {target} {when}."
+        else:
+            noun = "expense" if tx.type == "expense" else "income"
+            text = f"Saved {tx.amount_formatted} {noun}{what}{category}{_via_account(tx)} {when}{paid}."
     else:
         items = [
-            f"{tx.amount_formatted} {tx.description or (tx.category.name if tx.category else '')}".strip()
+            f"{tx.amount_formatted} {_route(tx) if tx.type == 'transfer' else tx.description or (tx.category.name if tx.category else '')}".strip()
             for tx in views
         ]
         text = f"Saved {len(views)} transactions: {_join(items)}."
+    for tx in by_rule:
+        text += " " + _merchant_rule_note(tx)
+    if unmatched_accounts:
+        text += " " + _unmatched_account_note(unmatched_accounts)
     if abandoned:
         text = "I set aside the earlier unfinished entry. " + text
     total_amounts = (
@@ -219,6 +259,14 @@ STATIC_REPLIES: dict[str, str] = {
     "llm_unavailable": (
         "I'm having trouble understanding messages right now. You can still add "
         "transactions from the Transactions page."
+    ),
+    "transfer_currency_mismatch": (
+        "Transfers between accounts in different currencies aren't supported. "
+        "Both accounts, and the amount, need to be in the same currency."
+    ),
+    "account_limit": (
+        "You've reached the limit of active accounts, so I couldn't add a new one. "
+        "Archive an account you no longer use, then try again."
     ),
     "save_failed": "I couldn't save that because something changed. Please try again.",
 }

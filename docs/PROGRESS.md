@@ -57,25 +57,48 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
   `docs/architecture.md` (design, workflow, failure behaviour, GCP deployment spec, scale plan),
   `docs/phase-1-report.md` (PRD report + PRD improvement suggestions). 142 tests passing.
 
-**Phase 1 is complete.**
+**Phase 1 is complete.** The user tested the web app in the browser: no issues.
 
-## Pending decisions (ask the user at the start of the next session)
+## Phase 2 (built and reviewed, ready for `main`, branch `phase-2/integration`)
 
-1. Browser testing feedback on the web app.
-2. GitHub repo URL, so CI can run.
-3. PRD suggestions in docs/phase-1-report.md: accept or reject each one. The biggest are
-   accounts as an entity, data export/deletion with transcript retention, and measurable
-   targets (p95 < 3 s, eval ≥ 95%).
-4. Whether to apply the two pending system-design skill fixes: `background: false`, and
-   removing the two leftover reference pointers.
+Decided on 2026-10-27:
+
+- Scope: merchant rules (learned from every save), accounts (no balances yet), transfers in
+  chat and on the transactions page, account security (devices, sign out others, change
+  password, forgot password with a console email sender).
+- Not taken this phase: data export/deletion, measurable NFR targets, browser E2E tests.
+- No GitHub remote yet; tickets live in a local markdown tracker.
+
+Plan: `.scratch/phase-2/spec.md` and 11 tickets in `.scratch/phase-2/issues/`. Each ticket's
+`Status:` line says whether it is merged. Built with the org-skills implement-spec flow:
+implementers in worktrees (one test database each), merged one at a time into
+`phase-2/integration`, then one code review over the whole branch.
+
+Checkpoint 2026-10-28: tickets 01–05 merged (settings sections, merchant rules learn and
+apply, accounts, security settings, merchant rules in Settings), plus a fix for `/chat`
+hanging on a second visit (Next.js keeps pages alive in React `<Activity>`). 211 tests pass.
+
+Checkpoint 2026-11-01: tickets 01–10 merged, and ticket 11 (docs) written. Added since the last
+checkpoint: tagging transactions with an account (06), forgot password (07), transfers on the
+API and the transactions page (08), transfers in chat with prompt `understand_v2` (09), "paid
+from HDFC" in chat (10), and dark mode. `uv run pytest`: 332 passed, 1 skipped. Live eval:
+100% over six runs of 23 cases (ticket 09), 93–100% per run over ten runs of 29 cases
+(ticket 10), misses all model or provider noise, p50 about 1.1 s. Report:
+[phase-2-report.md](phase-2-report.md).
+
+Code review 2026-11-01 over the whole branch: approve with minor follow-ups, all fixed in
+ticket 12. A category word in a merchant's name or said about another item no longer
+overrides a merchant rule, plurals count as naming a category, "idk"/"skip" no longer
+becomes an account or category, the account question offers "Cash", a new account in a
+transfer takes the other end's currency and commits together with the transfer, and a blank
+model reading is filled from the offline parser. `uv run pytest`: 357 passed, 1 skipped.
 
 ## Next
 
-1. User testing feedback on the web app (stack runs via `docker compose --profile app up -d`).
-2. Push to a GitHub remote so CI runs (needs a repo URL from the user).
-3. Phase 2 remainder: long-term preferences (merchant → category memory with inspect/edit/delete),
-   transfers in chat, plus any accepted PRD suggestions (accounts entity, data export/deletion,
-   password reset). See docs/phase-1-report.md.
+1. Merge Phase 2 into `main` (waiting for the owner's OK). The code is on GitHub
+   (`miteshjadav98/TrackMySpend`): `main` holds Phase 1, `phase-2/integration` holds Phase 2.
+2. Phase 3: split expenses with friends (Splitwise-style). Start from
+   `.scratch/phase-3/brief.md`: grill the open questions, then write the spec and tickets.
 
 ## Resume
 

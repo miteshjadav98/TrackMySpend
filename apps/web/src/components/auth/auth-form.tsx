@@ -63,6 +63,8 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     }
   }
 
+  // The reset-password page sends the user here once their new password is set.
+  const passwordWasReset = mode === "login" && params.get("reset") === "done";
   const formError = error
     ? error.code === "validation_failed" && error.field === null
       ? "Check the email address and password, then try again."
@@ -79,6 +81,15 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           ? "Pick up where you left off."
           : "Track spending by typing it, the way you'd text a friend."}
       </p>
+      {passwordWasReset ? (
+        <p
+          role="status"
+          className="mt-6 rounded-[10px] bg-lavender-wash px-3 py-2 text-sm text-lavender-ink"
+        >
+          Password changed. You&apos;ve been signed out everywhere, so sign in with your new
+          password.
+        </p>
+      ) : null}
       <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4" noValidate={false}>
         {mode === "register" ? (
           <Field label="Your name">
@@ -114,6 +125,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
             />
           )}
         </Field>
+        {mode === "login" ? (
+          <Link
+            href="/forgot-password"
+            className="-mt-2 self-end text-sm font-medium text-lavender-deep underline-offset-2 hover:underline"
+          >
+            Forgot password?
+          </Link>
+        ) : null}
         {formError ? (
           <p role="alert" className="rounded-[10px] bg-danger-wash px-3 py-2 text-sm text-danger">
             {formError}

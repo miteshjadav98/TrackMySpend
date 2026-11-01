@@ -19,6 +19,7 @@ from finance_core.dates import (
     parse_iso_date,
     resolve_date_expression,
 )
+from finance_core.llm.rules import item_segment
 from finance_core.llm.schemas import ExtractedTransaction
 from finance_core.money import (
     SUPPORTED_CURRENCIES,
@@ -28,8 +29,11 @@ from finance_core.money import (
     parse_amount_with_currency,
     to_minor,
 )
+from finance_core.workflows.category_choice import CategorySource
 
-IssueField = Literal["amount", "amount_confirm", "currency", "type", "category", "date"]
+IssueField = Literal[
+    "amount", "amount_confirm", "currency", "type", "category", "account", "to_account", "date"
+]
 
 
 class TransactionDraft(BaseModel):
@@ -37,13 +41,19 @@ class TransactionDraft(BaseModel):
 
     id: str
     origin_message_id: str
-    type: Literal["expense", "income"] | None = None
+    # The user's message this draft was understood from: a category named in it wins.
+    source_text: str = ""
+    # Just this item's part of that message ("swiggy 300" of "swiggy 300 and dinner 400"),
+    # so a category named for one item is not credited to another.
+    item_text: str = ""
+    type: Literal["expense", "income", "transfer"] | None = None
     amount: str | None = None  # exact decimal string
     amount_confirmed: bool = False  # literally typed by the user, or confirmed by them
     currency: str | None = None  # ISO code as given; None means "use the base currency"
     category_slug: str | None = None  # what the model/parser suggested
     category_id: str | None = None  # resolved against the user's categories
     category_name: str | None = None
+    category_source: CategorySource | None = None  # which precedence level chose it
     category_text: str | None = None  # the user's own name for a new category
     category_skipped: bool = False
     date: str | None = None  # ISO date
@@ -52,6 +62,29 @@ class TransactionDraft(BaseModel):
     description: str | None = None
     merchant: str | None = None
     payment_method: str | None = None
+    # A transfer's two ends. `account` is the name as the user said it; `account_id` is the
+    # account it resolved to, or None with `account_new` set when the user typed a new name
+    # in a clarification, which is created at save as `account_name`.
+    account: str | None = None
+    account_id: str | None = None
+    account_name: str | None = None
+    account_new: bool = False
+    to_account: str | None = None
+    to_account_id: str | None = None
+    to_account_name: str | None = None
+    to_account_new: bool = False
+
+    def has_account(self) -> bool:
+        return self.account_id is not None or self.account_new
+
+    def has_to_account(self) -> bool:
+        return self.to_account_id is not None or self.to_account_new
+
+    def same_account_both_ends(self) -> bool:
+        if self.account_id is not None and self.account_id == self.to_account_id:
+            return True
+        names = (self.account_name or "").casefold(), (self.to_account_name or "").casefold()
+        return (self.account_new or self.to_account_new) and names[0] == names[1] != ""
 
     def decimal_amount(self) -> Decimal | None:
         if self.amount is None:
@@ -116,6 +149,8 @@ def draft_from_extraction(
     return TransactionDraft(
         id=draft_id,
         origin_message_id=origin_message_id,
+        source_text=source_text,
+        item_text=item_segment(source_text, Decimal(amount)) if amount else source_text,
         type=extracted.type,
         amount=amount,
         amount_confirmed=grounded,
@@ -125,8 +160,10 @@ def draft_from_extraction(
         date_text=extracted.date_text,
         date_assumed=assumed,
         description=_clean(extracted.description, 120),
-        merchant=_clean(extracted.merchant, 120),
-        payment_method=extracted.payment_method,
+        merchant=_clean(extracted.merchant, 120) if extracted.type != "transfer" else None,
+        payment_method=extracted.payment_method if extracted.type != "transfer" else None,
+        account=_clean(extracted.account, 60),
+        to_account=_clean(extracted.to_account, 60) if extracted.type == "transfer" else None,
     )
 
 
@@ -140,7 +177,8 @@ def first_issue(draft: TransactionDraft, *, base_currency: str, today: date) -> 
     """The single most important thing to ask next, or None if the draft is complete.
 
     Order: amount, then confirming an unverified amount, currency, type (needed to offer
-    the right categories), category, and finally the date.
+    the right categories), category, and finally the date. A transfer has no category; it
+    asks for the account the money left, then the one it went to, before the date.
     """
     value = draft.decimal_amount()
     if value is None or value <= 0:
@@ -156,7 +194,14 @@ def first_issue(draft: TransactionDraft, *, base_currency: str, today: date) -> 
         return Issue("amount_confirm", "unverified")
     if draft.type is None:
         return Issue("type", "missing")
-    if draft.category_id is None and not draft.category_skipped and not draft.category_text:
+    if draft.type == "transfer":
+        if not draft.has_account():
+            return Issue("account", "unknown" if draft.account else "missing")
+        if not draft.has_to_account():
+            return Issue("to_account", "unknown" if draft.to_account else "missing")
+        if draft.same_account_both_ends():
+            return Issue("to_account", "same")
+    elif draft.category_id is None and not draft.category_skipped and not draft.category_text:
         return Issue("category", "missing")
     occurred = parse_iso_date(draft.date)
     if occurred is None:

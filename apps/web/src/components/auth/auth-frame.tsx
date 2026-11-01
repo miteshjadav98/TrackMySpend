@@ -6,7 +6,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
     <main className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <section
         aria-hidden
-        className="relative hidden overflow-hidden bg-ink px-14 py-16 text-white lg:flex lg:flex-col lg:justify-between"
+        className="relative hidden overflow-hidden bg-night px-14 py-16 text-white lg:flex lg:flex-col lg:justify-between"
       >
         <p className="display text-xl font-semibold tracking-tight">MoneyMoney</p>
         <div className="max-w-md">
@@ -16,7 +16,7 @@ export function AuthFrame({ children }: { children: ReactNode }) {
             <span className="text-lavender">It&apos;s in your books.</span>
           </p>
           <div className="mt-10 space-y-3">
-            <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-lavender-deep px-4 py-2.5 text-[15px]">
+            <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-lavender-fill px-4 py-2.5 text-[15px]">
               ₹350 on dinner yesterday, paid by UPI
             </div>
             <div className="w-[88%] rounded-2xl rounded-bl-md bg-white/[0.07] p-4 ring-1 ring-white/10">

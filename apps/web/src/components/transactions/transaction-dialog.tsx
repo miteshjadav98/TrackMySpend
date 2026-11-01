@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  AccountRef,
+  AccountView,
   CategoryView,
   TransactionCreate,
   TransactionType,
@@ -14,8 +16,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError, newKey, unwrap } from "@/lib/api";
-import { PAYMENT_METHODS, todayISO } from "@/lib/format";
-import { invalidateLedger, useCategories, useMe, useQueryClient } from "@/lib/queries";
+import { accountOptionLabel, PAYMENT_METHODS, todayISO } from "@/lib/format";
+import { invalidateLedger, useAccounts, useCategories, useMe, useQueryClient } from "@/lib/queries";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD", "JPY"];
 
@@ -24,7 +26,30 @@ const FIELD_FOR_ERROR: Record<string, string> = {
   occurredOn: "occurredOn",
   currency: "currency",
   categoryId: "categoryId",
+  accountId: "accountId",
+  toAccountId: "toAccountId",
 };
+
+const TYPE_LABELS: Record<TransactionType, string> = {
+  expense: "Money out",
+  income: "Money in",
+  transfer: "Transfer",
+};
+
+/**
+ * The accounts the picker offers: every active account, plus the transaction's current one
+ * if it has since been archived (an edit may keep it, but nobody can pick it anew).
+ */
+function accountChoices(accounts: AccountView[], current: AccountRef | null): { id: string; label: string }[] {
+  const choices = accounts
+    .filter((account) => !account.isArchived || account.id === current?.id)
+    .map((account) => ({ id: account.id, label: accountOptionLabel(account) }));
+  // Until the list has loaded, still show the account the transaction already has.
+  if (current && !choices.some((choice) => choice.id === current.id)) {
+    choices.unshift({ id: current.id, label: current.name });
+  }
+  return choices;
+}
 
 /** Add or edit a transaction by hand. The same server validation as chat applies. */
 export function TransactionDialog({
@@ -57,11 +82,14 @@ function TransactionForm({
 }) {
   const me = useMe();
   const categories = useCategories();
+  const accounts = useAccounts(true);
   const queryClient = useQueryClient();
   const toast = useToast();
   const [idempotencyKey] = useState(newKey);
   const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
   const [categoryId, setCategoryId] = useState<string>(transaction?.category?.id ?? "");
+  const [accountId, setAccountId] = useState<string>(transaction?.account?.id ?? "");
+  const [toAccountId, setToAccountId] = useState<string>(transaction?.toAccount?.id ?? "");
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -70,7 +98,26 @@ function TransactionForm({
     () => (categories.data ?? []).filter((c: CategoryView) => c.kind === type),
     [categories.data, type],
   );
+  const currentAccount = transaction?.account ?? null;
+  const accountOptions = useMemo(
+    () => accountChoices(accounts.data ?? [], currentAccount),
+    [accounts.data, currentAccount],
+  );
+  const toAccountOptions = useMemo(
+    () => accountChoices(accounts.data ?? [], transaction?.toAccount ?? null).filter((choice) => choice.id !== accountId),
+    [accounts.data, transaction?.toAccount, accountId],
+  );
   const baseCurrency = me.data?.profile.baseCurrency ?? "INR";
+  const [currency, setCurrency] = useState<string>(transaction?.currency ?? baseCurrency);
+  const isTransfer = type === "transfer";
+
+  // A transfer lives in its accounts' currency, so picking the source account sets it.
+  function pickFromAccount(id: string) {
+    setAccountId(id);
+    if (id === toAccountId) setToAccountId(""); // the two ends can't be the same account
+    const picked = (accounts.data ?? []).find((account) => account.id === id);
+    if (isTransfer && picked) setCurrency(picked.currency);
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,9 +129,11 @@ function TransactionForm({
     const body = {
       type,
       amount: String(form.get("amount") ?? "").replace(/,/g, "").trim(),
-      currency: String(form.get("currency") ?? baseCurrency),
+      currency,
       occurredOn: String(form.get("occurredOn") ?? todayISO()),
-      categoryId: categoryId || null,
+      categoryId: isTransfer ? null : categoryId || null,
+      accountId: accountId || null,
+      toAccountId: isTransfer ? toAccountId || null : null,
       description: text("description"),
       merchant: text("merchant"),
       paymentMethod: (text("paymentMethod") as TransactionCreate["paymentMethod"]) ?? null,
@@ -153,9 +202,9 @@ function TransactionForm({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <fieldset className="grid grid-cols-2 gap-2">
+      <fieldset className="grid grid-cols-3 gap-2">
         <legend className="sr-only">Type</legend>
-        {(["expense", "income"] as const).map((value) => (
+        {(["expense", "income", "transfer"] as const).map((value) => (
           <label
             key={value}
             className={`flex cursor-pointer items-center justify-center rounded-[10px] border px-3 py-2 text-[15px] font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-lavender-deep ${
@@ -177,7 +226,7 @@ function TransactionForm({
               }}
               className="sr-only"
             />
-            {value === "expense" ? "Money out" : "Money in"}
+            {TYPE_LABELS[value]}
           </label>
         ))}
       </fieldset>
@@ -202,7 +251,7 @@ function TransactionForm({
         </Field>
         <Field label="Currency" error={fieldError("currency")}>
           {({ id }) => (
-            <Select id={id} name="currency" defaultValue={transaction?.currency ?? baseCurrency}>
+            <Select id={id} name="currency" value={currency} onChange={(event) => setCurrency(event.target.value)}>
               {Array.from(new Set([baseCurrency, ...CURRENCIES])).map((code) => (
                 <option key={code}>{code}</option>
               ))}
@@ -225,18 +274,20 @@ function TransactionForm({
             />
           )}
         </Field>
-        <Field label="Category" error={fieldError("categoryId")}>
-          {({ id }) => (
-            <Select id={id} value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-              <option value="">Uncategorised</option>
-              {options.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
+        {isTransfer ? null : (
+          <Field label="Category" error={fieldError("categoryId")}>
+            {({ id }) => (
+              <Select id={id} value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+                <option value="">Uncategorised</option>
+                {options.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        )}
       </div>
 
       <Field label="What was it for?">
@@ -251,7 +302,7 @@ function TransactionForm({
         )}
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
+      {isTransfer ? null : (
         <Field label="Paid to / from">
           {({ id }) => (
             <Input
@@ -263,18 +314,65 @@ function TransactionForm({
             />
           )}
         </Field>
-        <Field label="Payment method">
-          {({ id }) => (
-            <Select id={id} name="paymentMethod" defaultValue={transaction?.paymentMethod ?? ""}>
-              <option value="">Not set</option>
-              {PAYMENT_METHODS.map((method) => (
-                <option key={method.value} value={method.value}>
-                  {method.label}
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field
+          label={isTransfer ? "From account" : type === "income" ? "Into account" : "From account"}
+          error={fieldError("accountId")}
+        >
+          {({ id, invalid, describedBy }) => (
+            <Select
+              id={id}
+              value={accountId}
+              onChange={(event) => pickFromAccount(event.target.value)}
+              required={isTransfer}
+              aria-invalid={invalid}
+              aria-describedby={describedBy}
+            >
+              <option value="">{isTransfer ? "Choose an account" : "No account"}</option>
+              {accountOptions.map((choice) => (
+                <option key={choice.id} value={choice.id}>
+                  {choice.label}
                 </option>
               ))}
             </Select>
           )}
         </Field>
+        {isTransfer ? (
+          <Field label="To account" error={fieldError("toAccountId")}>
+            {({ id, invalid, describedBy }) => (
+              <Select
+                id={id}
+                value={toAccountId}
+                onChange={(event) => setToAccountId(event.target.value)}
+                required
+                aria-invalid={invalid}
+                aria-describedby={describedBy}
+              >
+                <option value="">Choose an account</option>
+                {toAccountOptions.map((choice) => (
+                  <option key={choice.id} value={choice.id}>
+                    {choice.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        ) : (
+          <Field label="Payment method">
+            {({ id }) => (
+              <Select id={id} name="paymentMethod" defaultValue={transaction?.paymentMethod ?? ""}>
+                <option value="">Not set</option>
+                {PAYMENT_METHODS.map((method) => (
+                  <option key={method.value} value={method.value}>
+                    {method.label}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        )}
       </div>
 
       <Field label="Notes">

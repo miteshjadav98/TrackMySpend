@@ -8,9 +8,11 @@ from typing import Literal
 
 from pydantic import Field
 
+from finance_core.accounts.schemas import AccountRef
+from finance_core.categories.schemas import CategoryRef
 from finance_core.schemas import ApiInput, ApiModel
 
-TransactionTypeField = Literal["expense", "income"]
+TransactionTypeField = Literal["expense", "income", "transfer"]
 PaymentMethodField = Literal[
     "cash", "upi", "debit_card", "credit_card", "card", "net_banking",
     "wallet", "bank_transfer", "cheque", "other",
@@ -25,13 +27,6 @@ PAYMENT_METHOD_LABELS: dict[str, str] = {
 }  # fmt: skip
 
 
-class CategoryRef(ApiModel):
-    id: uuid.UUID
-    slug: str
-    name: str
-    icon: str | None
-
-
 class TransactionView(ApiModel):
     id: uuid.UUID
     type: TransactionTypeField
@@ -41,6 +36,10 @@ class TransactionView(ApiModel):
     amount_formatted: str
     occurred_on: date
     category: CategoryRef | None
+    # Defaults to None so saved chat cards stored before accounts existed still load.
+    account: AccountRef | None = None
+    # Only a transfer has one: the account the money went to.
+    to_account: AccountRef | None = None
     description: str | None
     merchant: str | None
     payment_method: PaymentMethodField | None
@@ -57,6 +56,8 @@ class TransactionCreate(ApiInput):
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     occurred_on: date | None = None
     category_id: uuid.UUID | None = None
+    account_id: uuid.UUID | None = None
+    to_account_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=500)
     merchant: str | None = Field(default=None, max_length=200)
     payment_method: PaymentMethodField | None = None
@@ -76,6 +77,8 @@ class TransactionUpdate(ApiInput):
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     occurred_on: date | None = None
     category_id: uuid.UUID | None = None
+    account_id: uuid.UUID | None = None
+    to_account_id: uuid.UUID | None = None
     description: str | None = Field(default=None, max_length=500)
     merchant: str | None = Field(default=None, max_length=200)
     payment_method: PaymentMethodField | None = None
@@ -91,6 +94,7 @@ class TransactionPage(ApiModel):
 class TransactionQuery:
     type: TransactionTypeField | None = None
     category_id: uuid.UUID | None = None
+    account_id: uuid.UUID | None = None  # matches either end of a transfer
     date_from: date | None = None
     date_to: date | None = None
     text: str | None = None
@@ -115,3 +119,5 @@ class NewTransaction:
     merchant: str | None
     payment_method: str | None
     notes: str | None = None
+    account_id: uuid.UUID | None = None
+    to_account_id: uuid.UUID | None = None

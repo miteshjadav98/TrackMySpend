@@ -102,6 +102,203 @@
         }
       }
     },
+    "/api/v1/auth/password-reset": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Request Password Reset",
+        "description": "Email a reset link to the account with this email, if there is one.\n\nThe reply never says whether the account exists: it is always the same body, and it\ndoes not wait for the account lookup or the email, so its timing gives nothing away.",
+        "operationId": "request_password_reset_api_v1_auth_password_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetRequested"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-reset/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Reset Password",
+        "description": "Set a new password with the token from an emailed reset link.\n\nEvery session of the user is signed out, so this browser drops any cookie it still has.\nNo rate limit is needed here: a token is 256 random bits, so it cannot be guessed.",
+        "operationId": "reset_password_api_v1_auth_password_reset_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Sessions",
+        "description": "The caller's signed-in sessions, this one first.",
+        "operationId": "list_sessions_api_v1_auth_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionView"
+                  },
+                  "type": "array",
+                  "title": "Response List Sessions Api V1 Auth Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke Session",
+        "description": "Sign out one of the caller's devices. Another user's session id is a 404.",
+        "operationId": "revoke_session_api_v1_auth_sessions__session_id__delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/revoke-others": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Revoke Other Sessions",
+        "description": "Sign out every device except the one making this request.",
+        "operationId": "revoke_other_sessions_api_v1_auth_sessions_revoke_others_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokedSessionsView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "description": "Change the caller's password; every other device is signed out, this one stays in.\n\nIt checks the current password, so it is rate-limited like login: a stolen session must\nnot become a way to guess the password.",
+        "operationId": "change_password_api_v1_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me": {
       "get": {
         "tags": [
@@ -260,6 +457,333 @@
         }
       }
     },
+    "/api/v1/accounts": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "List Accounts",
+        "operationId": "list_accounts_api_v1_accounts_get",
+        "parameters": [
+          {
+            "name": "includeArchived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Includearchived"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountView"
+                  },
+                  "title": "Response List Accounts Api V1 Accounts Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Create Account",
+        "operationId": "create_account_api_v1_accounts_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}": {
+      "patch": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Update Account",
+        "operationId": "update_account_api_v1_accounts__account_id__patch",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/merchant-rules": {
+      "get": {
+        "tags": [
+          "merchant rules"
+        ],
+        "summary": "List Merchant Rules",
+        "operationId": "list_merchant_rules_api_v1_merchant_rules_get",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "expense",
+                    "income"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Part of a merchant name",
+              "title": "Q"
+            },
+            "description": "Part of a merchant name"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantRulePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/merchant-rules/{rule_id}": {
+      "patch": {
+        "tags": [
+          "merchant rules"
+        ],
+        "summary": "Change Merchant Rule",
+        "operationId": "change_merchant_rule_api_v1_merchant_rules__rule_id__patch",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MerchantRuleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MerchantRuleView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "merchant rules"
+        ],
+        "summary": "Forget Merchant Rule",
+        "operationId": "forget_merchant_rule_api_v1_merchant_rules__rule_id__delete",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/transactions": {
       "get": {
         "tags": [
@@ -277,7 +801,8 @@
                 {
                   "enum": [
                     "expense",
-                    "income"
+                    "income",
+                    "transfer"
                   ],
                   "type": "string"
                 },
@@ -303,6 +828,23 @@
                 }
               ],
               "title": "Categoryid"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accountid"
             }
           },
           {
@@ -1296,6 +1838,184 @@
   },
   "components": {
     "schemas": {
+      "AccountCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "credit_card",
+              "wallet",
+              "cash",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "AccountCreate",
+        "description": "A new account. Without a currency it takes the user's base currency."
+      },
+      "AccountRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "credit_card",
+              "wallet",
+              "cash",
+              "other"
+            ],
+            "title": "Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind"
+        ],
+        "title": "AccountRef",
+        "description": "A compact reference to an account, as transactions show it."
+      },
+      "AccountUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "bank",
+                  "credit_card",
+                  "wallet",
+                  "cash",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "isArchived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isarchived"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AccountUpdate",
+        "description": "Partial update: a field left out (or null) stays as it is.\n\nThere is no `currency`: an account's currency is fixed when it is created, so sending\none is rejected like any other unknown field."
+      },
+      "AccountView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "credit_card",
+              "wallet",
+              "cash",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "isArchived": {
+            "type": "boolean",
+            "title": "Isarchived"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "currency",
+          "isArchived",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "AccountView",
+        "description": "An account as clients see it. An archived account stays on past transactions."
+      },
       "CategoryCreate": {
         "properties": {
           "name": {
@@ -1367,7 +2087,8 @@
           "name",
           "icon"
         ],
-        "title": "CategoryRef"
+        "title": "CategoryRef",
+        "description": "A compact reference to a category, as transactions and merchant rules show it."
       },
       "CategoryTotal": {
         "properties": {
@@ -1506,7 +2227,9 @@
               "category",
               "date",
               "description",
-              "payment_method"
+              "payment_method",
+              "account",
+              "to_account"
             ],
             "title": "Field"
           },
@@ -1927,7 +2650,8 @@
                 "type": "string",
                 "enum": [
                   "expense",
-                  "income"
+                  "income",
+                  "transfer"
                 ]
               },
               {
@@ -1956,6 +2680,28 @@
               }
             ],
             "title": "Category"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          },
+          "toAccount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toaccount"
           },
           "occurredOn": {
             "anyOf": [
@@ -2021,6 +2767,8 @@
           "type",
           "amount",
           "category",
+          "account",
+          "toAccount",
           "occurredOn",
           "occurredOnLabel",
           "description",
@@ -2131,6 +2879,94 @@
           "profile"
         ],
         "title": "MeView"
+      },
+      "MerchantRulePage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MerchantRuleView"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "MerchantRulePage"
+      },
+      "MerchantRuleUpdate": {
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Categoryid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "categoryId"
+        ],
+        "title": "MerchantRuleUpdate",
+        "description": "A change to a rule: the category its merchant is filed under from now on."
+      },
+      "MerchantRuleView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "merchant": {
+            "type": "string",
+            "title": "Merchant"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "expense",
+              "income"
+            ],
+            "title": "Type"
+          },
+          "category": {
+            "$ref": "#/components/schemas/CategoryRef"
+          },
+          "timesUsed": {
+            "type": "integer",
+            "title": "Timesused"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Lastusedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "merchant",
+          "type",
+          "category",
+          "timesUsed",
+          "lastUsedAt"
+        ],
+        "title": "MerchantRuleView",
+        "description": "One learned rule: the merchant, the category it files them under, and how often."
       },
       "MessagePage": {
         "properties": {
@@ -2342,6 +3178,88 @@
         ],
         "title": "Option"
       },
+      "PasswordChange": {
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 128,
+            "format": "password",
+            "title": "Currentpassword",
+            "writeOnly": true
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 128,
+            "format": "password",
+            "title": "Newpassword",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "title": "PasswordChange",
+        "description": "A signed-in user replacing their password; the current one proves it is them."
+      },
+      "PasswordResetConfirm": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 128,
+            "format": "password",
+            "title": "Token",
+            "writeOnly": true
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 128,
+            "format": "password",
+            "title": "Newpassword",
+            "writeOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "token",
+          "newPassword"
+        ],
+        "title": "PasswordResetConfirm",
+        "description": "A new password, set with the token from an emailed reset link."
+      },
+      "PasswordResetRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "PasswordResetRequest",
+        "description": "A signed-out user asking for a link to reset a forgotten password."
+      },
+      "PasswordResetRequested": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "PasswordResetRequested",
+        "description": "The reply to every reset request. It is the same whether or not the email has an\naccount, so nobody can use it to find out who is registered."
+      },
       "PeriodView": {
         "properties": {
           "start": {
@@ -2488,6 +3406,20 @@
         ],
         "title": "RegisterRequest"
       },
+      "RevokedSessionsView": {
+        "properties": {
+          "revoked": {
+            "type": "integer",
+            "title": "Revoked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revoked"
+        ],
+        "title": "RevokedSessionsView",
+        "description": "How many sessions a \"sign out all other devices\" request signed out."
+      },
       "SendMessageRequest": {
         "properties": {
           "clientMessageId": {
@@ -2521,6 +3453,58 @@
           "input"
         ],
         "title": "SendMessageRequest"
+      },
+      "SessionView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "device": {
+            "type": "string",
+            "title": "Device",
+            "description": "Best guess from the User-Agent, e.g. \"Chrome on Windows\"."
+          },
+          "ipAddress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipaddress"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Lastseenat",
+            "description": "Refreshed at most once an hour."
+          },
+          "isCurrent": {
+            "type": "boolean",
+            "title": "Iscurrent",
+            "description": "True for the session making this request."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "device",
+          "ipAddress",
+          "createdAt",
+          "lastSeenAt",
+          "isCurrent"
+        ],
+        "title": "SessionView",
+        "description": "One signed-in browser or device, as the user sees it in Settings → Security."
       },
       "SpendingSummary": {
         "properties": {
@@ -2687,7 +3671,8 @@
             "type": "string",
             "enum": [
               "expense",
-              "income"
+              "income",
+              "transfer"
             ],
             "title": "Type"
           },
@@ -2739,6 +3724,30 @@
               }
             ],
             "title": "Categoryid"
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "toAccountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toaccountid"
           },
           "description": {
             "anyOf": [
@@ -2899,7 +3908,8 @@
                 "type": "string",
                 "enum": [
                   "expense",
-                  "income"
+                  "income",
+                  "transfer"
                 ]
               },
               {
@@ -2959,6 +3969,30 @@
               }
             ],
             "title": "Categoryid"
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "toAccountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toaccountid"
           },
           "description": {
             "anyOf": [
@@ -3039,7 +4073,8 @@
             "type": "string",
             "enum": [
               "expense",
-              "income"
+              "income",
+              "transfer"
             ],
             "title": "Type"
           },
@@ -3075,6 +4110,26 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/CategoryRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "toAccount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
               },
               {
                 "type": "null"
@@ -3172,6 +4227,8 @@
           "amountFormatted",
           "occurredOn",
           "category",
+          "account",
+          "toAccount",
           "description",
           "merchant",
           "paymentMethod",

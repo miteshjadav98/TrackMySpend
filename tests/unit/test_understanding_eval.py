@@ -11,6 +11,7 @@ from finance_core.llm.rules import RulesLLMClient
 from tests.evals.understanding_cases import CASES, check
 
 TODAY = date(2026, 10, 24)
+ACCOUNTS = ["HDFC", "Paytm", "SBI", "ICICI"]
 CATEGORIES = [CategoryHint(c.slug, c.name, c.kind) for c in SYSTEM_CATEGORIES]
 
 
@@ -22,6 +23,7 @@ def _request(text: str) -> UnderstandRequest:
         base_currency="INR",
         locale="en-IN",
         categories=CATEGORIES,
+        accounts=ACCOUNTS,
     )
 
 
@@ -45,7 +47,13 @@ async def test_gemini_understanding_eval() -> None:
     failures = {}
     for case in CASES:
         result = await client.understand(_request(case["text"]))
-        understanding = reconcile(result.understanding, case["text"], today=TODAY, locale="en-IN")
+        understanding = reconcile(
+            result.understanding,
+            case["text"],
+            today=TODAY,
+            locale="en-IN",
+            account_names=ACCOUNTS,
+        )
         problems = check(case, understanding)
         if problems:
             failures[case["text"]] = problems

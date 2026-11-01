@@ -55,6 +55,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Password Reset
+         * @description Email a reset link to the account with this email, if there is one.
+         *
+         *     The reply never says whether the account exists: it is always the same body, and it
+         *     does not wait for the account lookup or the email, so its timing gives nothing away.
+         */
+        post: operations["request_password_reset_api_v1_auth_password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Password
+         * @description Set a new password with the token from an emailed reset link.
+         *
+         *     Every session of the user is signed out, so this browser drops any cookie it still has.
+         *     No rate limit is needed here: a token is 256 random bits, so it cannot be guessed.
+         */
+        post: operations["reset_password_api_v1_auth_password_reset_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description The caller's signed-in sessions, this one first.
+         */
+        get: operations["list_sessions_api_v1_auth_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Session
+         * @description Sign out one of the caller's devices. Another user's session id is a 404.
+         */
+        delete: operations["revoke_session_api_v1_auth_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/revoke-others": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Other Sessions
+         * @description Sign out every device except the one making this request.
+         */
+        post: operations["revoke_other_sessions_api_v1_auth_sessions_revoke_others_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Password
+         * @description Change the caller's password; every other device is signed out, this one stays in.
+         *
+         *     It checks the current password, so it is rate-limited like login: a stolen session must
+         *     not become a way to guess the password.
+         */
+        post: operations["change_password_api_v1_auth_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -105,6 +234,76 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Accounts */
+        get: operations["list_accounts_api_v1_accounts_get"];
+        put?: never;
+        /** Create Account */
+        post: operations["create_account_api_v1_accounts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounts/{account_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Account */
+        patch: operations["update_account_api_v1_accounts__account_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/merchant-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Merchant Rules */
+        get: operations["list_merchant_rules_api_v1_merchant_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Forget Merchant Rule */
+        delete: operations["forget_merchant_rule_api_v1_merchant_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        /** Change Merchant Rule */
+        patch: operations["change_merchant_rule_api_v1_merchant_rules__rule_id__patch"];
         trace?: never;
     };
     "/api/v1/transactions": {
@@ -263,6 +462,86 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccountCreate
+         * @description A new account. Without a currency it takes the user's base currency.
+         */
+        AccountCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bank" | "credit_card" | "wallet" | "cash" | "other";
+            /** Currency */
+            currency?: string | null;
+        };
+        /**
+         * AccountRef
+         * @description A compact reference to an account, as transactions show it.
+         */
+        AccountRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bank" | "credit_card" | "wallet" | "cash" | "other";
+        };
+        /**
+         * AccountUpdate
+         * @description Partial update: a field left out (or null) stays as it is.
+         *
+         *     There is no `currency`: an account's currency is fixed when it is created, so sending
+         *     one is rejected like any other unknown field.
+         */
+        AccountUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Kind */
+            kind?: ("bank" | "credit_card" | "wallet" | "cash" | "other") | null;
+            /** Isarchived */
+            isArchived?: boolean | null;
+        };
+        /**
+         * AccountView
+         * @description An account as clients see it. An archived account stays on past transactions.
+         */
+        AccountView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bank" | "credit_card" | "wallet" | "cash" | "other";
+            /** Currency */
+            currency: string;
+            /** Isarchived */
+            isArchived: boolean;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
         /** CategoryCreate */
         CategoryCreate: {
             /** Name */
@@ -275,7 +554,10 @@ export interface components {
             /** Icon */
             icon?: string | null;
         };
-        /** CategoryRef */
+        /**
+         * CategoryRef
+         * @description A compact reference to a category, as transactions and merchant rules show it.
+         */
         CategoryRef: {
             /**
              * Id
@@ -346,7 +628,7 @@ export interface components {
              * Field
              * @enum {string}
              */
-            field: "type" | "amount" | "currency" | "category" | "date" | "description" | "payment_method";
+            field: "type" | "amount" | "currency" | "category" | "date" | "description" | "payment_method" | "account" | "to_account";
             /**
              * Inputkind
              * @enum {string}
@@ -499,10 +781,14 @@ export interface components {
          */
         DraftPreview: {
             /** Type */
-            type: ("expense" | "income") | null;
+            type: ("expense" | "income" | "transfer") | null;
             amount: components["schemas"]["MoneyAmount"] | null;
             /** Category */
             category: string | null;
+            /** Account */
+            account: string | null;
+            /** Toaccount */
+            toAccount: string | null;
             /** Occurredon */
             occurredOn: string | null;
             /** Occurredonlabel */
@@ -556,6 +842,50 @@ export interface components {
         MeView: {
             user: components["schemas"]["UserView"];
             profile: components["schemas"]["ProfileView"];
+        };
+        /** MerchantRulePage */
+        MerchantRulePage: {
+            /** Items */
+            items: components["schemas"]["MerchantRuleView"][];
+            /** Nextcursor */
+            nextCursor: string | null;
+        };
+        /**
+         * MerchantRuleUpdate
+         * @description A change to a rule: the category its merchant is filed under from now on.
+         */
+        MerchantRuleUpdate: {
+            /**
+             * Categoryid
+             * Format: uuid
+             */
+            categoryId: string;
+        };
+        /**
+         * MerchantRuleView
+         * @description One learned rule: the merchant, the category it files them under, and how often.
+         */
+        MerchantRuleView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Merchant */
+            merchant: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "expense" | "income";
+            category: components["schemas"]["CategoryRef"];
+            /** Timesused */
+            timesUsed: number;
+            /**
+             * Lastusedat
+             * Format: date-time
+             */
+            lastUsedAt: string;
         };
         /** MessagePage */
         MessagePage: {
@@ -619,6 +949,58 @@ export interface components {
             description: string | null;
             /** Icon */
             icon: string | null;
+        };
+        /**
+         * PasswordChange
+         * @description A signed-in user replacing their password; the current one proves it is them.
+         */
+        PasswordChange: {
+            /**
+             * Currentpassword
+             * Format: password
+             */
+            currentPassword: string;
+            /**
+             * Newpassword
+             * Format: password
+             */
+            newPassword: string;
+        };
+        /**
+         * PasswordResetConfirm
+         * @description A new password, set with the token from an emailed reset link.
+         */
+        PasswordResetConfirm: {
+            /**
+             * Token
+             * Format: password
+             */
+            token: string;
+            /**
+             * Newpassword
+             * Format: password
+             */
+            newPassword: string;
+        };
+        /**
+         * PasswordResetRequest
+         * @description A signed-out user asking for a link to reset a forgotten password.
+         */
+        PasswordResetRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+        };
+        /**
+         * PasswordResetRequested
+         * @description The reply to every reset request. It is the same whether or not the email has an
+         *     account, so nobody can use it to find out who is registered.
+         */
+        PasswordResetRequested: {
+            /** Message */
+            message: string;
         };
         /** PeriodView */
         PeriodView: {
@@ -685,6 +1067,14 @@ export interface components {
              */
             locale: string;
         };
+        /**
+         * RevokedSessionsView
+         * @description How many sessions a "sign out all other devices" request signed out.
+         */
+        RevokedSessionsView: {
+            /** Revoked */
+            revoked: number;
+        };
         /** SendMessageRequest */
         SendMessageRequest: {
             /**
@@ -694,6 +1084,40 @@ export interface components {
             clientMessageId: string;
             /** Input */
             input: components["schemas"]["TextInput"] | components["schemas"]["InteractionResponse"];
+        };
+        /**
+         * SessionView
+         * @description One signed-in browser or device, as the user sees it in Settings → Security.
+         */
+        SessionView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Device
+             * @description Best guess from the User-Agent, e.g. "Chrome on Windows".
+             */
+            device: string;
+            /** Ipaddress */
+            ipAddress: string | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Lastseenat
+             * Format: date-time
+             * @description Refreshed at most once an hour.
+             */
+            lastSeenAt: string;
+            /**
+             * Iscurrent
+             * @description True for the session making this request.
+             */
+            isCurrent: boolean;
         };
         /**
          * SpendingSummary
@@ -774,7 +1198,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "expense" | "income";
+            type: "expense" | "income" | "transfer";
             /** Amount */
             amount: number | string;
             /** Currency */
@@ -783,6 +1207,10 @@ export interface components {
             occurredOn?: string | null;
             /** Categoryid */
             categoryId?: string | null;
+            /** Accountid */
+            accountId?: string | null;
+            /** Toaccountid */
+            toAccountId?: string | null;
             /** Description */
             description?: string | null;
             /** Merchant */
@@ -830,7 +1258,7 @@ export interface components {
             /** Version */
             version: number;
             /** Type */
-            type?: ("expense" | "income") | null;
+            type?: ("expense" | "income" | "transfer") | null;
             /** Amount */
             amount?: number | string | null;
             /** Currency */
@@ -839,6 +1267,10 @@ export interface components {
             occurredOn?: string | null;
             /** Categoryid */
             categoryId?: string | null;
+            /** Accountid */
+            accountId?: string | null;
+            /** Toaccountid */
+            toAccountId?: string | null;
             /** Description */
             description?: string | null;
             /** Merchant */
@@ -859,7 +1291,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "expense" | "income";
+            type: "expense" | "income" | "transfer";
             /** Amount */
             amount: number | string;
             /** Amountminor */
@@ -874,6 +1306,8 @@ export interface components {
              */
             occurredOn: string;
             category: components["schemas"]["CategoryRef"] | null;
+            account: components["schemas"]["AccountRef"] | null;
+            toAccount: components["schemas"]["AccountRef"] | null;
             /** Description */
             description: string | null;
             /** Merchant */
@@ -1119,6 +1553,170 @@ export interface operations {
             };
         };
     };
+    request_password_reset_api_v1_auth_password_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetRequested"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_password_api_v1_auth_password_reset_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_v1_auth_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionView"][];
+                };
+            };
+        };
+    };
+    revoke_session_api_v1_auth_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_other_sessions_api_v1_auth_sessions_revoke_others_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokedSessionsView"];
+                };
+            };
+        };
+    };
+    change_password_api_v1_auth_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_me_api_v1_me_get: {
         parameters: {
             query?: never;
@@ -1236,11 +1834,210 @@ export interface operations {
             };
         };
     };
-    list_transactions_api_v1_transactions_get: {
+    list_accounts_api_v1_accounts_get: {
+        parameters: {
+            query?: {
+                includeArchived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_account_api_v1_accounts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_account_api_v1_accounts__account_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_merchant_rules_api_v1_merchant_rules_get: {
         parameters: {
             query?: {
                 type?: ("expense" | "income") | null;
+                /** @description Part of a merchant name */
+                q?: string | null;
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantRulePage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_merchant_rule_api_v1_merchant_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_merchant_rule_api_v1_merchant_rules__rule_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MerchantRuleUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantRuleView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_transactions_api_v1_transactions_get: {
+        parameters: {
+            query?: {
+                type?: ("expense" | "income" | "transfer") | null;
                 categoryId?: string | null;
+                accountId?: string | null;
                 from?: string | null;
                 to?: string | null;
                 q?: string | null;

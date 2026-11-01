@@ -1,12 +1,15 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { ApiError } from "@/lib/api";
+import { followSystemTheme } from "@/lib/theme";
 import { ToastProvider } from "@/components/ui/toast";
 
 export function Providers({ children }: { children: ReactNode }) {
+  // With the "system" theme, switch light/dark live when the operating system does.
+  useEffect(() => followSystemTheme(), []);
   const [client] = useState(
     () =>
       new QueryClient({

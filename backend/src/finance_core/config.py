@@ -59,12 +59,17 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:3000"]
     )
     password_min_length: int = Field(default=10, ge=8)
+    # Where the web app is served; emailed links (password reset) point here.
+    web_base_url: str = "http://localhost:3000"
 
     # --- rate limits (per user / per IP, fixed window) --------------------------------
     rate_limit_login_per_minute: int = 10
     rate_limit_register_per_hour: int = 20
     rate_limit_chat_per_minute: int = 20
     rate_limit_chat_per_day: int = 500
+    # Each reset request sends an email, so these keep the feature from spamming anyone.
+    rate_limit_password_reset_per_email_per_hour: int = 5
+    rate_limit_password_reset_per_ip_per_hour: int = 20
 
     # --- LLM (Gemini on Vertex AI) ----------------------------------------------------
     llm_provider: Literal["gemini", "rules"] = "rules"

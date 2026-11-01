@@ -40,7 +40,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={toast.id}
             className={`rise-in pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm shadow-[var(--shadow-card)] ${
-              toast.tone === "error" ? "bg-danger text-white" : "bg-ink text-white"
+              toast.tone === "error" ? "bg-danger text-white" : "bg-night text-white"
             }`}
           >
             <span>{toast.message}</span>
