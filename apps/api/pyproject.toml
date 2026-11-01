@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
   "finance-core",
   "fastapi>=0.120",
-  "uvicorn[standard]>=0.38",
+  "uvicorn[standard]>=0.54.0",
 ]
 
 [project.scripts]
