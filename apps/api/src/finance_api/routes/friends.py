@@ -9,6 +9,7 @@ from fastapi import APIRouter, Response
 from finance_api.deps import RequestIdDep, SessionDep, UserContextDep
 from finance_core.friends.schemas import (
     FriendCreate,
+    FriendDetail,
     FriendInviteView,
     FriendUpdate,
     FriendView,
@@ -21,6 +22,13 @@ router = APIRouter(prefix="/api/v1", tags=["friends"])
 @router.get("/friends")
 async def list_friends(ctx: UserContextDep, session: SessionDep) -> list[FriendView]:
     return await FriendService(session).list_friends(ctx)
+
+
+@router.get("/friends/{friend_id}")
+async def get_friend(
+    friend_id: uuid.UUID, ctx: UserContextDep, session: SessionDep
+) -> FriendDetail:
+    return await FriendService(session).detail(ctx, friend_id)
 
 
 @router.post("/friends", status_code=201)

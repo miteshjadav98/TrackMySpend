@@ -4,6 +4,9 @@ import type { FriendInviteView, FriendUpdate, FriendView } from "@moneymoney/con
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 
+import Link from "next/link";
+
+import { balanceSentence, balanceTone } from "@/components/friends/balance-text";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -182,8 +185,15 @@ function FriendRow({ friend }: { friend: FriendView }) {
   return (
     <li className="flex items-center gap-3 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{friend.name}</p>
+        <Link href={`/friends/${friend.id}`} className="block truncate font-medium hover:underline">
+          {friend.name}
+        </Link>
         <p className="truncate text-xs text-ink-faint">{friendDetail(friend)}</p>
+        {friend.balances.map((balance) => (
+          <p key={balance.currency} className={`figure text-sm font-medium ${balanceTone(balance)}`}>
+            {balanceSentence(friend.name, balance)}
+          </p>
+        ))}
       </div>
       {confirmingRemove ? (
         <>
