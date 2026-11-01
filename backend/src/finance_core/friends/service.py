@@ -11,6 +11,8 @@ The rules it enforces:
   A linked friend's email is fixed (409 `friend_linked`).
 - Accepting also brings over every shared expense the two recorded with each other before they
   linked (see `share_delivery`), once, in the same database transaction.
+- The invited user is told of a pending invite, and the inviter of an accepted one, in the
+  same database transaction.
 - Every change is audited in the same database transaction as the change.
 """
 
@@ -36,6 +38,7 @@ from finance_core.friends.models import (
     SharedExpense,
     SharedExpenseShare,
 )
+from finance_core.friends.notices import INVITE_ACCEPTED, INVITE_RECEIVED, NoticeWriter
 from finance_core.friends.schemas import (
     BalanceView,
     FriendCreate,
@@ -76,6 +79,7 @@ class FriendService:
         self._session = session
         self._generation = generation
         self._delivery = ShareDelivery(session, clock=clock)
+        self._notices = NoticeWriter(session)
 
     # -- friends --------------------------------------------------------------------------
 
@@ -118,7 +122,7 @@ class FriendService:
         self._session.add(friend)
         self._audit(ctx.user_id, "friend.created", friend.id, {"name": friend.name, "email": email},
                     request_id=request_id)  # fmt: skip
-        invite = self._invite(ctx, friend, request_id) if email else None
+        invite = await self._invite(ctx, friend, request_id) if email else None
         await self._commit()
         await self._session.refresh(friend)
         return self._view(friend, invite.status if invite else None, [])
@@ -162,7 +166,7 @@ class FriendService:
                 changes["email"] = [friend.email, email]
                 friend.email = email
                 if email:
-                    self._invite(ctx, friend, request_id)
+                    await self._invite(ctx, friend, request_id)
 
         if not changes:
             return await self._view_of(ctx, friend)
@@ -245,6 +249,9 @@ class FriendService:
         # The inviter's row changed too, so it is recorded under the inviter.
         self._audit(inviter.id, "friend.linked", inviters_row.id,
                     {"linked_user_id": str(ctx.user_id)}, request_id=request_id)  # fmt: skip
+        await self._notices.notify(
+            recipient_id=inviter.id, actor_id=ctx.user_id, kind=INVITE_ACCEPTED, friend=inviters_row
+        )
         # Flushed so the delivery below sees both rows as linked.
         await self._session.flush()
         await self._delivery.bring_over_between(inviter.id, ctx.user_id, request_id)
@@ -318,7 +325,9 @@ class FriendService:
                     request_id=request_id)  # fmt: skip
         return created
 
-    def _invite(self, ctx: UserContext, friend: Friend, request_id: str | None) -> FriendInvite:
+    async def _invite(
+        self, ctx: UserContext, friend: Friend, request_id: str | None
+    ) -> FriendInvite:
         assert friend.email is not None
         invite = FriendInvite(
             id=uuid7(), friend_id=friend.id, invitee_email=friend.email, status="pending"
@@ -326,6 +335,15 @@ class FriendService:
         self._session.add(invite)
         self._audit(ctx.user_id, "friend_invite.sent", invite.id, {"friend_id": str(friend.id)},
                     entity_type="friend_invite", request_id=request_id)  # fmt: skip
+        # An invitee who already has an account is told; one who signs up later finds the
+        # invite waiting in their invites list instead.
+        invitee_id = await self._session.scalar(
+            select(User.id).where(func.lower(User.email) == friend.email)
+        )
+        if invitee_id is not None:
+            await self._notices.notify(
+                recipient_id=invitee_id, actor_id=ctx.user_id, kind=INVITE_RECEIVED
+            )
         return invite
 
     async def _ensure_email_is_usable(

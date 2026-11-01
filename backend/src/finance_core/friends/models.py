@@ -206,3 +206,47 @@ class Settlement(Base):
         ForeignKey(f"{SCHEMA_LEDGER}.accounts.id")
     )
     created_at: Mapped[datetime] = created_at_column()
+
+
+NOTICE_KINDS = (
+    "shared_expense_added",
+    "shared_expense_changed",
+    "shared_expense_deleted",
+    "settlement_recorded",
+    "settlement_deleted",
+    "invite_accepted",
+    "invite_received",
+)
+
+
+class Notice(Base):
+    """Something that happened in a friend's records that the user should hear about.
+
+    It keeps the facts, not the sentence; the sentence is worded when it is read. The shared
+    expense is not linked by a foreign key because a deleted one must still have its notice.
+    """
+
+    __tablename__ = "notices"
+    __table_args__ = (
+        CheckConstraint(f"kind IN ({', '.join(repr(kind) for kind in NOTICE_KINDS)})", name="kind"),
+        Index("ix_notices_user_created", "user_id", text("created_at DESC"), text("id DESC")),
+        Index("ix_notices_user_unread", "user_id", postgresql_where=text("read_at IS NULL")),
+        {"schema": SCHEMA_LEDGER},
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA_IDENTITY}.users.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(32))
+    # Who did it, named the way this user knows them, kept as written at the time.
+    actor_name: Mapped[str] = mapped_column(String(80))
+    # This user's own friend row for the actor, so a click can open that friend.
+    friend_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.friends.id", ondelete="SET NULL")
+    )
+    subject: Mapped[str | None] = mapped_column(String(500))  # the expense's description
+    amount_minor: Mapped[int | None] = mapped_column(BigInteger)
+    currency: Mapped[str | None] = mapped_column(String(3))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = created_at_column()

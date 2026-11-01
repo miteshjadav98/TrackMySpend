@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ClarificationCard, ConfirmationCard, type Respond } from "@/components/chat/cards/question-cards";
 import { SavedCard, SummaryCard, TransactionListCard } from "@/components/chat/cards/result-cards";
 import { Composer } from "@/components/chat/composer";
+import { SharedWithYouCard } from "@/components/notices/shared-with-you-card";
 import { TallyStrip } from "@/components/chat/tally-strip";
 import { Button } from "@/components/ui/button";
 import { NamedIcon } from "@/components/ui/icons";
@@ -219,6 +220,7 @@ export function ChatView({ conversationId }: { conversationId: string }) {
       <TallyStrip />
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto" aria-live="polite" aria-busy={busy}>
         <div className="mx-auto flex max-w-3xl flex-col gap-5 px-4 py-6 md:px-8">
+          <SharedWithYouCard />
           {detail.isPending ? <p className="text-center text-sm text-ink-faint">Loading conversation…</p> : null}
 
           {!detail.isPending && messages.length === 0 && !live ? (

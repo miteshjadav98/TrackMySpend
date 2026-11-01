@@ -9,6 +9,8 @@ import type {
   ConversationDetail,
   ConversationPage,
   MerchantRulePage,
+  NoticeList,
+  UnreadCount,
   MeView,
   SharedExpenseView,
   SpendingSummary,
@@ -36,6 +38,7 @@ export const keys = {
   // Under the friends key, so changing friends also refreshes every friend's page.
   friend: (id: string) => ["friends", id] as const,
   friendInvites: ["friend-invites"] as const,
+  notices: ["notices"] as const,
   sharedExpense: (id: string) => ["shared-expense", id] as const,
   merchantRules: (search: string) => ["merchant-rules", search] as const,
 };
@@ -219,4 +222,18 @@ export function useSharedExpense(id: string | null) {
         }),
       ),
   });
+}
+
+/** The "Shared with you" notices and how many are unread. The nav badge and the cards share it. */
+export function useNotices() {
+  return useQuery({
+    queryKey: keys.notices,
+    queryFn: () => unwrap<NoticeList>(api.GET("/api/v1/notices", { params: { query: { limit: 20 } } })),
+  });
+}
+
+/** Mark notices read (every unread one when no ids are given), then refresh the count. */
+export async function markNoticesRead(client: QueryClient, ids?: string[]): Promise<void> {
+  await unwrap<UnreadCount>(api.POST("/api/v1/notices/read", { body: { ids: ids ?? null } }));
+  await client.invalidateQueries({ queryKey: keys.notices });
 }

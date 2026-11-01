@@ -9,6 +9,7 @@ from finance_core.database.base import Base
 from finance_core.friends.models import (
     Friend,
     FriendInvite,
+    Notice,
     Settlement,
     SharedExpense,
     SharedExpenseShare,
@@ -29,6 +30,7 @@ __all__ = [
     "FriendInvite",
     "MerchantRule",
     "Message",
+    "Notice",
     "PasswordResetToken",
     "Settlement",
     "SharedExpense",
