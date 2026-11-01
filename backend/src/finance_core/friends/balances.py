@@ -9,17 +9,23 @@ A line is positive when it makes the friend owe the user more:
 - the user's share of an expense the friend paid: -share
 - a settlement the friend paid the user: -amount
 - a settlement the user paid the friend: +amount
+
+A linked friend's own records add the mirror lines, so both sides always agree: what a friend
+recorded with the user counts for the user too, against the user's own friend row for them
+(see `_lines_recorded_by_friends`).
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from typing import Any
 
-from sqlalchemy import Select, case, func, literal, select, union_all
+from sqlalchemy import Select, and_, case, func, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
-from finance_core.friends.models import Settlement, SharedExpense, SharedExpenseShare
+from finance_core.friends.models import Friend, Settlement, SharedExpense, SharedExpenseShare
 from finance_core.friends.schemas import BalanceView, HistoryEntry
 from finance_core.money import format_money, from_minor
 
@@ -80,7 +86,92 @@ def balance_lines(user_id: uuid.UUID) -> Select[tuple[object, ...]]:
         Settlement.created_at.label("created_at"),
         Settlement.note.label("label"),
     ).where(Settlement.recorder_id == user_id)
-    return union_all(friends_share_of_my_expense, my_share_of_friends_expense, settlements)  # type: ignore[return-value]
+    return union_all(  # type: ignore[return-value]
+        friends_share_of_my_expense,
+        my_share_of_friends_expense,
+        settlements,
+        *_lines_recorded_by_friends(user_id),
+    )
+
+
+def _lines_recorded_by_friends(user_id: uuid.UUID) -> list[Select[tuple[object, ...]]]:
+    """The same balance as the linked friend sees it: what they recorded with this user.
+
+    Their friend row for this user is `recorder_friend` (linked to the user); the user's own
+    row for the recorder is `mine`, and is the friend the line belongs to. Every line is
+    the mirror image of the recorder's: what makes the user owe more is negative here.
+    """
+    recorder_friend = aliased(Friend)
+    mine = aliased(Friend)
+    recorders_share = aliased(SharedExpenseShare)
+
+    def with_recorder(query: Any, recorder_id: Any) -> Select[tuple[object, ...]]:
+        return query.join(
+            mine,
+            and_(
+                mine.user_id == user_id,
+                mine.linked_user_id == recorder_id,
+                mine.is_archived.is_(False),
+            ),
+        )
+
+    my_share_of_their_expense = with_recorder(
+        select(
+            mine.id.label("friend_id"),
+            SharedExpense.currency.label("currency"),
+            (-SharedExpenseShare.amount_minor).label("effect_minor"),
+            literal(SHARED_EXPENSE).label("kind"),
+            SharedExpense.id.label("entity_id"),
+            SharedExpense.occurred_on.label("occurred_on"),
+            SharedExpense.created_at.label("created_at"),
+            SharedExpense.description.label("label"),
+        )
+        .select_from(SharedExpenseShare)
+        .join(SharedExpense, SharedExpense.id == SharedExpenseShare.shared_expense_id)
+        .join(recorder_friend, recorder_friend.id == SharedExpenseShare.friend_id),
+        SharedExpense.recorder_id,
+    ).where(recorder_friend.linked_user_id == user_id, SharedExpense.payer_friend_id.is_(None))
+    their_share_of_my_expense = with_recorder(
+        select(
+            mine.id.label("friend_id"),
+            SharedExpense.currency.label("currency"),
+            recorders_share.amount_minor.label("effect_minor"),
+            literal(SHARED_EXPENSE).label("kind"),
+            SharedExpense.id.label("entity_id"),
+            SharedExpense.occurred_on.label("occurred_on"),
+            SharedExpense.created_at.label("created_at"),
+            SharedExpense.description.label("label"),
+        )
+        .select_from(SharedExpense)
+        .join(recorder_friend, recorder_friend.id == SharedExpense.payer_friend_id)
+        .join(
+            recorders_share,
+            and_(
+                recorders_share.shared_expense_id == SharedExpense.id,
+                recorders_share.friend_id.is_(None),
+            ),
+        ),
+        SharedExpense.recorder_id,
+    ).where(recorder_friend.linked_user_id == user_id)
+    their_settlements = with_recorder(
+        select(
+            mine.id.label("friend_id"),
+            Settlement.currency.label("currency"),
+            case(
+                (Settlement.paid_by_recorder, -Settlement.amount_minor),
+                else_=Settlement.amount_minor,
+            ).label("effect_minor"),
+            literal(SETTLEMENT).label("kind"),
+            Settlement.id.label("entity_id"),
+            Settlement.occurred_on.label("occurred_on"),
+            Settlement.created_at.label("created_at"),
+            Settlement.note.label("label"),
+        )
+        .select_from(Settlement)
+        .join(recorder_friend, recorder_friend.id == Settlement.friend_id),
+        Settlement.recorder_id,
+    ).where(recorder_friend.linked_user_id == user_id)
+    return [my_share_of_their_expense, their_share_of_my_expense, their_settlements]
 
 
 async def balances_by_friend(
