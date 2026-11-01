@@ -23,15 +23,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_core.audit.service import record_audit
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
+from finance_core.friends.balances import balances_by_friend, history_with
 from finance_core.friends.models import (
     ACTIVE_EMAIL_INDEX,
     Friend,
     FriendInvite,
+    Settlement,
     SharedExpense,
     SharedExpenseShare,
 )
 from finance_core.friends.schemas import (
+    BalanceView,
     FriendCreate,
+    FriendDetail,
     FriendInviteView,
     FriendUpdate,
     FriendView,
@@ -71,8 +75,18 @@ class FriendService:
                 .order_by(func.lower(Friend.name), Friend.created_at, Friend.id)
             )
         ).all()
-        statuses = await self._open_invite_statuses([row.id for row in rows])
-        return [self._view(row, statuses.get(row.id)) for row in rows]
+        ids = [row.id for row in rows]
+        statuses = await self._open_invite_statuses(ids)
+        balances = await balances_by_friend(self._session, ctx.user_id, ids, ctx.locale)
+        return [self._view(row, statuses.get(row.id), balances.get(row.id, [])) for row in rows]
+
+    async def detail(self, ctx: UserContext, friend_id: uuid.UUID) -> FriendDetail:
+        """One friend with their balances and the shared expenses and settlements between you."""
+        friend = await self._owned_friend(ctx.user_id, friend_id)
+        return FriendDetail(
+            friend=await self._view_of(ctx, friend),
+            history=await history_with(self._session, ctx.user_id, friend.id, ctx.locale),
+        )
 
     async def add(
         self, ctx: UserContext, data: FriendCreate, *, request_id: str | None = None
@@ -94,7 +108,7 @@ class FriendService:
         invite = self._invite(ctx, friend, request_id) if email else None
         await self._commit()
         await self._session.refresh(friend)
-        return self._view(friend, invite.status if invite else None)
+        return self._view(friend, invite.status if invite else None, [])
 
     async def update(
         self,
@@ -138,13 +152,13 @@ class FriendService:
                     self._invite(ctx, friend, request_id)
 
         if not changes:
-            return await self._view_of(friend)
+            return await self._view_of(ctx, friend)
         self._audit(
             ctx.user_id, "friend.updated", friend.id, {"changes": changes}, request_id=request_id
         )
         await self._commit()
         await self._session.refresh(friend)
-        return await self._view_of(friend)
+        return await self._view_of(ctx, friend)
 
     async def remove(
         self, ctx: UserContext, friend_id: uuid.UUID, *, request_id: str | None = None
@@ -161,16 +175,20 @@ class FriendService:
         await self._commit()
 
     async def _has_shared_history(self, friend: Friend) -> bool:
-        """True when the friend is in a shared expense.
+        """True when the friend is in a shared expense or has a settlement.
 
-        Such a friend is archived instead of deleted, which keeps past expenses (and later
-        balances and settlements) correct. Settlements will extend this check.
+        Such a friend is archived instead of deleted, which keeps past expenses, settlements
+        and balances correct.
         """
+        settled = select(Settlement.id).where(Settlement.friend_id == friend.id)
         in_a_share = select(SharedExpenseShare.id).where(SharedExpenseShare.friend_id == friend.id)
         paid_one = select(SharedExpense.id).where(SharedExpense.payer_friend_id == friend.id)
-        return (await self._session.scalar(in_a_share.limit(1))) is not None or (
-            await self._session.scalar(paid_one.limit(1))
-        ) is not None
+        return any(
+            [
+                (await self._session.scalar(query.limit(1))) is not None
+                for query in (in_a_share, paid_one, settled)
+            ]
+        )
 
     # -- invites --------------------------------------------------------------------------
 
@@ -216,7 +234,7 @@ class FriendService:
                     {"linked_user_id": str(ctx.user_id)}, request_id=request_id)  # fmt: skip
         await self._commit()
         await self._session.refresh(mine)
-        return self._view(mine, None)
+        return await self._view_of(ctx, mine)
 
     async def decline(
         self, ctx: UserContext, invite_id: uuid.UUID, *, request_id: str | None = None
@@ -330,18 +348,20 @@ class FriendService:
         )
         return {friend_id: status for friend_id, status in rows.all()}
 
-    async def _view_of(self, friend: Friend) -> FriendView:
+    async def _view_of(self, ctx: UserContext, friend: Friend) -> FriendView:
         statuses = await self._open_invite_statuses([friend.id])
-        return self._view(friend, statuses.get(friend.id))
+        balances = await balances_by_friend(self._session, ctx.user_id, [friend.id], ctx.locale)
+        return self._view(friend, statuses.get(friend.id), balances.get(friend.id, []))
 
     @staticmethod
-    def _view(friend: Friend, invite_status: str | None) -> FriendView:
+    def _view(friend: Friend, invite_status: str | None, balances: list[BalanceView]) -> FriendView:
         return FriendView(
             id=friend.id,
             name=friend.name,
             email=friend.email,
             is_linked=friend.linked_user_id is not None,
             invite_status=invite_status,
+            balances=balances,
             created_at=friend.created_at,
             updated_at=friend.updated_at,
         )

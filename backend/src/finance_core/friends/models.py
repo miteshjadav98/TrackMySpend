@@ -1,4 +1,4 @@
-"""The friends, friend_invites, shared_expenses and shared_expense_shares tables."""
+"""The friends, friend_invites, shared_expenses, shared_expense_shares and settlements tables."""
 
 from __future__ import annotations
 
@@ -167,3 +167,42 @@ class SharedExpenseShare(Base):
     # The recorder's friend, or null for the recorder's own share.
     friend_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(f"{SCHEMA_LEDGER}.friends.id"))
     amount_minor: Mapped[int] = mapped_column(BigInteger)
+
+
+class Settlement(Base):
+    """Money handed over between the recorder and one of their friends to settle up.
+
+    It is not a transaction, so it never counts as spending or income; it only moves the
+    balance between the two. `paid_by_recorder` says which way the money went. Each user's own
+    account tag sits on their side, so a linked friend can later tag the same settlement
+    with their account without touching the recorder's.
+    """
+
+    __tablename__ = "settlements"
+    __table_args__ = (
+        CheckConstraint("amount_minor > 0 AND amount_minor <= 1000000000000000", name="amount"),
+        CheckConstraint("currency ~ '^[A-Z]{3}$'", name="currency"),
+        Index("ix_settlements_recorder_date", "recorder_id", text("occurred_on DESC")),
+        Index("ix_settlements_friend", "friend_id"),
+        {"schema": SCHEMA_LEDGER},
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    recorder_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA_IDENTITY}.users.id", ondelete="CASCADE")
+    )
+    # The recorder's friend row. NO ACTION: a friend with a settlement is archived, not deleted.
+    friend_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA_LEDGER}.friends.id"))
+    paid_by_recorder: Mapped[bool] = mapped_column(Boolean)
+    amount_minor: Mapped[int] = mapped_column(BigInteger)
+    currency: Mapped[str] = mapped_column(String(3))
+    occurred_on: Mapped[date] = mapped_column(Date)
+    note: Mapped[str | None] = mapped_column(String(500))
+    # Each user's own account tag; the friend's is set from the friend's side.
+    recorder_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.accounts.id")
+    )
+    friend_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.accounts.id")
+    )
+    created_at: Mapped[datetime] = created_at_column()

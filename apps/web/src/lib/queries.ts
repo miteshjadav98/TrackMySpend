@@ -3,6 +3,7 @@
 import type {
   AccountView,
   CategoryView,
+  FriendDetail,
   FriendInviteView,
   FriendView,
   ConversationDetail,
@@ -32,6 +33,8 @@ export const keys = {
   accounts: (includeArchived: boolean) => ["accounts", { includeArchived }] as const,
   transactions: (filters: TransactionFilters) => ["transactions", filters] as const,
   friends: ["friends"] as const,
+  // Under the friends key, so changing friends also refreshes every friend's page.
+  friend: (id: string) => ["friends", id] as const,
   friendInvites: ["friend-invites"] as const,
   sharedExpense: (id: string) => ["shared-expense", id] as const,
   merchantRules: (search: string) => ["merchant-rules", search] as const,
@@ -174,6 +177,17 @@ export function useFriends() {
   return useQuery({
     queryKey: keys.friends,
     queryFn: () => unwrap<FriendView[]>(api.GET("/api/v1/friends")),
+  });
+}
+
+/** One friend with their balances and the shared expenses and settlements between you. */
+export function useFriendDetail(id: string) {
+  return useQuery({
+    queryKey: keys.friend(id),
+    queryFn: () =>
+      unwrap<FriendDetail>(
+        api.GET("/api/v1/friends/{friend_id}", { params: { path: { friend_id: id } } }),
+      ),
   });
 }
 
