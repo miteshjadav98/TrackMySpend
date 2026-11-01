@@ -29,4 +29,4 @@ Spec: `../spec.md` → User Stories 10, 30-35, 37, 48; Implementation Decisions 
 - Archived friends take no new settlements (404), like new shared expenses.
 - API: `GET /friends/{id}` (balances and history), `GET/POST /settlements`, `DELETE /settlements/{id}`. A settlement larger than the balance returns `exceedsBalance: true` and a `warning` sentence.
 - Web: `/friends/[id]` page with the history and a "Record settlement" form; balances on the list rows.
-- Merged into phase-3/integration. API checks, web typecheck/lint/build pass; contracts have no drift; alembic head 0010 with no drift; full pytest 423 passed, 1 skipped (live LLM eval).
+- Merged into phase-3/integration as 068bded. API checks, web typecheck/lint/build pass; contracts have no drift; alembic head 0010 with no drift; full pytest 423 passed, 1 skipped (live LLM eval).
