@@ -3,6 +3,8 @@
 import type {
   AccountView,
   CategoryView,
+  FriendInviteView,
+  FriendView,
   ConversationDetail,
   ConversationPage,
   MerchantRulePage,
@@ -28,6 +30,8 @@ export const keys = {
   categories: ["categories"] as const,
   accounts: (includeArchived: boolean) => ["accounts", { includeArchived }] as const,
   transactions: (filters: TransactionFilters) => ["transactions", filters] as const,
+  friends: ["friends"] as const,
+  friendInvites: ["friend-invites"] as const,
   merchantRules: (search: string) => ["merchant-rules", search] as const,
 };
 
@@ -160,3 +164,28 @@ export function useMerchantRules(search: string) {
 }
 
 export { useQueryClient };
+
+
+/** The user's friends list. */
+export function useFriends() {
+  return useQuery({
+    queryKey: keys.friends,
+    queryFn: () => unwrap<FriendView[]>(api.GET("/api/v1/friends")),
+  });
+}
+
+/** Friend invites sent to the user, waiting for an answer. */
+export function useFriendInvites() {
+  return useQuery({
+    queryKey: keys.friendInvites,
+    queryFn: () => unwrap<FriendInviteView[]>(api.GET("/api/v1/friend-invites")),
+  });
+}
+
+/** After any friend or invite change: both lists can move (accepting adds a friend). */
+export function invalidateFriends(client: QueryClient): Promise<unknown> {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: keys.friends }),
+    client.invalidateQueries({ queryKey: keys.friendInvites }),
+  ]);
+}

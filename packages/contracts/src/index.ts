@@ -29,6 +29,11 @@ export type AccountUpdate = S["AccountUpdate"];
 export type AccountKind = AccountView["kind"];
 export type AccountRef = S["AccountRef"];
 
+export type FriendView = S["FriendView"];
+export type FriendCreate = S["FriendCreate"];
+export type FriendUpdate = S["FriendUpdate"];
+export type FriendInviteView = S["FriendInviteView"];
+
 export type CategoryView = S["CategoryView"];
 export type MoneyAmount = S["MoneyAmount"];
 export type TransactionView = S["TransactionView"];

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ConversationView, MeView } from "@moneymoney/contracts";
-import { List, LogOut, MessageSquare, Plus, Settings, X } from "lucide-react";
+import { List, LogOut, MessageSquare, Plus, Settings, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -14,6 +14,7 @@ import { keys, useConversations, useQueryClient } from "@/lib/queries";
 const NAV = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/transactions", label: "Transactions", icon: List },
+  { href: "/friends", label: "Friends", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

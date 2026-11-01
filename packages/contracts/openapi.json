@@ -596,6 +596,261 @@
         }
       }
     },
+    "/api/v1/friends": {
+      "get": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "List Friends",
+        "operationId": "list_friends_api_v1_friends_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FriendView"
+                  },
+                  "type": "array",
+                  "title": "Response List Friends Api V1 Friends Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Add Friend",
+        "operationId": "add_friend_api_v1_friends_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friends/{friend_id}": {
+      "patch": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Update Friend",
+        "operationId": "update_friend_api_v1_friends__friend_id__patch",
+        "parameters": [
+          {
+            "name": "friend_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friend Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Remove Friend",
+        "operationId": "remove_friend_api_v1_friends__friend_id__delete",
+        "parameters": [
+          {
+            "name": "friend_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friend Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friend-invites": {
+      "get": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "List Incoming Invites",
+        "operationId": "list_incoming_invites_api_v1_friend_invites_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FriendInviteView"
+                  },
+                  "type": "array",
+                  "title": "Response List Incoming Invites Api V1 Friend Invites Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friend-invites/{invite_id}/accept": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Accept Invite",
+        "operationId": "accept_invite_api_v1_friend_invites__invite_id__accept_post",
+        "parameters": [
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invite Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friend-invites/{invite_id}/decline": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Decline Invite",
+        "operationId": "decline_invite_api_v1_friend_invites__invite_id__decline_post",
+        "parameters": [
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invite Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/merchant-rules": {
       "get": {
         "tags": [
@@ -2775,6 +3030,164 @@
           "merchant",
           "paymentMethod"
         ]
+      },
+      "FriendCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "FriendCreate",
+        "description": "A new friend. With an email, an invite goes to whoever owns that email."
+      },
+      "FriendInviteView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "fromName": {
+            "type": "string",
+            "title": "Fromname"
+          },
+          "fromEmail": {
+            "type": "string",
+            "title": "Fromemail"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fromName",
+          "fromEmail",
+          "createdAt"
+        ],
+        "title": "FriendInviteView",
+        "description": "An invite waiting for the signed-in user to accept or decline."
+      },
+      "FriendUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FriendUpdate",
+        "description": "Partial update. A name left out stays; an email sent as null is cleared."
+      },
+      "FriendView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "isLinked": {
+            "type": "boolean",
+            "title": "Islinked"
+          },
+          "inviteStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "declined"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitestatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "isLinked",
+          "inviteStatus",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "FriendView",
+        "description": "A friend as clients see them. `invite_status` is set while an invite is waiting for an\nanswer or was declined; a linked friend has none."
       },
       "HTTPValidationError": {
         "properties": {

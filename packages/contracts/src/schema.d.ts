@@ -271,6 +271,93 @@ export interface paths {
         patch: operations["update_account_api_v1_accounts__account_id__patch"];
         trace?: never;
     };
+    "/api/v1/friends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Friends */
+        get: operations["list_friends_api_v1_friends_get"];
+        put?: never;
+        /** Add Friend */
+        post: operations["add_friend_api_v1_friends_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friends/{friend_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Friend */
+        delete: operations["remove_friend_api_v1_friends__friend_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Friend */
+        patch: operations["update_friend_api_v1_friends__friend_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/friend-invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Incoming Invites */
+        get: operations["list_incoming_invites_api_v1_friend_invites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-invites/{invite_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Invite */
+        post: operations["accept_invite_api_v1_friend_invites__invite_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-invites/{invite_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Invite */
+        post: operations["decline_invite_api_v1_friend_invites__invite_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/merchant-rules": {
         parameters: {
             query?: never;
@@ -799,6 +886,76 @@ export interface components {
             merchant: string | null;
             /** Paymentmethod */
             paymentMethod: string | null;
+        };
+        /**
+         * FriendCreate
+         * @description A new friend. With an email, an invite goes to whoever owns that email.
+         */
+        FriendCreate: {
+            /** Name */
+            name: string;
+            /** Email */
+            email?: string | null;
+        };
+        /**
+         * FriendInviteView
+         * @description An invite waiting for the signed-in user to accept or decline.
+         */
+        FriendInviteView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Fromname */
+            fromName: string;
+            /** Fromemail */
+            fromEmail: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
+         * FriendUpdate
+         * @description Partial update. A name left out stays; an email sent as null is cleared.
+         */
+        FriendUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Email */
+            email?: string | null;
+        };
+        /**
+         * FriendView
+         * @description A friend as clients see them. `invite_status` is set while an invite is waiting for an
+         *     answer or was declined; a linked friend has none.
+         */
+        FriendView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string | null;
+            /** Islinked */
+            isLinked: boolean;
+            /** Invitestatus */
+            inviteStatus: ("pending" | "declined") | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1921,6 +2078,203 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AccountView"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_friends_api_v1_friends_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"][];
+                };
+            };
+        };
+    };
+    add_friend_api_v1_friends_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FriendCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_friend_api_v1_friends__friend_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                friend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_friend_api_v1_friends__friend_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                friend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FriendUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_incoming_invites_api_v1_friend_invites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendInviteView"][];
+                };
+            };
+        };
+    };
+    accept_invite_api_v1_friend_invites__invite_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_invite_api_v1_friend_invites__invite_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
