@@ -33,4 +33,4 @@ ADR: `docs/adr/0001-shares-are-each-users-own-expense.md`.
 - The shares-sum rule is enforced in the service and by split arithmetic only; no deferred database check was added.
 - Seam for ticket 04: `SharedExpenseService._create_share_transactions` (one share transaction per participant who is a user; today only the recorder).
 - Editing is a full `PUT` of the bill and split. The edit form opens an existing split as exact amounts.
-- Merged into phase-3/integration (merge commit recorded on the integration branch as "Merge ticket 02: shared expenses"); full pytest 405 passed, 1 skipped (live LLM eval).
+- Merged into phase-3/integration as bd9a303; full pytest 405 passed, 1 skipped (live LLM eval).
