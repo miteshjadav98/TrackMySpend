@@ -181,8 +181,17 @@ START -> understand --+--> prepare_record <--> clarify (interrupt)
                       |         +--> save --------+--> respond -> END
                       +--> summarize ----------------> respond
                       +--> search -------------------> respond
+                      +--> settle -------------------> respond
+                      +--> balances -----------------> respond
                       +------------------------------> respond
 ```
+
+`settle` records a settlement through `SettlementService`; `balances` answers "who owes whom"
+from `FriendService.list_friends`, whose balances are computed in SQL. The model only reads
+the words: "paid X N" becomes a settlement only when `workflows/settling.py` finds X among
+the user's friends, no purpose ("for his old phone") and a non-zero balance in that currency.
+Otherwise it goes on as an expense with X as merchant. `settle` has no retry policy because a
+settlement has no idempotency key; the chat layer already replays a retried message id.
 
 **State rules** (`workflows/state.py`):
 
@@ -325,9 +334,9 @@ MoneyMoney remembers the category you use for each merchant (`merchants/`).
   `stream_reply()` returns text. Gemini and the offline rules engine both implement it.
 - **Gemini:** `gemini-3.5-flash-lite` with thinking level `low`, using JSON-schema
   structured output. Prompts are versioned files (`llm/prompts/`), and the version is
-  logged with every call. The understand prompt is `understand_v3` (shared expenses,
-  with the user's friend names in the context block); `understand_v1` and `understand_v2`
-  stay beside it.
+  logged with every call. The understand prompt is `understand_v4` (settlements, balance
+  questions and shared-expense lists, on top of v3's shared expenses and friend names in
+  the context block); `understand_v1` to `understand_v3` stay beside it.
 - **Reconciliation** (`workflows/reconcile.py`): the model's output is merged with the
   deterministic rules parse. This step:
   - fills gaps

@@ -696,6 +696,8 @@ class TransactionService:
                     Transaction.to_account_id == query.account_id,
                 )
             )
+        if query.shared_only:
+            stmt = stmt.where(Transaction.shared_expense_id.is_not(None))
         if query.date_from:
             stmt = stmt.where(Transaction.occurred_on >= query.date_from)
         if query.date_to:

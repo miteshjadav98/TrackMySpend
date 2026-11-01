@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from tests.conftest import new_conversation, say
 from tests.integration.test_friends_side import (
     FRIENDS,
     SHARED,
@@ -143,6 +144,17 @@ async def test_a_settlement_recorded_or_deleted_is_told_to_the_friend(
     recorded, deleted = await messages_of(mitesh)
     assert recorded == "Jaymin recorded a settlement of ₹500.00"
     assert deleted == "Jaymin deleted a settlement of ₹500.00"
+
+
+async def test_a_settlement_recorded_from_chat_is_told_to_the_linked_friend(
+    make_client: MakeClient,
+) -> None:
+    mitesh, jaymin = await linked_pair(make_client)
+    chat = await new_conversation(jaymin.http)
+
+    await say(jaymin.http, chat, "Mitesh paid me 500")
+
+    assert await messages_of(mitesh) == ["Jaymin recorded a settlement of ₹500.00"]
 
 
 async def test_the_inviter_is_told_when_the_invite_is_accepted(make_client: MakeClient) -> None:
