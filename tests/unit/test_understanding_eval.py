@@ -47,7 +47,13 @@ async def test_gemini_understanding_eval() -> None:
     failures = {}
     for case in CASES:
         result = await client.understand(_request(case["text"]))
-        understanding = reconcile(result.understanding, case["text"], today=TODAY, locale="en-IN")
+        understanding = reconcile(
+            result.understanding,
+            case["text"],
+            today=TODAY,
+            locale="en-IN",
+            account_names=ACCOUNTS,
+        )
         problems = check(case, understanding)
         if problems:
             failures[case["text"]] = problems

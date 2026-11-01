@@ -82,6 +82,12 @@ export function transferRoute(tx: { account?: { name: string } | null; toAccount
   return `${tx.account?.name ?? "?"} → ${tx.toAccount?.name ?? "?"}`;
 }
 
+/** Where an expense came from or income went: "from HDFC" / "into HDFC"; empty when untagged. */
+export function accountPhrase(tx: { type: string; account?: { name: string } | null }): string {
+  if (!tx.account || tx.type === "transfer") return "";
+  return `${tx.type === "income" ? "into" : "from"} ${tx.account.name}`;
+}
+
 /** An account as a picker option: archived ones say so, since they can't be picked anew. */
 export function accountOptionLabel(account: { name: string; isArchived: boolean }): string {
   return account.isArchived ? `${account.name} (archived)` : account.name;
