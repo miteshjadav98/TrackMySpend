@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import select
 
 from finance_core.audit.models import AuditEvent
-from tests.conftest import register
+from tests.conftest import accept_invite, register
 
 SHARED = "/api/v1/shared-expenses"
 SETTLEMENTS = "/api/v1/settlements"
@@ -61,7 +61,7 @@ async def befriend(owner: Person, other: Person, *, as_name: str | None = None) 
     assert added.status_code == 201, added.text
     owner.friend[other.name] = added.json()["id"]
     [invite] = (await other.http.get(INVITES)).json()
-    accepted = await other.http.post(f"{INVITES}/{invite['id']}/accept")
+    accepted = await accept_invite(other.http, invite["id"])
     assert accepted.status_code == 200, accepted.text
     other.friend[owner.name] = accepted.json()["id"]
 
@@ -349,6 +349,56 @@ async def test_balances_and_settlements_agree_on_both_sides(make_client: MakeCli
     ]
 
 
+async def test_a_linked_friend_tags_their_own_account_on_a_settlement_and_only_they_see_it(
+    make_client: MakeClient, app: Any
+) -> None:
+    mitesh = await sign_up(make_client, "Mitesh")
+    jaymin = await sign_up(make_client, "Jaymin")
+    await befriend(mitesh, jaymin)
+    paid = (await settle(jaymin, "Mitesh", "you_paid_friend", "200")).json()
+    bank = (
+        await mitesh.http.post("/api/v1/accounts", json={"name": "HDFC", "kind": "bank"})
+    ).json()
+    url = f"{SETTLEMENTS}/{paid['id']}"
+
+    tagged = await mitesh.http.patch(url, json={"accountId": bank["id"]})
+
+    assert tagged.status_code == 200, tagged.text
+    assert tagged.json()["account"]["name"] == "HDFC"
+    assert tagged.json()["recordedByYou"] is False
+    [seen_by_mitesh] = (await mitesh.http.get(SETTLEMENTS)).json()
+    assert seen_by_mitesh["account"]["name"] == "HDFC"
+    [seen_by_jaymin] = (await jaymin.http.get(SETTLEMENTS)).json()
+    assert seen_by_jaymin["account"] is None  # the recorder's own side is untouched
+    assert (await mitesh.http.patch(url, json={"accountId": None})).json()["account"] is None
+    async with app.state.container.session_factory() as session:
+        actions = (await session.scalars(select(AuditEvent.action))).all()
+    assert "settlement.account_tagged" in actions
+
+
+async def test_only_the_friends_side_tags_a_settlement_and_only_with_their_own_account(
+    make_client: MakeClient,
+) -> None:
+    mitesh = await sign_up(make_client, "Mitesh")
+    jaymin = await sign_up(make_client, "Jaymin")
+    riya = await sign_up(make_client, "Riya")
+    await befriend(mitesh, jaymin)
+    paid = (await settle(jaymin, "Mitesh", "you_paid_friend", "200")).json()
+    url = f"{SETTLEMENTS}/{paid['id']}"
+    jaymins = (
+        await jaymin.http.post("/api/v1/accounts", json={"name": "Jay", "kind": "bank"})
+    ).json()
+    miteshs = (
+        await mitesh.http.post("/api/v1/accounts", json={"name": "Mit", "kind": "bank"})
+    ).json()
+
+    assert (await jaymin.http.patch(url, json={"accountId": jaymins["id"]})).status_code == 404
+    assert (await mitesh.http.patch(url, json={"accountId": jaymins["id"]})).status_code == 404
+    assert (await riya.http.patch(url, json={"accountId": miteshs["id"]})).status_code == 404
+    [still] = (await mitesh.http.get(SETTLEMENTS)).json()
+    assert still["account"] is None
+
+
 async def test_when_the_friend_paid_each_sees_the_balance_pointing_the_right_way(
     make_client: MakeClient,
 ) -> None:
@@ -377,7 +427,7 @@ async def test_accepting_an_invite_brings_over_past_shared_expenses_and_settleme
     assert await my_transactions(jaymin) == []
 
     [invite] = (await jaymin.http.get(INVITES)).json()
-    accepted = await jaymin.http.post(f"{INVITES}/{invite['id']}/accept")
+    accepted = await accept_invite(jaymin.http, invite["id"])
     assert accepted.status_code == 200, accepted.text
     jaymin.friend["Mitesh"] = accepted.json()["id"]
 
@@ -405,7 +455,7 @@ async def test_accepting_also_brings_over_what_the_accepter_recorded_earlier(
     jaymin.friend["Mitesh"] = added.json()["id"]
     await record(jaymin, "Mitesh")
     [invite] = (await mitesh.http.get(INVITES)).json()
-    assert (await mitesh.http.post(f"{INVITES}/{invite['id']}/accept")).status_code == 200
+    assert (await accept_invite(mitesh.http, invite["id"])).status_code == 200
 
     assert [t["description"] for t in await my_transactions(mitesh)] == ["Pizza"]
 

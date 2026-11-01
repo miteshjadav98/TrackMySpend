@@ -36,6 +36,7 @@ class FriendView(ApiModel):
     email: str | None
     is_linked: bool
     invite_status: InviteStatusField | None
+    is_archived: bool
     balances: list[BalanceView]
     created_at: datetime
     updated_at: datetime
@@ -62,6 +63,18 @@ class FriendInviteView(ApiModel):
     from_name: str
     from_email: str
     created_at: datetime
+
+
+class InviteCodeSent(ApiModel):
+    """The address a one-time code was emailed to, so the screen can say where to look."""
+
+    email: str
+
+
+class InviteAccept(ApiInput):
+    """The 6-digit code from the email, which proves the user owns the invited address."""
+
+    code: str = Field(pattern=r"^\d{6}$")
 
 
 SplitKindField = Literal["equal", "exact"]
@@ -156,6 +169,12 @@ class SettlementCreate(ApiInput):
     note: str | None = Field(default=None, max_length=500)
 
 
+class SettlementAccountTag(ApiInput):
+    """Sets or clears the user's own account on a settlement, from the user's own side."""
+
+    account_id: uuid.UUID | None
+
+
 class SettlementFriend(ApiModel):
     """The friend a settlement is with, named as the user knows them."""
 
@@ -176,6 +195,9 @@ class SettlementView(ApiModel):
     occurred_on: date
     note: str | None
     account: AccountRef | None
+    # False when a linked friend recorded it: only the recorder deletes it, but each side
+    # tags its own account.
+    recorded_by_you: bool
     created_at: datetime
 
 

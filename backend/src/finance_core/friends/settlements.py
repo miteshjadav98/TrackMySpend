@@ -9,6 +9,10 @@ The rules it enforces:
 - A settlement shows on both sides: the linked friend lists it too, from their own point of
   view (direction flipped, named by their own friend row). Only whoever recorded it deletes
   it; anyone else gets a 404.
+- A request may carry an idempotency key; a retry with the same key returns the first
+  settlement instead of recording a second one.
+- A linked friend tags their own account on a settlement someone else recorded (it fills
+  `friend_account_id`); nobody sets the other side's tag.
 - Each write and its audit event, for the recorder and a linked friend, are saved in one
   database transaction, and so is the notice that tells a linked friend.
 """
@@ -20,6 +24,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy import and_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -33,6 +38,7 @@ from finance_core.friends.balances import balance_in
 from finance_core.friends.models import Friend, Settlement
 from finance_core.friends.notices import SETTLEMENT_DELETED, SETTLEMENT_RECORDED, NoticeWriter
 from finance_core.friends.schemas import (
+    SettlementAccountTag,
     SettlementCreate,
     SettlementCreated,
     SettlementFriend,
@@ -61,9 +67,22 @@ class SettlementService:
         self._notices = NoticeWriter(session)
 
     async def create(
-        self, ctx: UserContext, data: SettlementCreate, *, request_id: str | None = None
-    ) -> SettlementCreated:
-        """Record a settlement and say whether it was more than was owed."""
+        self,
+        ctx: UserContext,
+        data: SettlementCreate,
+        *,
+        idempotency_key: str | None = None,
+        request_id: str | None = None,
+    ) -> tuple[SettlementCreated, bool]:
+        """Record a settlement and say whether it was more than was owed.
+
+        The flag is False when the key was used before: the first settlement comes back and
+        nothing is recorded.
+        """
+        if idempotency_key is not None:
+            first = await self._recorded_with_key(ctx, idempotency_key)
+            if first is not None:
+                return await self._replay(ctx, first), False
         friend = await self._owned_friend(ctx, data.friend_id)
         currency = (data.currency or ctx.base_currency).upper()
         if currency not in SUPPORTED_CURRENCIES:
@@ -108,11 +127,20 @@ class SettlementService:
             occurred_on=occurred_on,
             note=(data.note or "").strip() or None,
             recorder_account_id=account_id,
+            idempotency_key=idempotency_key,
         )
         self._session.add(settlement)
         self._audit(ctx.user_id, friend, "settlement.created", settlement, request_id)
         await self._notify(ctx, friend, SETTLEMENT_RECORDED, settlement)
-        await self._session.commit()
+        try:
+            await self._session.commit()
+        except IntegrityError:
+            # Two requests with one key raced past the check above; the index let one in.
+            await self._session.rollback()
+            first = await self._recorded_with_key(ctx, idempotency_key) if idempotency_key else None
+            if first is None:
+                raise
+            return await self._replay(ctx, first), False
         await self._session.refresh(settlement)
 
         view = (await self._views(ctx, [(settlement, friend)]))[0]
@@ -124,7 +152,52 @@ class SettlementService:
                 f"That is more than {who} ({owed_text}), so the balance with {friend.name} "
                 "now points the other way."
             )
-        return SettlementCreated(**view.model_dump(), exceeds_balance=exceeds, warning=warning)
+        created = SettlementCreated(**view.model_dump(), exceeds_balance=exceeds, warning=warning)
+        return created, True
+
+    async def tag_account(
+        self,
+        ctx: UserContext,
+        settlement_id: uuid.UUID,
+        data: SettlementAccountTag,
+        *,
+        request_id: str | None = None,
+    ) -> SettlementView:
+        """A linked friend sets (or clears) their own account on a settlement the other
+        person recorded. Anyone else, including the recorder, gets a 404."""
+        recorders_row = aliased(Friend)
+        row = (
+            await self._session.execute(
+                select(Settlement, Friend)
+                .join(recorders_row, recorders_row.id == Settlement.friend_id)
+                .join(
+                    Friend,
+                    and_(
+                        Friend.user_id == ctx.user_id,
+                        Friend.linked_user_id == Settlement.recorder_id,
+                        Friend.is_archived.is_(False),
+                    ),
+                )
+                .where(Settlement.id == settlement_id, recorders_row.linked_user_id == ctx.user_id)
+            )
+        ).first()
+        if row is None:  # not on the user's side of this settlement, or never existed
+            raise NotFoundError("Settlement not found")
+        settlement, mine = row
+        account_id = None
+        if data.account_id is not None:
+            picked = await self._accounts.pick_for_transaction(
+                ctx, data.account_id, field="accountId"
+            )
+            account_id = picked.id
+        settlement.friend_account_id = account_id
+        record_audit(
+            self._session, user_id=ctx.user_id, actor="user", action="settlement.account_tagged",
+            entity_type="settlement", entity_id=settlement.id,
+            data={"accountId": str(account_id) if account_id else None}, request_id=request_id,
+        )  # fmt: skip
+        await self._session.commit()
+        return (await self._views(ctx, [(settlement, mine)]))[0]
 
     async def list_settlements(
         self, ctx: UserContext, *, friend_id: uuid.UUID | None = None, limit: int = 100
@@ -180,6 +253,20 @@ class SettlementService:
         await self._session.commit()
 
     # -- helpers --------------------------------------------------------------------------
+
+    async def _recorded_with_key(self, ctx: UserContext, key: str) -> Settlement | None:
+        return await self._session.scalar(
+            select(Settlement).where(
+                Settlement.recorder_id == ctx.user_id, Settlement.idempotency_key == key
+            )
+        )
+
+    async def _replay(self, ctx: UserContext, first: Settlement) -> SettlementCreated:
+        """The reply for a retried request: the first settlement, with no new warning."""
+        friend = await self._session.get(Friend, first.friend_id)
+        assert friend is not None  # a settlement's friend is archived, never deleted
+        view = (await self._views(ctx, [(first, friend)]))[0]
+        return SettlementCreated(**view.model_dump(), exceeds_balance=False, warning=None)
 
     async def _owned_friend(self, ctx: UserContext, friend_id: uuid.UUID) -> Friend:
         # An archived friend takes no new settlements, like no new shared expenses.
@@ -258,6 +345,7 @@ class SettlementService:
                     occurred_on=row.occurred_on,
                     note=row.note,
                     account=accounts.get(account_id) if account_id else None,
+                    recorded_by_you=mine,
                     created_at=row.created_at,
                 )
             )

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Literal
 
-from finance_core.friends.names import matching_friends
+from finance_core.friends.names import matching_friends, names_telling_duplicates_apart
 from finance_core.friends.schemas import FriendView
 from finance_core.llm.schemas import ExtractedTransaction, SettlementSpec
 
@@ -65,7 +65,9 @@ def choose_settlement(
     if not matches:
         return SettleChoice("ask", reason="unknown_friend")
     if len(matches) > 1:
-        return SettleChoice("ask", reason="ambiguous_friend", options=[f.name for f in matches])
+        names = names_telling_duplicates_apart(friends)
+        options = [names[f.id] for f in matches]
+        return SettleChoice("ask", reason="ambiguous_friend", options=options)
     return SettleChoice("settle", friend=matches[0])
 
 

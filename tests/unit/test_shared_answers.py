@@ -18,7 +18,8 @@ NOW = datetime(2026, 10, 24, tzinfo=UTC)
 
 def friend(name: str, email: str | None = None) -> FriendView:
     return FriendView(
-        id=uuid.uuid4(), name=name, email=email, is_linked=False, invite_status=None, balances=[],
+        id=uuid.uuid4(), name=name, email=email, is_linked=False, invite_status=None, is_archived=False,
+        balances=[],
         created_at=NOW, updated_at=NOW,
     )  # fmt: skip
 

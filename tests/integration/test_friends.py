@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy import select
 
 from finance_core.audit.models import AuditEvent
-from tests.conftest import register
+from tests.conftest import accept_invite, register
 
 FRIENDS = "/api/v1/friends"
 INVITES = "/api/v1/friend-invites"
@@ -148,7 +148,7 @@ async def test_accepting_an_invite_links_both_users_to_each_other(
     await mitesh.post(FRIENDS, json={"name": "Jay", "email": address("jaymin")})
     [invite] = (await jaymin.get(INVITES)).json()
 
-    accepted = await jaymin.post(f"{INVITES}/{invite['id']}/accept")
+    accepted = await accept_invite(jaymin, invite["id"])
     assert accepted.status_code == 200, accepted.text
     assert accepted.json()["name"] == "Mitesh"
     assert accepted.json()["isLinked"] is True
@@ -159,7 +159,7 @@ async def test_accepting_an_invite_links_both_users_to_each_other(
     [jaymin_sees] = (await jaymin.get(FRIENDS)).json()
     assert (jaymin_sees["name"], jaymin_sees["email"]) == ("Mitesh", address("mitesh"))
     assert (await jaymin.get(INVITES)).json() == []
-    assert (await jaymin.post(f"{INVITES}/{invite['id']}/accept")).status_code == 404
+    assert (await jaymin.post(f"{INVITES}/{invite['id']}/code")).status_code == 404
 
 
 async def test_accepting_links_an_existing_friend_with_the_inviters_email(
@@ -172,7 +172,7 @@ async def test_accepting_links_an_existing_friend_with_the_inviters_email(
     invites = (await jaymin.get(INVITES)).json()
     assert len(invites) == 1  # his own invite to Mitesh is Mitesh's to answer, not his
 
-    accepted = await jaymin.post(f"{INVITES}/{invites[0]['id']}/accept")
+    accepted = await accept_invite(jaymin, invites[0]["id"])
     assert accepted.json()["id"] == mine["id"]  # his own row for Mitesh, now linked
     assert accepted.json()["name"] == "Mitu"
     assert len((await jaymin.get(FRIENDS)).json()) == 1
@@ -213,7 +213,7 @@ async def test_a_linked_friends_email_cannot_be_changed_or_cleared(
     jaymin = await sign_up(make_client, "Jaymin", address("jaymin"))
     friend = (await mitesh.post(FRIENDS, json={"name": "J", "email": address("jaymin")})).json()
     [invite] = (await jaymin.get(INVITES)).json()
-    await jaymin.post(f"{INVITES}/{invite['id']}/accept")
+    await accept_invite(jaymin, invite["id"])
 
     response = await mitesh.patch(f"{FRIENDS}/{friend['id']}", json={"email": "other@example.com"})
     assert response.status_code == 409
@@ -234,9 +234,9 @@ async def test_a_third_user_gets_404s_for_other_peoples_friends_and_invites(
     path = f"{FRIENDS}/{friend['id']}"
     assert (await stranger.patch(path, json={"name": "Mine now"})).status_code == 404
     assert (await stranger.delete(path)).status_code == 404
-    assert (await stranger.post(f"{INVITES}/{invite['id']}/accept")).status_code == 404
+    assert (await stranger.post(f"{INVITES}/{invite['id']}/code")).status_code == 404
     assert (await stranger.post(f"{INVITES}/{invite['id']}/decline")).status_code == 404
-    assert (await mitesh.post(f"{INVITES}/{invite['id']}/accept")).status_code == 404
+    assert (await mitesh.post(f"{INVITES}/{invite['id']}/code")).status_code == 404
     assert (await stranger.get(FRIENDS)).json() == []
     assert (await stranger.get(INVITES)).json() == []
     assert (await mitesh.patch(f"{FRIENDS}/{NO_SUCH_ID}", json={"name": "x"})).status_code == 404
@@ -256,7 +256,7 @@ async def test_every_friend_and_invite_change_is_audited(app: Any, make_client: 
     ).json()
     await mitesh.patch(f"{FRIENDS}/{friend['id']}", json={"name": "Jay"})
     [invite] = (await jaymin.get(INVITES)).json()
-    await jaymin.post(f"{INVITES}/{invite['id']}/accept")
+    await accept_invite(jaymin, invite["id"])
     extra = (await mitesh.post(FRIENDS, json={"name": "Temp"})).json()
     await mitesh.delete(f"{FRIENDS}/{extra['id']}")
 
@@ -279,4 +279,8 @@ async def test_every_friend_and_invite_change_is_audited(app: Any, make_client: 
     assert "friend.updated" in friend_actions
     assert friend_actions.count("friend.linked") == 2
     assert "friend.removed" in friend_actions
-    assert await actions_for("friend_invite") == ["friend_invite.sent", "friend_invite.accepted"]
+    assert await actions_for("friend_invite") == [
+        "friend_invite.sent",
+        "friend_invite.code_sent",
+        "friend_invite.accepted",
+    ]

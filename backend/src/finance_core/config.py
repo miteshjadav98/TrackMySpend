@@ -70,6 +70,7 @@ class Settings(BaseSettings):
     # Each reset request sends an email, so these keep the feature from spamming anyone.
     rate_limit_password_reset_per_email_per_hour: int = 5
     rate_limit_password_reset_per_ip_per_hour: int = 20
+    rate_limit_invite_code_per_hour: int = 5
 
     # --- LLM (Gemini on Vertex AI) ----------------------------------------------------
     llm_provider: Literal["gemini", "rules"] = "rules"

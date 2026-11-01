@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from finance_core.friends.names import names_telling_duplicates_apart
 from finance_core.friends.schemas import BalanceView, FriendView
 from finance_core.llm.schemas import SettlementSpec
 from finance_core.workflows.friend_replies import (
@@ -27,10 +28,10 @@ def balance(currency: str, minor: int) -> BalanceView:
     )  # fmt: skip
 
 
-def friend(name: str, *balances: BalanceView) -> FriendView:
+def friend(name: str, *balances: BalanceView, email: str | None = None) -> FriendView:
     return FriendView(
-        id=uuid.uuid4(), name=name, email=None, is_linked=False, invite_status=None,
-        balances=list(balances), created_at=NOW, updated_at=NOW,
+        id=uuid.uuid4(), name=name, email=email, is_linked=False, invite_status=None,
+        is_archived=False, balances=list(balances), created_at=NOW, updated_at=NOW,
     )  # fmt: skip
 
 
@@ -181,3 +182,25 @@ def test_nobody_owing_anything_says_everyone_is_settled_up() -> None:
     assert compose_balances([friend("Riya")], asked_about=None) == (
         "Nobody owes anything: you are settled up with everyone."
     )
+
+
+def test_two_friends_with_the_same_name_are_told_apart_by_email_when_asking_which() -> None:
+    first = friend("Jaymin", email="jay.one@example.com")
+    second = friend("Jaymin", email="jay.two@example.com")
+
+    choice = choose_settlement(spec("friend_paid_me"), [first, second], "INR")
+
+    assert choice.kind == "ask"
+    assert choice.options == ["Jaymin (jay.one@example.com)", "Jaymin (jay.two@example.com)"]
+    assert "Jaymin (jay.one@example.com) or Jaymin (jay.two@example.com)" in (
+        compose_unclear_settlement("ambiguous_friend", "Jaymin", choice.options)
+    )
+
+
+def test_a_name_that_is_not_shared_stays_plain() -> None:
+    jaymin = friend("Jaymin", email="jay@example.com")
+    riya = friend("Riya", email="riya@example.com")
+
+    names = names_telling_duplicates_apart([jaymin, riya])
+
+    assert names == {jaymin.id: "Jaymin", riya.id: "Riya"}

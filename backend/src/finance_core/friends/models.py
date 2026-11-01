@@ -13,6 +13,8 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
+    LargeBinary,
     String,
     text,
 )
@@ -94,6 +96,11 @@ class FriendInvite(Base):
     status: Mapped[str] = mapped_column(String(16), default="pending")
     created_at: Mapped[datetime] = created_at_column()
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The one-time code that proves the invited person owns the email: only its hash is kept,
+    # it expires, and a few wrong tries burn it (see `invite_codes`).
+    code_hash: Mapped[bytes | None] = mapped_column(LargeBinary(32))
+    code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    code_wrong_tries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class SharedExpense(Base):
@@ -184,6 +191,8 @@ class Settlement(Base):
         CheckConstraint("currency ~ '^[A-Z]{3}$'", name="currency"),
         Index("ix_settlements_recorder_date", "recorder_id", text("occurred_on DESC")),
         Index("ix_settlements_friend", "friend_id"),
+        # Idempotency: one row per (recorder, key). NULL keys are allowed and never collide.
+        Index("uq_settlements_recorder_idempotency", "recorder_id", "idempotency_key", unique=True),
         {"schema": SCHEMA_LEDGER},
     )
 
@@ -205,6 +214,8 @@ class Settlement(Base):
     friend_account_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(f"{SCHEMA_LEDGER}.accounts.id")
     )
+    # Client-generated, so a retried request returns the first settlement instead of a second.
+    idempotency_key: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = created_at_column()
 
 

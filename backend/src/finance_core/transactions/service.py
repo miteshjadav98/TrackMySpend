@@ -157,6 +157,8 @@ class TransactionService:
         self._session = session
         self._clock = clock
         self._generation = generation
+        # Users whose summaries changed in a write that is not committed yet.
+        self._unbumped: set[uuid.UUID] = set()
         self._categories = CategoryService(session)
         self._accounts = AccountService(session)
         self._merchant_rules = MerchantRuleService(session, clock=clock)
@@ -323,8 +325,13 @@ class TransactionService:
         actor: Actor = "user",
         request_id: str | None = None,
         strict_idempotency: bool = False,
+        commit: bool = True,
     ) -> list[tuple[TransactionView, bool]]:
         """Insert a batch atomically. Each item may carry an idempotency key.
+
+        With `commit=False` the rows are only flushed, audit events included, so the caller can
+        save them together with other work in one database transaction. The caller then
+        commits and calls `bump_pending_generations`.
 
         A repeated key returns the existing row instead of inserting a duplicate. With
         `strict_idempotency`, reusing a key for *different* data is a 409, which is what
@@ -387,9 +394,13 @@ class TransactionService:
                 )
             results.append((existing.id, False))
 
-        await self._session.commit()
-        if any(created for _, created in results) and self._generation is not None:
-            await self._generation.bump(ctx.user_id)
+        if any(created for _, created in results):
+            self._unbumped.add(ctx.user_id)
+        if commit:
+            await self._session.commit()
+            await self.bump_pending_generations()
+        else:
+            await self._session.flush()
 
         views = await self._views([row_id for row_id, _ in results], ctx.locale)
         return [(views[row_id], created) for row_id, created in results]
@@ -646,6 +657,12 @@ class TransactionService:
             request_id=request_id,
         )  # fmt: skip
         await self._session.delete(row)
+
+    async def bump_pending_generations(self) -> None:
+        """Tell cached summaries about writes that were committed after `commit=False`."""
+        for user_id in self._unbumped:
+            await self.bump_generation(user_id)
+        self._unbumped.clear()
 
     async def bump_generation(self, user_id: uuid.UUID) -> None:
         """Tell cached summaries that this user's transactions changed."""

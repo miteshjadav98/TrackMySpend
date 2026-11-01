@@ -7,6 +7,8 @@ the same rules as `accounts/names.py`: an exact name wins, else words contained 
 from __future__ import annotations
 
 import re
+import uuid
+from collections import Counter
 from collections.abc import Sequence
 from typing import Protocol
 
@@ -33,6 +35,25 @@ def matching_friends[FriendLike: _Named](
         return exact
     said_words = _words(said)
     return [f for f in friends if said_words and said_words <= _words(f.name)]
+
+
+class _Identified(_Named, Protocol):
+    @property
+    def id(self) -> uuid.UUID: ...
+
+    @property
+    def email(self) -> str | None: ...
+
+
+def names_telling_duplicates_apart(friends: Sequence[_Identified]) -> dict[uuid.UUID, str]:
+    """Each friend's name for a chat reply: the plain name, or "Name (email)" when another
+    friend has the same name, so two Jaymins never read as one. A duplicate with no email
+    keeps the plain name; there is nothing better to say."""
+    counts = Counter(f.name.casefold() for f in friends)
+    return {
+        f.id: f"{f.name} ({f.email})" if counts[f.name.casefold()] > 1 and f.email else f.name
+        for f in friends
+    }
 
 
 def resolve_friend_name[FriendLike: _Named](

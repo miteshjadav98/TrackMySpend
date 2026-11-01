@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from tests.conftest import new_conversation, say
+from tests.conftest import accept_invite, new_conversation, say
 from tests.integration.test_friends_side import (
     FRIENDS,
     SHARED,
@@ -163,7 +163,7 @@ async def test_the_inviter_is_told_when_the_invite_is_accepted(make_client: Make
 
     await mitesh.http.post(FRIENDS, json={"name": "Riya D", "email": address("Riya")})
     [invite] = (await riya.http.get("/api/v1/friend-invites")).json()
-    await riya.http.post(f"/api/v1/friend-invites/{invite['id']}/accept")
+    await accept_invite(riya.http, invite["id"])
 
     assert await messages_of(mitesh) == ["Riya D accepted your friend invite"]
 

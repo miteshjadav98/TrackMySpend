@@ -7,8 +7,12 @@ The rules it enforces:
   (409 `friend_email_exists`). A user cannot add their own email (422).
 - Giving a friend an email sends an invite to that address. It is matched by email, so an
   address with no account yet simply waits until someone signs up with it.
-- Accepting an invite links both users: each ends up with a friend row pointing at the other.
-  A linked friend's email is fixed (409 `friend_linked`).
+- Accepting an invite needs the one-time code emailed to the invited address (see
+  `invite_codes`), because sign-up never verifies an email. Then it links both users: each ends
+  up with a friend row pointing at the other. A linked friend's email is fixed (409
+  `friend_linked`).
+- A friend with a balance in any currency cannot be removed (409 `friend_has_balance`): archiving
+  would hide a debt. A friend with history and no balance is archived, and can be unarchived.
 - Accepting also brings over every shared expense the two recorded with each other before they
   linked (see `share_delivery`), once, in the same database transaction.
 - The invited user is told of a pending invite, and the inviter of an accepted one, in the
@@ -28,8 +32,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from finance_core.audit.service import record_audit
 from finance_core.cache.primitives import UserDataGeneration
 from finance_core.clock import Clock
+from finance_core.email_sender import EmailMessage
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
 from finance_core.friends.balances import balances_by_friend, history_with
+from finance_core.friends.invite_codes import InviteCodes
 from finance_core.friends.models import (
     ACTIVE_EMAIL_INDEX,
     Friend,
@@ -79,16 +85,17 @@ class FriendService:
         self._session = session
         self._generation = generation
         self._delivery = ShareDelivery(session, clock=clock)
+        self._codes = InviteCodes(session, clock)
         self._notices = NoticeWriter(session)
 
     # -- friends --------------------------------------------------------------------------
 
-    async def list_friends(self, ctx: UserContext) -> list[FriendView]:
-        """The user's active friends, by name."""
+    async def list_friends(self, ctx: UserContext, *, archived: bool = False) -> list[FriendView]:
+        """The user's active friends, by name; with `archived`, the removed ones instead."""
         rows = (
             await self._session.scalars(
                 select(Friend)
-                .where(Friend.user_id == ctx.user_id, Friend.is_archived.is_(False))
+                .where(Friend.user_id == ctx.user_id, Friend.is_archived.is_(archived))
                 .order_by(func.lower(Friend.name), Friend.created_at, Friend.id)
             )
         ).all()
@@ -182,6 +189,13 @@ class FriendService:
     ) -> None:
         """Remove a friend: delete them, or archive them when they have shared history."""
         friend = await self._owned_friend(ctx.user_id, friend_id)
+        # Archiving hides a friend from balances, so a debt must be settled first.
+        owed = await balances_by_friend(self._session, ctx.user_id, [friend.id], ctx.locale)
+        if owed.get(friend.id):
+            raise ConflictError(
+                f"{friend.name} still has a balance with you. Settle up first.",
+                code="friend_has_balance",
+            )
         details = {"name": friend.name, "email": friend.email, "linked": friend.linked_user_id is not None}  # fmt: skip
         if await self._has_shared_history(friend):
             friend.is_archived = True
@@ -190,6 +204,19 @@ class FriendService:
             await self._session.delete(friend)
             self._audit(ctx.user_id, "friend.removed", friend.id, details, request_id=request_id)
         await self._commit()
+
+    async def unarchive(
+        self, ctx: UserContext, friend_id: uuid.UUID, *, request_id: str | None = None
+    ) -> FriendView:
+        """Bring a removed friend back, with their history and balance as they were."""
+        friend = await self._owned_friend(ctx.user_id, friend_id, archived=True)
+        friend.is_archived = False
+        self._audit(ctx.user_id, "friend.unarchived", friend.id, {"name": friend.name},
+                    request_id=request_id)  # fmt: skip
+        # If a new friend took the same email meanwhile, the unique index refuses with a 409.
+        await self._commit()
+        await self._session.refresh(friend)
+        return await self._view_of(ctx, friend)
 
     async def _has_shared_history(self, friend: Friend) -> bool:
         """True when the friend is in a shared expense or has a settlement.
@@ -226,11 +253,34 @@ class FriendService:
             for invite, _, inviter in rows
         ]
 
-    async def accept(
+    async def send_invite_code(
         self, ctx: UserContext, invite_id: uuid.UUID, *, request_id: str | None = None
+    ) -> EmailMessage:
+        """Make a fresh one-time code for the invite and return the email that carries it."""
+        invite, _, inviter = await self._incoming_invite(ctx, invite_id)
+        code = self._codes.issue(invite)
+        self._audit(ctx.user_id, "friend_invite.code_sent", invite.id, None,
+                    entity_type="friend_invite", request_id=request_id)  # fmt: skip
+        await self._commit()
+        return self._codes.email(invite.invitee_email, code, inviter_name=inviter.display_name)
+
+    async def accept(
+        self,
+        ctx: UserContext,
+        invite_id: uuid.UUID,
+        code: str,
+        *,
+        request_id: str | None = None,
     ) -> FriendView:
-        """Accept an invite: link the inviter's friend row and the user's own row for them."""
+        """Accept an invite with its emailed code: link the inviter's friend row and the
+        user's own row for them. A wrong or expired code changes nothing."""
         invite, inviters_row, inviter = await self._incoming_invite(ctx, invite_id)
+        if not await self._codes.redeem(invite.id, code):
+            await self._commit()  # keeps the count of wrong tries
+            raise ValidationFailedError(
+                "That code is wrong or has expired. Ask for a new one.",
+                code="invite_code_invalid",
+            )
         mine = await self._row_to_link(ctx, inviter, request_id)
         mine.linked_user_id = inviter.id
         inviters_row.linked_user_id = ctx.user_id
@@ -362,11 +412,15 @@ class FriendService:
         if await self._session.scalar(query) is not None:
             raise _email_taken()
 
-    async def _owned_friend(self, user_id: uuid.UUID, friend_id: uuid.UUID) -> Friend:
+    async def _owned_friend(
+        self, user_id: uuid.UUID, friend_id: uuid.UUID, *, archived: bool = False
+    ) -> Friend:
         # Ownership is part of the WHERE clause: another user's id is simply "not found".
         friend = await self._session.scalar(
             select(Friend).where(
-                Friend.id == friend_id, Friend.user_id == user_id, Friend.is_archived.is_(False)
+                Friend.id == friend_id,
+                Friend.user_id == user_id,
+                Friend.is_archived.is_(archived),
             )
         )
         if friend is None:
@@ -398,6 +452,7 @@ class FriendService:
             email=friend.email,
             is_linked=friend.linked_user_id is not None,
             invite_status=invite_status,
+            is_archived=friend.is_archived,
             balances=balances,
             created_at=friend.created_at,
             updated_at=friend.updated_at,

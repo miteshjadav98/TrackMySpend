@@ -87,6 +87,7 @@ class SharedExpenseService:
         self._transactions = TransactionService(session, clock=clock, generation=generation)
         self._delivery = ShareDelivery(session, clock=clock)
         self._notices = NoticeWriter(session)
+        self._unbumped: set[uuid.UUID] = set()  # changed by writes that are not committed yet
 
     # -- writes ---------------------------------------------------------------------------
 
@@ -98,9 +99,13 @@ class SharedExpenseService:
         request_id: str | None = None,
         source: str = "api",
         source_ref: str | None = None,
+        commit: bool = True,
     ) -> SharedExpenseView:
         """Record a shared expense and the recorder's share of it. The chat passes its message
-        as `source_ref`, so a retried message finds the share it already saved."""
+        as `source_ref`, so a retried message finds the share it already saved.
+
+        With `commit=False` everything is only flushed, so the chat can save a whole message
+        in one database transaction; it then commits and calls `bump_pending_generations`."""
         plan = await self._plan(ctx, data, existing=None)
         my_share = await self._transactions.resolve(
             ctx,
@@ -142,8 +147,12 @@ class SharedExpenseService:
                 subject=_label(expense), amount_minor=plan.shares[friend_id],
                 currency=expense.currency,
             )  # fmt: skip
-        await self._session.commit()
-        await self._bump_generations([ctx.user_id, *linked.values()])
+        if commit:
+            await self._session.commit()
+            await self._bump_generations([ctx.user_id, *linked.values()])
+        else:
+            await self._session.flush()
+            self._unbumped.update([ctx.user_id, *linked.values()])
         return await self.get(ctx, expense.id)
 
     async def update(
@@ -514,6 +523,12 @@ class SharedExpenseService:
                 entity_type="shared_expense", entity_id=entity_id, data=data,
                 request_id=request_id,
             )  # fmt: skip
+
+    async def bump_pending_generations(self) -> None:
+        """Tell cached summaries about shared expenses committed after `commit=False`."""
+        users = list(self._unbumped)
+        self._unbumped.clear()
+        await self._bump_generations(users)
 
     async def _bump_generations(self, user_ids: Sequence[uuid.UUID]) -> None:
         for user_id in dict.fromkeys(user_ids):
