@@ -19,7 +19,7 @@ saves must be idempotent, every change needs an audit trail, and one user must n
 another user's data. Those requirements shape most of the decisions below.
 
 The seams for growth are already in place. Domain services know nothing about HTTP or the
-LLM, so an MCP server (Phase 6) or a background worker can reuse them unchanged.
+LLM, so an MCP server (Phase 7) or a background worker can reuse them unchanged.
 
 ## Components
 
@@ -31,7 +31,7 @@ flowchart LR
     core --> pg[("PostgreSQL<br/>identity · ledger · chat · audit · agent")]
     core --> redis[("Redis<br/>cache · rate limits · locks")]
     core --> gemini["Gemini on Vertex AI"]
-    mcp["MCP server (Phase 6)"] -.-> core
+    mcp["MCP server (Phase 7)"] -.-> core
     jobs["Jobs: migrate, prune-checkpoints"] --> core
 ```
 
@@ -630,7 +630,7 @@ Where the system bends first, and what to do about it:
 | FX conversion | Totals per currency are exact; conversion needs a rate source and a policy | Users with multi-currency spending asking for a single total |
 | Read replicas | One primary handles the load | Primary CPU above about 60% sustained, or summary queries above about 30% of load |
 | Multi-region | 99.9% single-region is the target | Contractual availability above 99.95%, or users across continents |
-| Account balances | Most transactions carry no account yet, so a balance would be wrong. Opening balances come with it | Imports (Phase 4) and debt tracking (Phase 7) put an account on most transactions |
+| Account balances | Most transactions carry no account yet, so a balance would be wrong. Opening balances come with it | Imports (Phase 4) and debt tracking (Phase 6) put an account on most transactions |
 | Cross-currency transfers | They need an exchange rate and a rule for which rate. Both accounts and the amount must share one currency | A decision on the multi-currency policy (Phase 5) |
 | Groups | Phase 3 is between the user and individual friends. A group needs its own membership and balances across members | Users asking to split one trip across many people repeatedly |
 | Percentage and share-count splits | Equal and exact amounts cover the common cases | Users asking for "60/40" or "2 shares" splits |
