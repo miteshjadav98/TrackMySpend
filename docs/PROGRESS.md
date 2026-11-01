@@ -93,7 +93,7 @@ becomes an account or category, the account question offers "Cash", a new accoun
 transfer takes the other end's currency and commits together with the transfer, and a blank
 model reading is filled from the offline parser. `uv run pytest`: 357 passed, 1 skipped.
 
-## Phase 3 (built and reviewed, ready for `main`, branch `phase-3/integration`)
+## Phase 3 (done, merged into `main` as bd8eaf6)
 
 Split expenses with friends. Settled in a grilling session on 2026-11-01; spec
 `.scratch/phase-3/spec.md`, ADR `docs/adr/0001-shares-are-each-users-own-expense.md`, and 8
@@ -116,7 +116,7 @@ settlement; and replies tell two friends with the same name apart by email. `uv 
 
 ## Next
 
-1. Merge Phase 3 into `main` (waiting for the owner's OK; Phase 2 is already on `main`).
+1. Phase 4: imports (CSV and Excel first). Start with a grilling session, then the spec and tickets.
 2. Pick which Phase 3 limitations to fix first (see the report), and choose an email provider.
 
 ## Resume

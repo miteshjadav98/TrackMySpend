@@ -77,8 +77,8 @@ together, and [docs/phase-1-report.md](docs/phase-1-report.md) and
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1 | Chat entry with clarifications, transaction history, exact summaries, auth and isolation, Gemini + offline parser, tests, containers, CI | Done |
-| 2 | Merchant rules, accounts, transfers, account security, dark mode | Built; code review next |
-| 3 | Split expenses with friends, Splitwise-style: "me and Jaymin spent 1000 on pizza, split it"; who owes whom, settling up, and the friend sees it in their own records | Built; code review next |
+| 2 | Merchant rules, accounts, transfers, account security, dark mode | Done |
+| 3 | Split expenses with friends, Splitwise-style: "me and Jaymin spent 1000 on pizza, split it"; who owes whom, settling up, and the friend sees it in their own records | Done |
 | 4 | Imports: CSV and Excel first, then receipts and PDF bank statements | Planned |
 | 5 | Charts and insights; a policy for totals across currencies | Planned |
 | 6 | MCP server over the same domain services (OAuth 2.1, confirmation before writes) | Planned |
