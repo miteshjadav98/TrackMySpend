@@ -42,17 +42,19 @@ def choose_category(
     picked: CategoryOption | None,
     suggested: CategoryOption | None,
     merchant_rule: CategoryOption | None,
+    merchant: str | None = None,
 ) -> CategoryChoice | None:
     """The category that files a chat draft, or None when the user has to be asked.
 
     `message` is what the user wrote; `picked` is their answer to a category
     clarification; `suggested` is the model's suggested category; `merchant_rule` is the
-    category the user's merchant rule names for the draft's merchant and type.
+    category the user's merchant rule names for the draft's merchant and type. `merchant`
+    is taken out of the message first, so "Cult Fitness" never names "Fitness".
     """
     if picked is not None:
         return CategoryChoice(picked, "picked")
     # The model's suggestion counts as the user's own words when the message names it.
-    if suggested is not None and names_category(message, suggested):
+    if suggested is not None and names_category(_without_merchant(message, merchant), suggested):
         return CategoryChoice(suggested, "named")
     if merchant_rule is not None:
         return CategoryChoice(merchant_rule, "merchant_rule")
@@ -67,13 +69,38 @@ def names_category(message: str, category: CategoryOption) -> bool:
     """
     if category.is_fallback:
         return False
-    said = _words(message)
-    name = _words(category.name)
+    said = {_stem(word) for word in _words(message)}
+    name = {_stem(word) for word in _words(category.name)}
     says_whole_name = name <= said
     says_a_distinctive_word = bool((name - _GENERIC_WORDS) & said)
     return says_whole_name or says_a_distinctive_word
 
 
 def _words(text: str) -> set[str]:
+    return set(_tokens(text))
+
+
+def _tokens(text: str) -> list[str]:
     # Runs of letters and digits, so "&" or "!" is never a word.
-    return set(re.findall(r"[^\W_]+", text.casefold()))
+    return re.findall(r"[^\W_]+", text.casefold())
+
+
+def _stem(word: str) -> str:
+    """Singular form of a simple plural, so "grocery" names Groceries and "hobbies" names Hobby."""
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith(("sses", "xes", "zes", "ches", "shes")):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _without_merchant(message: str, merchant: str | None) -> str:
+    """The message with the merchant's own words cut out once: they name a shop, not a category."""
+    words, merchant_words = _tokens(message), _tokens(merchant or "")
+    size = len(merchant_words)
+    for start in range(len(words) - size + 1 if size else 0):
+        if words[start : start + size] == merchant_words:
+            return " ".join(words[:start] + words[start + size :])
+    return message

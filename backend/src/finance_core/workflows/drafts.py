@@ -19,6 +19,7 @@ from finance_core.dates import (
     parse_iso_date,
     resolve_date_expression,
 )
+from finance_core.llm.rules import item_segment
 from finance_core.llm.schemas import ExtractedTransaction
 from finance_core.money import (
     SUPPORTED_CURRENCIES,
@@ -42,6 +43,9 @@ class TransactionDraft(BaseModel):
     origin_message_id: str
     # The user's message this draft was understood from: a category named in it wins.
     source_text: str = ""
+    # Just this item's part of that message ("swiggy 300" of "swiggy 300 and dinner 400"),
+    # so a category named for one item is not credited to another.
+    item_text: str = ""
     type: Literal["expense", "income", "transfer"] | None = None
     amount: str | None = None  # exact decimal string
     amount_confirmed: bool = False  # literally typed by the user, or confirmed by them
@@ -146,6 +150,7 @@ def draft_from_extraction(
         id=draft_id,
         origin_message_id=origin_message_id,
         source_text=source_text,
+        item_text=item_segment(source_text, Decimal(amount)) if amount else source_text,
         type=extracted.type,
         amount=amount,
         amount_confirmed=grounded,

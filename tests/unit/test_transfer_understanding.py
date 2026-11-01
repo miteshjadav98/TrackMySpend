@@ -3,6 +3,7 @@ order in which a transfer draft asks for what is missing."""
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
 from types import SimpleNamespace
 from typing import Any
@@ -12,7 +13,9 @@ import pytest
 from finance_core.accounts.names import infer_account_kind, resolve_account_name
 from finance_core.llm.rules import extract_search, extract_transactions
 from finance_core.llm.schemas import ExtractedTransaction
+from finance_core.workflows.answers import AnswerApplier
 from finance_core.workflows.drafts import TransactionDraft, draft_from_extraction, first_issue
+from finance_core.workflows.questions import build_question
 
 TODAY = date(2026, 10, 24)
 
@@ -177,3 +180,83 @@ def test_a_transfer_draft_drops_merchant_and_payment_method() -> None:
     )  # fmt: skip
     assert (draft.merchant, draft.payment_method) == (None, None)
     assert (draft.account, draft.to_account) == ("HDFC", "Paytm")
+
+
+# -- review fixes: non-answers and the ready-made Cash option ---------------------------------
+
+NON_ANSWERS = ["idk", "skip", "not sure", "dont know", "don't know", "no idea", "none", "?"]
+
+
+class _NoCategories:
+    async def match(self, *args: Any) -> None:
+        return None
+
+
+def _applier(accounts: list[Any] | None = None) -> Any:
+    return AnswerApplier(
+        _NoCategories(),  # type: ignore[arg-type]
+        user_id=uuid.uuid4(),
+        today=TODAY,
+        locale="en-IN",
+        accounts=accounts or [],
+    )
+
+
+@pytest.mark.parametrize("reply", NON_ANSWERS)
+async def test_not_knowing_the_account_asks_again_instead_of_creating_one(reply: str) -> None:
+    pending = {"type": "clarification", "field": "account", "inputKind": "single_select"}
+
+    by_text = await _applier().from_text(pending, reply, transfer())
+    typed = await _applier().apply_value("account", reply, transfer(), allow_custom=True)
+
+    assert by_text.kind == typed.kind == "invalid"
+    assert by_text.notice and typed.notice
+
+
+@pytest.mark.parametrize("reply", ["idk", "whatever", "nothing", "dunno"])
+async def test_not_knowing_the_category_does_not_create_one(reply: str) -> None:
+    outcome = await _applier().apply_value(
+        "category", reply, transfer(type="expense"), allow_custom=True
+    )
+
+    assert outcome.kind == "invalid"
+
+
+def test_the_account_question_offers_cash_when_the_user_has_no_cash_account() -> None:
+    question = build_question(
+        first_issue(transfer(), base_currency="INR", today=TODAY),  # type: ignore[arg-type]
+        transfer(),
+        draft_index=0, draft_count=1, round_number=0, base_currency="INR", locale="en-IN",
+        today=TODAY, category_options=[], account_options=[account("HDFC")],
+    )  # fmt: skip
+
+    assert [(o.label, o.value) for o in question.options] == [("HDFC", "HDFC"), ("Cash", "Cash")]
+
+
+def test_the_account_question_does_not_offer_cash_twice() -> None:
+    question = build_question(
+        first_issue(transfer(), base_currency="INR", today=TODAY),  # type: ignore[arg-type]
+        transfer(),
+        draft_index=0, draft_count=1, round_number=0, base_currency="INR", locale="en-IN",
+        today=TODAY, category_options=[], account_options=[account("Wallet", "cash")],
+    )  # fmt: skip
+
+    assert [o.label for o in question.options] == ["Wallet"]
+
+
+async def test_picking_the_ready_made_cash_option_creates_a_cash_account_at_save() -> None:
+    pending = {
+        "type": "clarification",
+        "field": "account",
+        "inputKind": "single_select",
+        "allowCustomInput": True,
+        "options": [{"label": "Cash", "value": "Cash"}],
+    }
+
+    outcome = await _applier().from_response(
+        pending, {"action": "submit", "value": "Cash"}, transfer()
+    )
+
+    assert outcome.draft is not None
+    assert (outcome.draft.account_name, outcome.draft.account_new) == ("Cash", True)
+    assert infer_account_kind("Cash") == "cash"
