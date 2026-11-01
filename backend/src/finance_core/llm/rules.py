@@ -33,8 +33,10 @@ from finance_core.llm.schemas import (
     Intent,
     PeriodSpec,
     SearchSpec,
+    SettlementSpec,
     TurnUnderstanding,
 )
+from finance_core.llm.settling import read_balance_question, read_paying_back
 from finance_core.llm.sharing import Sharing, read_sharing
 from finance_core.money import AmountMention, find_amounts
 
@@ -400,6 +402,41 @@ def extract_transactions(
     return results
 
 
+def extract_settlement(
+    text: str,
+    today: date,
+    locale: str,
+    account_names: Sequence[str] = (),
+    friend_names: Sequence[str] = (),
+) -> SettlementSpec | None:
+    """The settlement in `text` with its account and date, or None if it is not one.
+
+    A message that splits a bill is a shared expense, even when it says "Jaymin paid me".
+    """
+    if read_sharing(text, friend_names):
+        return None
+    found = read_paying_back(text, friend_names)
+    if found is None:
+        return None
+    date_text = find_date_expression(text)
+    resolved = (
+        resolve_date_expression(date_text, today, day_first=day_first_for_locale(locale))
+        if date_text
+        else None
+    )
+    account = _paid_from_account(text, account_names)
+    return SettlementSpec(
+        friend=found.friend,
+        direction=found.direction,
+        amount=_plain(found.amount),
+        currency=found.currency,
+        purpose=found.purpose,
+        account=account[0] if account else None,
+        date_text=date_text,
+        date=resolved.isoformat() if resolved else None,
+    )
+
+
 def extract_period(text: str, today: date) -> PeriodSpec:
     t = text.lower()
     if re.search(r"\byesterday\b", t):
@@ -449,6 +486,7 @@ def extract_search(text: str) -> SearchSpec:
         category=infer_category_slug(text, kind),
         text=merchant,
         sort="largest" if _LARGEST.search(t) else "recent",
+        shared=bool(re.search(r"\bshared\b", t)),
         limit=int(top.group(1))
         if top
         else (1 if _LARGEST.search(t) and "expenses" not in t else None),
@@ -477,9 +515,23 @@ class RulesLLMClient:
 
     async def understand(self, request: UnderstandRequest) -> UnderstandResult:
         started = time.perf_counter()
-        intent = classify(request.text)
+        settlement = extract_settlement(
+            request.text, request.today, request.locale, request.accounts, request.friends
+        )
+        balance = read_balance_question(request.text, request.friends)
+        intent = (
+            "balance_question"
+            if balance
+            else "record_settlement"
+            if settlement
+            else classify(request.text)
+        )
         understanding = TurnUnderstanding(intent=intent)
-        if intent == "record_transactions":
+        if intent == "balance_question":
+            understanding.balance = balance
+        elif intent == "record_settlement":
+            understanding.settlement = settlement
+        elif intent == "record_transactions":
             understanding.transactions = extract_transactions(
                 request.text, request.today, request.locale, request.accounts, request.friends
             )

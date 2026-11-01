@@ -17,6 +17,8 @@ Intent = Literal[
     "record_transactions",
     "spending_summary",
     "search_transactions",
+    "record_settlement",
+    "balance_question",
     "help",
     "smalltalk",
     "out_of_scope",
@@ -94,6 +96,37 @@ class ExtractedTransaction(_Lenient):
     )
 
 
+class SettlementSpec(_Lenient):
+    """Money that changed hands between the user and one friend to clear what is owed."""
+
+    friend: str | None = Field(default=None, description="The friend's name as the user said it")
+    direction: Literal["friend_paid_me", "i_paid_friend"] | None = Field(
+        default=None, description="Who handed the money to whom"
+    )
+    amount: str | None = Field(
+        default=None, description="Plain number string as stated by the user; null if not stated"
+    )
+    currency: str | None = Field(
+        default=None, description="ISO 4217 code only if the user wrote a currency; else null"
+    )
+    purpose: str | None = Field(
+        default=None,
+        description="What the money was for when the user said ('his old phone'); null when "
+        "it only pays back what is owed",
+    )
+    account: str | None = Field(
+        default=None, description="The user's own account the money went into or left, as named"
+    )
+    date_text: str | None = Field(default=None, description="The user's own words for the date")
+    date: str | None = Field(default=None, description="That date as YYYY-MM-DD; null if none")
+
+
+class BalanceSpec(_Lenient):
+    friend: str | None = Field(
+        default=None, description="The friend asked about; null to ask about every friend"
+    )
+
+
 class PeriodSpec(_Lenient):
     kind: PeriodKind = "this_month"
     month: str | None = Field(default=None, description="YYYY-MM when kind is 'month'")
@@ -108,6 +141,9 @@ class SearchSpec(_Lenient):
     text: str | None = Field(default=None, description="Merchant or keyword to match, if any")
     sort: Literal["recent", "largest"] = "recent"
     limit: int | None = Field(default=None, description="How many to show, if the user said")
+    shared: bool = Field(
+        default=False, description="True when the user asks only for shared expenses"
+    )
 
 
 class PendingAnswer(_Lenient):
@@ -120,4 +156,6 @@ class TurnUnderstanding(_Lenient):
     transactions: list[ExtractedTransaction] = Field(default_factory=list)
     period: PeriodSpec | None = None
     search: SearchSpec | None = None
+    settlement: SettlementSpec | None = None
+    balance: BalanceSpec | None = None
     pending_answer: PendingAnswer | None = None
