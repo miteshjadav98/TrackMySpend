@@ -14,6 +14,7 @@ from finance_core.friends.models import (
     SharedExpense,
     SharedExpenseShare,
 )
+from finance_core.imports.models import ImportRow, StatementImport, StatementLayout
 from finance_core.merchants.models import MerchantRule
 from finance_core.transactions.models import Transaction
 from finance_core.users.models import FinancialProfile, User
@@ -28,6 +29,7 @@ __all__ = [
     "FinancialProfile",
     "Friend",
     "FriendInvite",
+    "ImportRow",
     "MerchantRule",
     "Message",
     "Notice",
@@ -35,6 +37,8 @@ __all__ = [
     "Settlement",
     "SharedExpense",
     "SharedExpenseShare",
+    "StatementImport",
+    "StatementLayout",
     "Transaction",
     "User",
 ]
