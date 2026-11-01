@@ -105,7 +105,7 @@ def _lines_recorded_by_friends(user_id: uuid.UUID) -> list[Select[tuple[object, 
     mine = aliased(Friend)
     recorders_share = aliased(SharedExpenseShare)
 
-    def with_recorder(query: Any, recorder_id: Any) -> Select[tuple[object, ...]]:
+    def with_recorder(query: Any, recorder_id: Any) -> Any:
         return query.join(
             mine,
             and_(
