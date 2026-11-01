@@ -59,7 +59,7 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
 
 **Phase 1 is complete.** The user tested the web app in the browser: no issues.
 
-## Phase 2 (in progress, branch `phase-2/integration`)
+## Phase 2 (built, code review next, branch `phase-2/integration`)
 
 Decided on 2026-10-27:
 
@@ -77,15 +77,22 @@ implementers in worktrees (one test database each), merged one at a time into
 Checkpoint 2026-10-28: tickets 01–05 merged (settings sections, merchant rules learn and
 apply, accounts, security settings, merchant rules in Settings), plus a fix for `/chat`
 hanging on a second visit (Next.js keeps pages alive in React `<Activity>`). 211 tests pass.
-Running: 06 (tag transactions with an account) and 07 (forgot password).
+
+Checkpoint 2026-11-01: tickets 01–10 merged, and ticket 11 (docs) written. Added since the last
+checkpoint: tagging transactions with an account (06), forgot password (07), transfers on the
+API and the transactions page (08), transfers in chat with prompt `understand_v2` (09), "paid
+from HDFC" in chat (10), and dark mode. `uv run pytest`: 332 passed, 1 skipped. Live eval:
+100% over six runs of 23 cases (ticket 09), 93–100% per run over ten runs of 29 cases
+(ticket 10), misses all model or provider noise, p50 about 1.1 s. Report:
+[phase-2-report.md](phase-2-report.md).
 
 ## Next
 
-1. Finish the Phase 2 tickets (frontier first; see the ticket statuses).
-2. Code review of the integration branch, fix findings, Phase 2 report.
-3. Merge Phase 2 into `main` after the review. The code is on GitHub
+1. Code review of the whole `phase-2/integration` branch, then fix the findings. (The Phase 2
+   report is written: [phase-2-report.md](phase-2-report.md).)
+2. Merge Phase 2 into `main` after the review. The code is on GitHub
    (`miteshjadav98/TrackMySpend`): `main` holds Phase 1, `phase-2/integration` holds Phase 2.
-4. Phase 3: split expenses with friends (Splitwise-style). Start from
+3. Phase 3: split expenses with friends (Splitwise-style). Start from
    `.scratch/phase-3/brief.md`: grill the open questions, then write the spec and tickets.
 
 ## Resume
