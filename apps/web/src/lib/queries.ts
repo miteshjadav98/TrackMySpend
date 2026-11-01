@@ -6,6 +6,9 @@ import type {
   FriendDetail,
   FriendInviteView,
   FriendView,
+  ImportDetail,
+  ImportSummary,
+  RowStatus,
   ConversationDetail,
   ConversationPage,
   MerchantRulePage,
@@ -44,6 +47,9 @@ export const keys = {
   notices: ["notices"] as const,
   sharedExpense: (id: string) => ["shared-expense", id] as const,
   merchantRules: (search: string) => ["merchant-rules", search] as const,
+  imports: ["imports"] as const,
+  // Under the imports key, so refreshing the imports list also refreshes an open preview.
+  import: (id: string, status: string, limit: number) => ["imports", id, status, limit] as const,
 };
 
 /** Anything that changes money: refresh every view that shows totals or rows. */
@@ -55,6 +61,8 @@ export function invalidateLedger(client: QueryClient): Promise<unknown> {
     client.invalidateQueries({ queryKey: keys.categories }),
     // Every save can teach or use a merchant rule.
     client.invalidateQueries({ queryKey: ["merchant-rules"] }),
+    // Importing or undoing a statement changes what the imports list and previews show.
+    client.invalidateQueries({ queryKey: keys.imports }),
   ]);
 }
 
@@ -172,6 +180,34 @@ export function useMerchantRules(search: string) {
         }),
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}
+
+/** The user's statement imports, newest first (previews waiting to be saved, saved, undone). */
+export function useImports(enabled = true) {
+  return useQuery({
+    queryKey: keys.imports,
+    enabled,
+    queryFn: () => unwrap<ImportSummary[]>(api.GET("/api/v1/imports")),
+  });
+}
+
+/** One import with its layout guess and the first `limit` preview rows (optionally one status). */
+export function useImport(id: string | null, status: RowStatus | "", limit: number) {
+  return useQuery({
+    queryKey: keys.import(id ?? "", status, limit),
+    enabled: id !== null,
+    // Keep the table on screen while a tick or a bigger page loads.
+    placeholderData: (previous) => previous,
+    queryFn: () =>
+      unwrap<ImportDetail>(
+        api.GET("/api/v1/imports/{import_id}", {
+          params: {
+            path: { import_id: id ?? "" },
+            query: { status: status || undefined, limit },
+          },
+        }),
+      ),
   });
 }
 
