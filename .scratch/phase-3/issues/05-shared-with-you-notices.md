@@ -37,4 +37,4 @@ re-asks on every page change.
 Full pytest: 517 passed, 1 skipped (live LLM eval). check:api, check:web, web build pass; contracts
 regenerated; alembic head 0011, no drift.
 
-Merged into phase-3/integration. Merge checks: full pytest 517 passed, 1 skipped (live LLM eval); check:api, check:web, web build pass; contracts no real diff; alembic head 0011, no drift. All boxes ticked.
+Merged into phase-3/integration as b2a1347. Merge checks: full pytest 517 passed, 1 skipped (live LLM eval); check:api, check:web, web build pass; contracts no real diff; alembic head 0011, no drift. All boxes ticked.
