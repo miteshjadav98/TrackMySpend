@@ -41,4 +41,4 @@ Implementer (t09): one migration, 0012, adds `friend_invites.code_hash`, `code_e
 - Test helper `accept_invite` in `tests/conftest.py` does the two-step accept for older tests.
 
 
-Merged into phase-3/integration. Merge checks: 609 passed, 1 skipped (live LLM eval); check:api, check:web, web build, contracts (no diff), alembic heads (0012) and alembic check all clean.
+Merged into phase-3/integration as 39d6e7a. Merge checks: 609 passed, 1 skipped (live LLM eval); check:api, check:web, web build, contracts (no diff), alembic heads (0012) and alembic check all clean.

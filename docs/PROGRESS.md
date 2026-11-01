@@ -93,7 +93,7 @@ becomes an account or category, the account question offers "Cash", a new accoun
 transfer takes the other end's currency and commits together with the transfer, and a blank
 model reading is filled from the offline parser. `uv run pytest`: 357 passed, 1 skipped.
 
-## Phase 3 (built, branch `phase-3/integration`)
+## Phase 3 (built and reviewed, ready for `main`, branch `phase-3/integration`)
 
 Split expenses with friends. Settled in a grilling session on 2026-11-01; spec
 `.scratch/phase-3/spec.md`, ADR `docs/adr/0001-shares-are-each-users-own-expense.md`, and 8
@@ -106,10 +106,17 @@ written. `uv run pytest`: 588 passed, 1 skipped. Live eval: 100% over five runs 
 (v3, p50 about 1.25 s) and 100% over five runs of 50 cases (v4, p50 about 1.37 s; about 0.13 s
 slower than v3 on the same cases). Report: [phase-3-report.md](phase-3-report.md).
 
+Code review 2026-11-01 over the whole branch, all findings fixed in ticket 09 (merge 39d6e7a):
+accepting a friend invite now needs a one-time code sent to the invited email (sign-up never
+proves the email); a friend who still owes money cannot be removed, and removed friends can be
+brought back; a chat message mixing shared and ordinary expenses saves all or nothing; a
+retried settlement request is saved once; a linked friend can tag their own account on a
+settlement; and replies tell two friends with the same name apart by email. `uv run pytest`:
+609 passed, 1 skipped.
+
 ## Next
 
-1. Code review of `phase-3/integration`, fix the findings in one ticket, then merge into
-   `main` with the owner's OK (Phase 2 is also waiting to merge).
+1. Merge Phase 3 into `main` (waiting for the owner's OK; Phase 2 is already on `main`).
 2. Pick which Phase 3 limitations to fix first (see the report), and choose an email provider.
 
 ## Resume
