@@ -33,8 +33,10 @@ class _Lenient(BaseModel):
 
 
 class ExtractedTransaction(_Lenient):
-    type: Literal["expense", "income"] | None = Field(
-        default=None, description="expense = money out, income = money in; null if unclear"
+    type: Literal["expense", "income", "transfer"] | None = Field(
+        default=None,
+        description="expense = money out, income = money in, transfer = money moved between "
+        "two of the user's own accounts; null if unclear",
     )
     amount: str | None = Field(
         default=None,
@@ -56,6 +58,14 @@ class ExtractedTransaction(_Lenient):
     description: str | None = Field(default=None, description="Short label, 1-5 words")
     merchant: str | None = Field(default=None, description="Business or person, if named")
     payment_method: PaymentMethodLiteral | None = None
+    account: str | None = Field(
+        default=None,
+        description="The user's own account the money left (for income: arrived in), as the "
+        "user named it; null if none named",
+    )
+    to_account: str | None = Field(
+        default=None, description="For a transfer only: the account the money went to"
+    )
 
 
 class PeriodSpec(_Lenient):
@@ -67,7 +77,7 @@ class PeriodSpec(_Lenient):
 
 
 class SearchSpec(_Lenient):
-    type: Literal["expense", "income"] | None = None
+    type: Literal["expense", "income", "transfer"] | None = None
     category: str | None = Field(default=None, description="Category slug filter, if any")
     text: str | None = Field(default=None, description="Merchant or keyword to match, if any")
     sort: Literal["recent", "largest"] = "recent"

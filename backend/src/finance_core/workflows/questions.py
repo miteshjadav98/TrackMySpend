@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from finance_core.accounts.schemas import AccountView
 from finance_core.categories.schemas import CategoryView
 from finance_core.dates import format_day, parse_iso_date
 from finance_core.interactions import (
@@ -48,6 +49,8 @@ def preview(
         description=draft.description,
         merchant=draft.merchant,
         payment_method=PAYMENT_METHOD_LABELS.get(draft.payment_method or ""),
+        account=draft.account_name or draft.account,
+        to_account=draft.to_account_name or draft.to_account,
     )
 
 
@@ -80,6 +83,7 @@ def build_question(
     locale: str,
     today: date,
     category_options: list[CategoryView],
+    account_options: list[AccountView] | None = None,
     notice: str | None = None,
 ) -> ClarificationInteraction | ConfirmationInteraction:
     interaction_id = f"q-{draft.id[:8]}-{issue.field}-{round_number}"
@@ -172,6 +176,12 @@ def build_question(
             **common,
         )
 
+    if issue.field in ("account", "to_account"):
+        return _account_question(
+            issue, draft, prefix=prefix, amount_text=amount_text,
+            accounts=account_options or [], common=common,
+        )  # fmt: skip
+
     # date
     if issue.reason == "future":
         message = "That date is in the future. Which day did it happen?"
@@ -188,3 +198,47 @@ def build_question(
         max_date=today,
         **common,
     )
+
+
+def _account_question(
+    issue: Issue,
+    draft: TransactionDraft,
+    *,
+    prefix: str,
+    amount_text: str | None,
+    accounts: list[AccountView],
+    common: dict[str, object],
+) -> ClarificationInteraction:
+    """Which account a transfer left, or went to. Offers the user's active accounts and
+    takes a typed new name."""
+    source = issue.field == "account"
+    named = draft.account if source else draft.to_account
+    if issue.reason == "same":
+        prefix += "The money can't go to the account it came from. "
+    elif issue.reason == "unknown" and named:
+        prefix += f"I couldn't tell which of your accounts “{named}” is. "
+    moved = f"the {amount_text}" if amount_text else "the money"
+    question = (
+        f"Which account did {moved} come from?" if source else f"Which account did {moved} go to?"
+    )
+    # The other end is never offered: a transfer needs two different accounts.
+    other = None if source else draft.account_id
+    return ClarificationInteraction(
+        message=prefix + question,
+        field=issue.field,  # type: ignore[arg-type]
+        input_kind="single_select",
+        options=[
+            Option(label=a.name, value=str(a.id), icon=_ACCOUNT_ICONS.get(a.kind))
+            for a in accounts
+            if str(a.id) != other
+        ][:8],
+        allow_custom_input=True,
+        placeholder="Or type a new account name",
+        **common,  # type: ignore[arg-type]
+    )
+
+
+_ACCOUNT_ICONS = {
+    "bank": "landmark", "credit_card": "credit-card", "wallet": "wallet", "cash": "banknote",
+    "other": "circle-ellipsis",
+}  # fmt: skip
