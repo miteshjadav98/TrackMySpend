@@ -13,6 +13,7 @@ import base64
 import binascii
 import json
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -150,6 +151,28 @@ class MerchantRuleService:
             return None
         category = await self._session.get(Category, rule.category_id)
         return category if category is not None and not category.is_archived else None
+
+    async def categories_for_many(
+        self, user_id: uuid.UUID, *, type: str, merchants: Sequence[str]
+    ) -> dict[str, uuid.UUID]:
+        """`category_for` for many merchants in one query: merchant key -> category id.
+
+        Merchants without a rule, or whose category is archived, are left out.
+        """
+        keys = {key for key in (merchant_key(name) for name in merchants) if key}
+        if not keys:
+            return {}
+        rows = await self._session.execute(
+            select(MerchantRule.merchant_key, MerchantRule.category_id)
+            .join(Category, Category.id == MerchantRule.category_id)
+            .where(
+                MerchantRule.user_id == user_id,
+                MerchantRule.type == type,
+                MerchantRule.merchant_key.in_(keys),
+                Category.is_archived.is_(False),
+            )
+        )
+        return {key: category_id for key, category_id in rows}
 
     # -- Settings: list, change and forget ------------------------------------------------
 

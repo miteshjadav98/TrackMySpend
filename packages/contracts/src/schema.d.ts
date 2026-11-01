@@ -472,6 +472,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Imports */
+        get: operations["list_imports_api_v1_imports_get"];
+        put?: never;
+        /** Upload Statement */
+        post: operations["upload_statement_api_v1_imports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Import */
+        get: operations["get_import_api_v1_imports__import_id__get"];
+        put?: never;
+        post?: never;
+        /** Discard Import */
+        delete: operations["discard_import_api_v1_imports__import_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Layout */
+        put: operations["save_layout_api_v1_imports__import_id__layout_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Rows */
+        patch: operations["update_rows_api_v1_imports__import_id__rows_patch"];
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Import */
+        post: operations["confirm_import_api_v1_imports__import_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/imports/{import_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo Import */
+        post: operations["undo_import_api_v1_imports__import_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/merchant-rules": {
         parameters: {
             query?: never;
@@ -793,6 +897,16 @@ export interface components {
             /** Formatted */
             formatted: string;
         };
+        /** Body_upload_statement_api_v1_imports_post */
+        Body_upload_statement_api_v1_imports_post: {
+            /**
+             * Accountid
+             * Format: uuid
+             */
+            accountId: string;
+            /** File */
+            file: string;
+        };
         /** CategoryCreate */
         CategoryCreate: {
             /** Name */
@@ -914,6 +1028,54 @@ export interface components {
              * @default 1
              */
             draftCount: number;
+        };
+        /**
+         * ColumnMap
+         * @description Which column (counted from 0) holds what: the statement layout of an account.
+         */
+        ColumnMap: {
+            /** Datecolumn */
+            dateColumn: number | null;
+            /** Descriptioncolumn */
+            descriptionColumn: number | null;
+            /** Amountcolumn */
+            amountColumn: number | null;
+            /** Debitcolumn */
+            debitColumn: number | null;
+            /** Creditcolumn */
+            creditColumn: number | null;
+            /** Referencecolumn */
+            referenceColumn: number | null;
+            /**
+             * Dateorder
+             * @default day_first
+             * @enum {string}
+             */
+            dateOrder: "day_first" | "month_first";
+        };
+        /**
+         * ColumnMapInput
+         * @description The layout the user confirmed or corrected.
+         */
+        ColumnMapInput: {
+            /** Datecolumn */
+            dateColumn?: number | null;
+            /** Descriptioncolumn */
+            descriptionColumn?: number | null;
+            /** Amountcolumn */
+            amountColumn?: number | null;
+            /** Debitcolumn */
+            debitColumn?: number | null;
+            /** Creditcolumn */
+            creditColumn?: number | null;
+            /** Referencecolumn */
+            referenceColumn?: number | null;
+            /**
+             * Dateorder
+             * @default day_first
+             * @enum {string}
+             */
+            dateOrder: "day_first" | "month_first";
         };
         /** ConfirmationInteraction */
         ConfirmationInteraction: {
@@ -1173,6 +1335,92 @@ export interface components {
             effectMinor: number;
             /** Effectformatted */
             effectFormatted: string;
+        };
+        /**
+         * ImportDetail
+         * @description An import with its detected layout, a few raw rows to check it against, and a page of
+         *     preview rows.
+         */
+        ImportDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            account: components["schemas"]["AccountRef"];
+            /** Filename */
+            fileName: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "previewing" | "imported" | "undone";
+            /** Currency */
+            currency: string;
+            /** Rowcount */
+            rowCount: number;
+            /** Importedcount */
+            importedCount: number;
+            /** Skippedcount */
+            skippedCount: number;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Expiresat */
+            expiresAt: string | null;
+            /** Confirmedat */
+            confirmedAt: string | null;
+            /** Undoneat */
+            undoneAt: string | null;
+            /** Headers */
+            headers: string[];
+            /** Samplerows */
+            sampleRows: string[][];
+            layout: components["schemas"]["ColumnMap"];
+            /** Layoutconfirmed */
+            layoutConfirmed: boolean;
+            counts: components["schemas"]["PreviewCounts"];
+            /** Rows */
+            rows: components["schemas"]["PreviewRow"][];
+            /** Rowstotal */
+            rowsTotal: number;
+        };
+        /** ImportSummary */
+        ImportSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            account: components["schemas"]["AccountRef"];
+            /** Filename */
+            fileName: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "previewing" | "imported" | "undone";
+            /** Currency */
+            currency: string;
+            /** Rowcount */
+            rowCount: number;
+            /** Importedcount */
+            importedCount: number;
+            /** Skippedcount */
+            skippedCount: number;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Expiresat */
+            expiresAt: string | null;
+            /** Confirmedat */
+            confirmedAt: string | null;
+            /** Undoneat */
+            undoneAt: string | null;
         };
         /**
          * InteractionResponse
@@ -1469,6 +1717,62 @@ export interface components {
             /** Isyou */
             isYou: boolean;
         };
+        /**
+         * PreviewCounts
+         * @description The numbers at the top of the preview. Totals are summed by the database.
+         */
+        PreviewCounts: {
+            /** Toimport */
+            toImport: number;
+            /** Skipped */
+            skipped: number;
+            /** Likelyduplicates */
+            likelyDuplicates: number;
+            /** Transfers */
+            transfers: number;
+            /** Selected */
+            selected: number;
+            /** Selectedoutminor */
+            selectedOutMinor: number;
+            /** Selectedinminor */
+            selectedInMinor: number;
+        };
+        /** PreviewRow */
+        PreviewRow: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Position */
+            position: number;
+            /** Occurredon */
+            occurredOn: string | null;
+            /** Direction */
+            direction: ("out" | "in") | null;
+            /** Amount */
+            amount: number | string | null;
+            /** Amountminor */
+            amountMinor: number | null;
+            /** Amountformatted */
+            amountFormatted: string | null;
+            /** Description */
+            description: string | null;
+            /** Merchant */
+            merchant: string | null;
+            category: components["schemas"]["CategoryRef"] | null;
+            /** Categorysource */
+            categorySource: ("rule" | "ai" | "keyword" | "default" | "user") | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "to_import" | "skipped" | "likely_duplicate" | "transfer";
+            /** Note */
+            note: string | null;
+            /** Isselected */
+            isSelected: boolean;
+        };
         /** ProfileUpdate */
         ProfileUpdate: {
             /** Displayname */
@@ -1526,6 +1830,26 @@ export interface components {
         RevokedSessionsView: {
             /** Revoked */
             revoked: number;
+        };
+        /**
+         * RowChange
+         * @description One preview row edited: ticked or unticked, or filed under another category.
+         */
+        RowChange: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Isselected */
+            isSelected?: boolean | null;
+            /** Categoryid */
+            categoryId?: string | null;
+        };
+        /** RowChanges */
+        RowChanges: {
+            /** Rows */
+            rows: components["schemas"]["RowChange"][];
         };
         /** SendMessageRequest */
         SendMessageRequest: {
@@ -3244,6 +3568,255 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_imports_api_v1_imports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportSummary"][];
+                };
+            };
+        };
+    };
+    upload_statement_api_v1_imports_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_statement_api_v1_imports_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_import_api_v1_imports__import_id__get: {
+        parameters: {
+            query?: {
+                status?: ("to_import" | "skipped" | "likely_duplicate" | "transfer") | null;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_import_api_v1_imports__import_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_layout_api_v1_imports__import_id__layout_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColumnMapInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_rows_api_v1_imports__import_id__rows_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RowChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_import_api_v1_imports__import_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_import_api_v1_imports__import_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportDetail"];
+                };
             };
             /** @description Validation Error */
             422: {

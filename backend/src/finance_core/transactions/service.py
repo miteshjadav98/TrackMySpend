@@ -56,6 +56,7 @@ from finance_core.users.context import UserContext
 
 MAX_PAGE_SIZE = 100
 MAX_BATCH = 20
+IMPORT_INSERT_BATCH = 500
 # What a share transaction cannot change on its own: only the shared expense moves these.
 SHARE_LOCKED_FIELDS = ("type", "amount_minor", "currency", "occurred_on")
 
@@ -404,6 +405,76 @@ class TransactionService:
 
         views = await self._views([row_id for row_id, _ in results], ctx.locale)
         return [(views[row_id], created) for row_id, created in results]
+
+    async def create_imported(
+        self,
+        ctx: UserContext,
+        items: Sequence[tuple[NewTransaction, str]],
+        *,
+        source_ref: str,
+        learn_merchants: bool,
+        request_id: str | None = None,
+    ) -> int:
+        """Insert statement-import rows in bulk, without committing; returns how many were new.
+
+        Each item carries its fingerprint as the idempotency key, so a row already saved is
+        skipped rather than doubled. One INSERT per batch keeps a 5,000-row import quick.
+        Only rows whose category the user chose (`learn_merchants`) teach merchant rules.
+        The caller commits and then calls `bump_pending_generations`.
+        """
+        created = 0
+        for start in range(0, len(items), IMPORT_INSERT_BATCH):
+            batch = items[start : start + IMPORT_INSERT_BATCH]
+            by_key = {key: new for new, key in batch}
+            inserted = (
+                await self._session.execute(
+                    pg_insert(Transaction)
+                    .values(
+                        [
+                            {
+                                "id": uuid7(),
+                                "user_id": ctx.user_id,
+                                "type": new.type,
+                                "amount_minor": new.amount_minor,
+                                "currency": new.currency,
+                                "occurred_on": new.occurred_on,
+                                "category_id": new.category_id,
+                                "account_id": new.account_id,
+                                "description": new.description,
+                                "merchant": new.merchant,
+                                "payment_method": new.payment_method,
+                                "notes": new.notes,
+                                "source": "import",
+                                "source_ref": source_ref,
+                                "idempotency_key": key,
+                                "version": 1,
+                            }
+                            for new, key in batch
+                        ]
+                    )
+                    .on_conflict_do_nothing(index_elements=["user_id", "idempotency_key"])
+                    .returning(Transaction.id, Transaction.idempotency_key)
+                )
+            ).all()
+            for transaction_id, key in inserted:
+                assert key is not None  # every item carries a key
+                new = by_key[key]
+                record_audit(
+                    self._session, user_id=ctx.user_id, actor="user",
+                    action="transaction.created", entity_type="transaction",
+                    entity_id=transaction_id,
+                    data={**_audit_snapshot(new), "source": "import"}, request_id=request_id,
+                )  # fmt: skip
+                if learn_merchants:
+                    await self._merchant_rules.learn(
+                        ctx.user_id, type=new.type, merchant=new.merchant,
+                        category_id=new.category_id,
+                    )  # fmt: skip
+            created += len(inserted)
+        if created:
+            self._unbumped.add(ctx.user_id)
+        await self._session.flush()
+        return created
 
     async def update(
         self,

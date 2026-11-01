@@ -1,9 +1,11 @@
 "use client";
 
 import type { TransactionType, TransactionView } from "@moneymoney/contracts";
-import { Plus, Search } from "lucide-react";
+import { FileUp, History, Plus, Search } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
 
+import { ImportStatementDialog } from "@/components/imports/import-dialog";
+import { ImportsDialog } from "@/components/imports/imports-dialog";
 import { SharedExpenseDialog } from "@/components/transactions/shared-expense-dialog";
 import { TransactionDialog } from "@/components/transactions/transaction-dialog";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,10 @@ export function TransactionsScreen() {
   });
   // The shared expense open on top of the transactions page, if any.
   const [sharedId, setSharedId] = useState<string | null>(null);
+  // The import dialog is mounted fresh each time it opens, so a new statement never inherits
+  // the last one's state (the page stays alive between visits). `reviewId` reopens a preview.
+  const [importDialog, setImportDialog] = useState<{ reviewId: string | null } | null>(null);
+  const [importsOpen, setImportsOpen] = useState(false);
   const deferredQuery = useDeferredValue(query.trim());
   const categories = useCategories();
   // Archived accounts too: their past transactions are still worth finding.
@@ -68,9 +74,17 @@ export function TransactionsScreen() {
             <h1 className="display text-[1.9rem] leading-tight font-semibold">Transactions</h1>
             <p className="mt-1 text-ink-soft">Everything you&apos;ve recorded, newest first.</p>
           </div>
-          <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setDialog({ open: true, transaction: null })}>
-            Add transaction
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button icon={<History className="size-4" aria-hidden />} onClick={() => setImportsOpen(true)}>
+              Imports
+            </Button>
+            <Button icon={<FileUp className="size-4" aria-hidden />} onClick={() => setImportDialog({ reviewId: null })}>
+              Import statement
+            </Button>
+            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setDialog({ open: true, transaction: null })}>
+              Add transaction
+            </Button>
+          </div>
         </header>
 
         <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,2fr)_repeat(5,minmax(0,1fr))]">
@@ -200,6 +214,11 @@ export function TransactionsScreen() {
                           Shared
                         </span>
                       ) : null}
+                      {tx.source === "import" ? (
+                        <span className="ml-2 rounded-full bg-paper px-2 py-0.5 text-xs font-medium text-ink-soft">
+                          Imported
+                        </span>
+                      ) : null}
                       <span className="block text-xs text-ink-faint">
                         {[isTransfer ? tx.description : null, tx.merchant, tx.source === "chat" ? "from chat" : null].filter(Boolean).join(" · ") || " "}
                       </span>
@@ -248,6 +267,17 @@ export function TransactionsScreen() {
         }}
       />
       <SharedExpenseDialog sharedExpenseId={sharedId} onClose={() => setSharedId(null)} />
+      {importDialog ? (
+        <ImportStatementDialog initialImportId={importDialog.reviewId} onClose={() => setImportDialog(null)} />
+      ) : null}
+      <ImportsDialog
+        open={importsOpen}
+        onClose={() => setImportsOpen(false)}
+        onReview={(importId) => {
+          setImportsOpen(false);
+          setImportDialog({ reviewId: importId });
+        }}
+      />
     </div>
   );
 }

@@ -1485,6 +1485,384 @@
         }
       }
     },
+    "/api/v1/imports": {
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "List Imports",
+        "operationId": "list_imports_api_v1_imports_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImportSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Imports Api V1 Imports Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Upload Statement",
+        "operationId": "upload_statement_api_v1_imports_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_statement_api_v1_imports_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/{import_id}": {
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Get Import",
+        "operationId": "get_import_api_v1_imports__import_id__get",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "to_import",
+                    "skipped",
+                    "likely_duplicate",
+                    "transfer"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Discard Import",
+        "operationId": "discard_import_api_v1_imports__import_id__delete",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/{import_id}/layout": {
+      "put": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Save Layout",
+        "operationId": "save_layout_api_v1_imports__import_id__layout_put",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ColumnMapInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/{import_id}/rows": {
+      "patch": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Update Rows",
+        "operationId": "update_rows_api_v1_imports__import_id__rows_patch",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowChanges"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/{import_id}/confirm": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Confirm Import",
+        "operationId": "confirm_import_api_v1_imports__import_id__confirm_post",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/imports/{import_id}/undo": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Undo Import",
+        "operationId": "undo_import_api_v1_imports__import_id__undo_post",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/merchant-rules": {
       "get": {
         "tags": [
@@ -3027,6 +3405,26 @@
         "title": "BalanceView",
         "description": "What is owed between the user and a friend in one currency. Positive means the friend\nowes the user; negative means the user owes the friend. `formatted` is the size of the\nbalance without a sign. Settled-up currencies are left out."
       },
+      "Body_upload_statement_api_v1_imports_post": {
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Accountid"
+          },
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accountId",
+          "file"
+        ],
+        "title": "Body_upload_statement_api_v1_imports_post"
+      },
       "CategoryCreate": {
         "properties": {
           "name": {
@@ -3349,6 +3747,192 @@
           "draftCount"
         ],
         "title": "ClarificationInteraction"
+      },
+      "ColumnMap": {
+        "properties": {
+          "dateColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datecolumn"
+          },
+          "descriptionColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descriptioncolumn"
+          },
+          "amountColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountcolumn"
+          },
+          "debitColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debitcolumn"
+          },
+          "creditColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creditcolumn"
+          },
+          "referenceColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencecolumn"
+          },
+          "dateOrder": {
+            "type": "string",
+            "enum": [
+              "day_first",
+              "month_first"
+            ],
+            "title": "Dateorder",
+            "default": "day_first"
+          }
+        },
+        "type": "object",
+        "title": "ColumnMap",
+        "description": "Which column (counted from 0) holds what: the statement layout of an account.",
+        "required": [
+          "dateColumn",
+          "descriptionColumn",
+          "amountColumn",
+          "debitColumn",
+          "creditColumn",
+          "referenceColumn",
+          "dateOrder"
+        ]
+      },
+      "ColumnMapInput": {
+        "properties": {
+          "dateColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datecolumn"
+          },
+          "descriptionColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descriptioncolumn"
+          },
+          "amountColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountcolumn"
+          },
+          "debitColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debitcolumn"
+          },
+          "creditColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creditcolumn"
+          },
+          "referenceColumn": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencecolumn"
+          },
+          "dateOrder": {
+            "type": "string",
+            "enum": [
+              "day_first",
+              "month_first"
+            ],
+            "title": "Dateorder",
+            "default": "day_first"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ColumnMapInput",
+        "description": "The layout the user confirmed or corrected."
       },
       "ConfirmationInteraction": {
         "properties": {
@@ -4072,6 +4656,248 @@
         "title": "HistoryEntry",
         "description": "One line in a friend's history. `effect_minor` is how it moved the balance: positive\nmeans the friend owes the user more, negative means less."
       },
+      "ImportDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "account": {
+            "$ref": "#/components/schemas/AccountRef"
+          },
+          "fileName": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "previewing",
+              "imported",
+              "undone"
+            ],
+            "title": "Status"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "rowCount": {
+            "type": "integer",
+            "title": "Rowcount"
+          },
+          "importedCount": {
+            "type": "integer",
+            "title": "Importedcount"
+          },
+          "skippedCount": {
+            "type": "integer",
+            "title": "Skippedcount"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiresat"
+          },
+          "confirmedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmedat"
+          },
+          "undoneAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undoneat"
+          },
+          "headers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Headers"
+          },
+          "sampleRows": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Samplerows"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/ColumnMap"
+          },
+          "layoutConfirmed": {
+            "type": "boolean",
+            "title": "Layoutconfirmed"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/PreviewCounts"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "rowsTotal": {
+            "type": "integer",
+            "title": "Rowstotal"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "account",
+          "fileName",
+          "status",
+          "currency",
+          "rowCount",
+          "importedCount",
+          "skippedCount",
+          "createdAt",
+          "expiresAt",
+          "confirmedAt",
+          "undoneAt",
+          "headers",
+          "sampleRows",
+          "layout",
+          "layoutConfirmed",
+          "counts",
+          "rows",
+          "rowsTotal"
+        ],
+        "title": "ImportDetail",
+        "description": "An import with its detected layout, a few raw rows to check it against, and a page of\npreview rows."
+      },
+      "ImportSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "account": {
+            "$ref": "#/components/schemas/AccountRef"
+          },
+          "fileName": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "previewing",
+              "imported",
+              "undone"
+            ],
+            "title": "Status"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "rowCount": {
+            "type": "integer",
+            "title": "Rowcount"
+          },
+          "importedCount": {
+            "type": "integer",
+            "title": "Importedcount"
+          },
+          "skippedCount": {
+            "type": "integer",
+            "title": "Skippedcount"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "expiresAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiresat"
+          },
+          "confirmedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmedat"
+          },
+          "undoneAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undoneat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "account",
+          "fileName",
+          "status",
+          "currency",
+          "rowCount",
+          "importedCount",
+          "skippedCount",
+          "createdAt",
+          "expiresAt",
+          "confirmedAt",
+          "undoneAt"
+        ],
+        "title": "ImportSummary"
+      },
       "InteractionResponse": {
         "properties": {
           "type": {
@@ -4759,6 +5585,219 @@
         "title": "PersonView",
         "description": "Someone in a shared expense, named the way the recorder knows them."
       },
+      "PreviewCounts": {
+        "properties": {
+          "toImport": {
+            "type": "integer",
+            "title": "Toimport"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "likelyDuplicates": {
+            "type": "integer",
+            "title": "Likelyduplicates"
+          },
+          "transfers": {
+            "type": "integer",
+            "title": "Transfers"
+          },
+          "selected": {
+            "type": "integer",
+            "title": "Selected"
+          },
+          "selectedOutMinor": {
+            "type": "integer",
+            "title": "Selectedoutminor"
+          },
+          "selectedInMinor": {
+            "type": "integer",
+            "title": "Selectedinminor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "toImport",
+          "skipped",
+          "likelyDuplicates",
+          "transfers",
+          "selected",
+          "selectedOutMinor",
+          "selectedInMinor"
+        ],
+        "title": "PreviewCounts",
+        "description": "The numbers at the top of the preview. Totals are summed by the database."
+      },
+      "PreviewRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "occurredOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredon"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "out",
+                  "in"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "amountMinor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountminor"
+          },
+          "amountFormatted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amountformatted"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategoryRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "categorySource": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "rule",
+                  "ai",
+                  "keyword",
+                  "default",
+                  "user"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categorysource"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "to_import",
+              "skipped",
+              "likely_duplicate",
+              "transfer"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "isSelected": {
+            "type": "boolean",
+            "title": "Isselected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "position",
+          "occurredOn",
+          "direction",
+          "amount",
+          "amountMinor",
+          "amountFormatted",
+          "description",
+          "merchant",
+          "category",
+          "categorySource",
+          "status",
+          "note",
+          "isSelected"
+        ],
+        "title": "PreviewRow"
+      },
       "ProfileUpdate": {
         "properties": {
           "displayName": {
@@ -4893,6 +5932,64 @@
         ],
         "title": "RevokedSessionsView",
         "description": "How many sessions a \"sign out all other devices\" request signed out."
+      },
+      "RowChange": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "isSelected": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isselected"
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoryid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "RowChange",
+        "description": "One preview row edited: ticked or unticked, or filed under another category."
+      },
+      "RowChanges": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowChange"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Rows"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "RowChanges"
       },
       "SendMessageRequest": {
         "properties": {
