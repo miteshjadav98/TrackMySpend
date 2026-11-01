@@ -56,4 +56,4 @@ Implementer (branch `phase-4/t01-csv-import`): built end to end; all boxes ticke
 - Not done: the Excel/.xlsx path (ticket 02). The browser flow was typechecked, linted and
   built, but not clicked through by hand.
 
-Merged into phase-4/integration. Merge checks: pytest 703 passed, 1 skipped (live LLM eval); check:api, check:web, web build, contracts and alembic check all clean.
+Merged into phase-4/integration as e98fa69. Merge checks: pytest 703 passed, 1 skipped (live LLM eval); check:api, check:web, web build, contracts and alembic check all clean.
