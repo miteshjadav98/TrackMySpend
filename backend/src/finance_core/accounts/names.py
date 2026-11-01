@@ -60,6 +60,20 @@ def resolve_account_name[AccountLike: _Named](
     return None
 
 
+def same_account_name(first: str, second: str) -> bool:
+    """True when two spellings are the same words: "HDFC-Savings" and "hdfc savings"."""
+    return _words(first) == _words(second) != set()
+
+
+def could_mean_an_account(name: str, account_names: Sequence[str]) -> bool:
+    """True when `name` means one account or several, so "from HDFC" is an account phrase even
+    if the user has two HDFC accounts and the chat cannot tell which."""
+    said = _words(name)
+    return bool(said) and any(
+        said <= _words(known) or _words(known) <= said for known in account_names
+    )
+
+
 def infer_account_kind(name: str) -> AccountKindField:
     """The kind of a new account the user named in chat: cash, credit card, wallet or bank."""
     lowered = name.casefold()

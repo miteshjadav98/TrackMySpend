@@ -121,6 +121,43 @@ CASES: list[dict[str, Any]] = [
     },
     {"text": "hi there", "intent": "smalltalk"},
     {"text": "what can you do?", "intent": "help"},
+    # Expenses and income tagged with one of the user's accounts: the account is never the merchant.
+    {
+        "text": "paid 300 for lunch from HDFC",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "300", "category": "food",
+                          "account": "HDFC", "merchant": None}],
+    },
+    {
+        "text": "salary 50000 into HDFC",
+        "intent": "record_transactions",
+        "transactions": [{"type": "income", "amount": "50000", "category": "salary",
+                          "account": "HDFC", "merchant": None}],
+    },
+    {
+        "text": "bought groceries for 1200 using my SBI account yesterday",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "1200", "category": "groceries",
+                          "account": "SBI", "date": "2026-10-23", "merchant": None}],
+    },
+    {
+        "text": "spent 450 on dinner at Dominos from Paytm",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "450", "category": "food",
+                          "account": "Paytm", "merchant": "Dominos"}],
+    },
+    {
+        "text": "received 2000 refund on ICICI account today",
+        "intent": "record_transactions",
+        "transactions": [{"type": "income", "amount": "2000", "account": "ICICI",
+                          "merchant": None, "date": "2026-10-24"}],
+    },
+    {
+        "text": "paid 250 for a taxi from the office",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "250", "category": "transport",
+                          "account": None}],
+    },
 ]  # fmt: skip
 
 

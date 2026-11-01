@@ -15,7 +15,7 @@ import { TransactionDialog } from "@/components/transactions/transaction-dialog"
 import { NamedIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { api, unwrap } from "@/lib/api";
-import { formatDay, paymentLabel, transferRoute } from "@/lib/format";
+import { accountPhrase, formatDay, paymentLabel, transferRoute } from "@/lib/format";
 import { invalidateLedger, useQueryClient } from "@/lib/queries";
 
 function Amount({ tx, className = "" }: { tx: TransactionView; className?: string }) {
@@ -76,6 +76,7 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
             isTransfer ? "Transfer" : (tx.category?.name ?? "Uncategorised"),
             formatDay(tx.occurredOn),
             paymentLabel(tx.paymentMethod),
+            accountPhrase(tx),
           ]
             .filter(Boolean)
             .join(" · ");

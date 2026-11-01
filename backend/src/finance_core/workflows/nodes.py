@@ -78,6 +78,7 @@ _TURN_RESET: dict[str, Any] = {
     "outcome": None,
     "saved": [],
     "filed_by_merchant_rule": [],
+    "unmatched_accounts": [],
     "summary": None,
     "results": None,
     "reply": None,
@@ -159,13 +160,18 @@ async def _file_under_category(
 def _with_accounts_resolved(
     draft: TransactionDraft, accounts: list[AccountView]
 ) -> TransactionDraft:
-    """A transfer's account names, as the user said them, matched to their active accounts.
+    """The account names the user said, matched to their active accounts.
 
-    A name that matches none or several is left alone, so the draft asks which one is meant.
+    A transfer whose name matches none or several is left alone, so the draft asks which one
+    is meant. An expense or income is only tagged when the name means exactly one account;
+    otherwise it is saved untagged and the reply says so, because the chat never asks.
     An end the user already answered (picked, or typed as a new account) is never touched.
     """
     if draft.type != "transfer":
-        return draft
+        found = resolve_account_name(draft.account, accounts) if draft.account else None
+        if found is None or draft.account_id:
+            return draft
+        return draft.model_copy(update={"account_id": str(found.id), "account_name": found.name})
     updates: dict[str, Any] = {}
     for prefix, said in (("account", draft.account), ("to_account", draft.to_account)):
         answered = getattr(draft, f"{prefix}_id") or getattr(draft, f"{prefix}_new")
@@ -198,6 +204,15 @@ async def _account_for_save(
         # Created meanwhile, or the same name was typed twice: use the one that exists.
         existing = resolve_account_name(new_name, await accounts.list_accounts(ctx.user))
         return existing.id if existing else None
+
+
+def _unmatched_accounts(drafts: list[TransactionDraft]) -> list[str]:
+    """Account names the user said for an expense or income that matched none of their accounts."""
+    return [
+        draft.account
+        for draft in drafts
+        if draft.type != "transfer" and draft.account and not draft.account_id
+    ]
 
 
 def _filed_by_merchant_rule(
@@ -269,7 +284,13 @@ class FinanceNodes:
             )
         understanding = result.understanding
         if result.source != "rules":
-            understanding = reconcile(understanding, text, today=ctx.today, locale=ctx.locale)
+            understanding = reconcile(
+                understanding,
+                text,
+                today=ctx.today,
+                locale=ctx.locale,
+                account_names=request.accounts,
+            )
         meta = {
             "intent": understanding.intent,
             "source": result.source,
@@ -569,6 +590,7 @@ class FinanceNodes:
         return {
             "saved": [view.model_dump(mode="json", by_alias=True) for view in views],
             "filed_by_merchant_rule": _filed_by_merchant_rule(drafts, views),
+            "unmatched_accounts": _unmatched_accounts(drafts),
             "drafts": [],
             "outcome": "saved",
         }
@@ -599,6 +621,7 @@ class FinanceNodes:
             currency=draft.currency,
             occurred_on=date.fromisoformat(draft.date),
             category_id=category_id,
+            account_id=uuid.UUID(draft.account_id) if draft.account_id else None,
             description=draft.description,
             merchant=draft.merchant,
             payment_method=draft.payment_method,
@@ -699,6 +722,7 @@ class FinanceNodes:
                 locale=ctx.locale,
                 abandoned=bool(state.get("abandoned")),
                 filed_by_merchant_rule=frozenset(state.get("filed_by_merchant_rule") or []),
+                unmatched_accounts=state.get("unmatched_accounts") or [],
                 interaction_id=f"{base_id}-saved",
             )
         elif outcome == "summary" and state.get("summary"):

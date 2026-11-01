@@ -14,10 +14,11 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import date
 from decimal import Decimal
 
+from finance_core.accounts.names import could_mean_an_account
 from finance_core.categories.defaults import (
     CategoryKind,
     infer_category,
@@ -111,6 +112,13 @@ _FROM_ACCOUNT = re.compile(
 )
 _TO_ACCOUNT = re.compile(
     r"\b(?:to|into)\s+(?:my\s+)?" + _ACCOUNT_NAME.format(group="name", stop=_ACCOUNT_STOP), _I
+)
+# Only for expenses and income, and only when the name is one of the user's accounts:
+# "using my SBI account", "on ICICI account".
+_USING_ACCOUNT = re.compile(
+    r"\b(?:using|via|with|through|on)\s+(?:my\s+)?"
+    + _ACCOUNT_NAME.format(group="name", stop=_ACCOUNT_STOP),
+    _I,
 )
 _MOVED = re.compile(r"\b(transfer|transferred|transferring|moved|move|moving)\b", _I)
 _WITHDREW = re.compile(r"\b(withdrew|withdrawn|withdraw|withdrawal|atm)\b", _I)
@@ -257,7 +265,21 @@ def detect_transfer(segment: str) -> tuple[str | None, str | None, str] | None:
     return None
 
 
-def extract_transactions(text: str, today: date, locale: str) -> list[ExtractedTransaction]:
+def _paid_from_account(segment: str, account_names: Sequence[str]) -> tuple[str, str] | None:
+    """(account as written, the phrase that named it) for "from HDFC" / "into HDFC" when the
+    name is one of the user's accounts; None otherwise, so "from Nike" stays a merchant."""
+    stripped = _strip_dates(segment)
+    for pattern in (_FROM_ACCOUNT, _TO_ACCOUNT, _USING_ACCOUNT):
+        for match in pattern.finditer(stripped):
+            name = _NAME_TAIL.sub("", match.group("name").strip())
+            if name and could_mean_an_account(name, account_names):
+                return name, match.group(0)
+    return None
+
+
+def extract_transactions(
+    text: str, today: date, locale: str, account_names: Sequence[str] = ()
+) -> list[ExtractedTransaction]:
     global_date = find_date_expression(text)
     global_type = detect_type(text)
     global_payment = detect_payment_method(text)
@@ -293,7 +315,12 @@ def extract_transactions(text: str, today: date, locale: str) -> list[ExtractedT
         category, keyword = (found[0].slug, found[1]) if found else (None, None)
         if kind is None and found is not None:
             kind = found[0].kind  # "uber 220" -> transport -> an expense
-        merchant = detect_merchant(segment)
+        # "from HDFC" naming one of the user's accounts is the account, never the merchant.
+        paid_from = _paid_from_account(segment, account_names)
+        without_account = (
+            re.sub(re.escape(paid_from[1]), " ", segment, flags=_I) if paid_from else segment
+        )
+        merchant = detect_merchant(without_account)
         results.append(
             ExtractedTransaction(
                 type=kind,
@@ -305,6 +332,7 @@ def extract_transactions(text: str, today: date, locale: str) -> list[ExtractedT
                 description=_description(segment, keyword, merchant, category),
                 merchant=merchant,
                 payment_method=detect_payment_method(segment) or global_payment,
+                account=paid_from[0] if paid_from else None,
             )
         )
     return results
@@ -391,7 +419,7 @@ class RulesLLMClient:
         understanding = TurnUnderstanding(intent=intent)
         if intent == "record_transactions":
             understanding.transactions = extract_transactions(
-                request.text, request.today, request.locale
+                request.text, request.today, request.locale, request.accounts
             )
         elif intent in ("spending_summary", "search_transactions"):
             understanding.period = extract_period(request.text, request.today)

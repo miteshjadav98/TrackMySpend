@@ -64,6 +64,7 @@ class FinanceState(TypedDict, total=False):
     outcome: str | None
     saved: list[dict[str, Any]]
     filed_by_merchant_rule: list[str]  # ids of saved transactions a merchant rule filed
+    unmatched_accounts: list[str]  # account names said for an expense or income that matched none
     summary: dict[str, Any] | None
     results: dict[str, Any] | None
     reply: dict[str, Any] | None  # {"text": str, "ui": [interaction, ...]}
