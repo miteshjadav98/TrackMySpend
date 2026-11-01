@@ -255,7 +255,9 @@ def check(case: dict[str, Any], understanding: Any) -> list[str]:
                     got_shares = {(x.person.casefold(), Decimal(x.amount)) for x in actual}
                     want_shares = {(x["person"].casefold(), Decimal(x["amount"])) for x in value}
                     if got_shares != want_shares:
-                        problems.append(f"tx{index}.shares {sorted(got_shares)} != {sorted(want_shares)}")
+                        problems.append(
+                            f"tx{index}.shares {sorted(got_shares)} != {sorted(want_shares)}"
+                        )
                     continue
                 if field in ("account", "to_account") and isinstance(value, str):
                     if (actual or "").casefold() != value.casefold():  # names ignore case
