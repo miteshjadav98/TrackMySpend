@@ -34,4 +34,4 @@ agree). `FriendService` now takes a clock. The seam for notices (ticket 05) is
 delete: the same users should get a notice. Not built: a way for the friend to tag their own
 account on a settlement (`friend_account_id` is read but never set).
 
-Merged into phase-3/integration (merge commit: see git log, subject "Merge ticket 04"). Full pytest: 507 passed, 1 skipped (live LLM eval). check:api, check:web, web build pass; contracts unchanged; alembic head 0010, no drift. All boxes ticked.
+Merged into phase-3/integration as 2d060c3. Full pytest: 507 passed, 1 skipped (live LLM eval). check:api, check:web, web build pass; contracts unchanged; alembic head 0010, no drift. All boxes ticked.
