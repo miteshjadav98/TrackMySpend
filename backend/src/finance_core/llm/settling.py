@@ -76,7 +76,7 @@ def _is_known(name: str, friend_names: Sequence[str]) -> bool:
 
 def _usable_name(name: str) -> str | None:
     """The name tidied, or None when it is a word like "me" or "everyone"."""
-    if name.casefold() in _NOT_NAMES or name.split()[0].casefold() in _NOT_NAMES:
+    if name.casefold() in _NOT_NAMES or name.split(maxsplit=1)[0].casefold() in _NOT_NAMES:
         return None
     return _tidy_name(name)
 
@@ -100,9 +100,9 @@ def read_paying_back(text: str, friend_names: Sequence[str] = ()) -> PayingBack 
     friend = _usable_name(match.group("name"))
     if friend is None:
         return None
-    if direction == "i_paid_friend" and not _is_known(friend, friend_names):
-        return None
     purpose = _PURPOSE.search(text)
+    if direction == "i_paid_friend" and (purpose or not _is_known(friend, friend_names)):
+        return None  # paying a shop, or paying a friend for something, is an expense
     return PayingBack(
         friend=friend,
         direction=direction,
@@ -112,11 +112,20 @@ def read_paying_back(text: str, friend_names: Sequence[str] = ()) -> PayingBack 
     )
 
 
+def _friend_said(name: str, friend_names: Sequence[str]) -> str | None:
+    """The friend a balance question names. The pattern may take a second word that belongs to
+    the sentence ("Riya anything"), so the full name is used only when it is a friend's."""
+    full = _usable_name(name)
+    if full is None or _is_known(full, friend_names):
+        return full
+    return _usable_name(name.split()[0])
+
+
 def read_balance_question(text: str, friend_names: Sequence[str] = ()) -> BalanceSpec | None:
     """The balance question in `text`: one friend, or every friend when none is named."""
     for pattern in _BALANCE_OF_ONE:
         if match := pattern.search(text):
-            return BalanceSpec(friend=_usable_name(match.group("name")))
+            return BalanceSpec(friend=_friend_said(match.group("name"), friend_names))
     if _BALANCE_OF_ALL.search(text):
         return BalanceSpec(friend=None)
     return None

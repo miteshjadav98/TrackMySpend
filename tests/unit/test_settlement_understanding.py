@@ -37,7 +37,8 @@ def test_a_friend_paying_me_back_is_the_same_settlement() -> None:
 
 
 @pytest.mark.parametrize(
-    "text", ["paid Jaymin 500", "paid Jaymin back 500", "I paid back Jaymin 500", "paid 500 to Jaymin"]
+    "text",
+    ["paid Jaymin 500", "paid Jaymin back 500", "I paid back Jaymin 500", "paid 500 to Jaymin"],
 )
 def test_me_paying_a_friend_is_a_settlement_to_that_friend(text: str) -> None:
     found = read_paying_back(text, FRIENDS)
@@ -46,10 +47,13 @@ def test_me_paying_a_friend_is_a_settlement_to_that_friend(text: str) -> None:
     assert found.purpose is None
 
 
-def test_paying_someone_for_a_thing_keeps_the_purpose() -> None:
-    found = read_paying_back("paid Jaymin 2000 for his old phone", FRIENDS)
-    assert found is not None
-    assert found.purpose == "his old phone"
+def test_paying_a_friend_for_something_is_not_a_settlement() -> None:
+    assert read_paying_back("paid Jaymin 2000 for his old phone", FRIENDS) is None
+
+
+def test_a_friend_paying_me_for_something_is_still_a_settlement_with_its_purpose() -> None:
+    found = read_paying_back("Jaymin paid me 500 for the tickets", FRIENDS)
+    assert found is not None and found.purpose == "the tickets"
 
 
 def test_paying_someone_who_is_not_a_friend_is_not_a_settlement() -> None:
@@ -118,7 +122,9 @@ def test_reconcile_takes_the_amount_the_user_wrote_when_the_model_changed_it() -
         intent="record_settlement",
         settlement=SettlementSpec(friend="Jaymin", direction="friend_paid_me", amount="5000"),
     )
-    fixed = reconcile(model, "Jaymin paid me 500", today=TODAY, locale="en-IN", friend_names=FRIENDS)
+    fixed = reconcile(
+        model, "Jaymin paid me 500", today=TODAY, locale="en-IN", friend_names=FRIENDS
+    )
     assert fixed.settlement is not None and fixed.settlement.amount == "500"
 
 

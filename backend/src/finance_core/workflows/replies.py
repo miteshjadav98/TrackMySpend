@@ -48,6 +48,14 @@ _SUGGESTIONS_BY_OUTCOME: dict[str, list[SuggestedPrompt]] = {
         SuggestedPrompt(label="This month's spending", prompt="How much did I spend this month?", icon="pie-chart"),
         SuggestedPrompt(label="Add an expense", prompt="I spent ₹", mode="prefill", icon="plus"),
     ],
+    "settlement_saved": [
+        SuggestedPrompt(label="Who owes me?", prompt="Who owes me money?", icon="list"),
+        SuggestedPrompt(label="My shared expenses", prompt="Show my shared expenses this month", icon="list"),
+    ],
+    "balances": [
+        SuggestedPrompt(label="My shared expenses", prompt="Show my shared expenses this month", icon="list"),
+        SuggestedPrompt(label="This month's spending", prompt="How much did I spend this month?", icon="pie-chart"),
+    ],
 }  # fmt: skip
 
 

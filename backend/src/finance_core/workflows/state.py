@@ -67,6 +67,11 @@ class FinanceState(TypedDict, total=False):
     unmatched_accounts: list[str]  # account names said for an expense or income that matched none
     shared_saved: list[dict[str, Any]]  # shared expenses saved this turn, for the save card
     added_friends: list[str]  # names of friends the chat added at save
+    settlement: dict[str, Any] | None  # a settlement chosen to be recorded
+    settlement_saved: dict[str, Any] | None  # what the settlement reply says
+    balance: dict[str, Any] | None  # the balance question asked
+    balance_answer: dict[str, Any] | None  # the friends' balances that answer it
+    friend_question: dict[str, Any] | None  # why a settlement or balance question needs more
     summary: dict[str, Any] | None
     results: dict[str, Any] | None
     reply: dict[str, Any] | None  # {"text": str, "ui": [interaction, ...]}
