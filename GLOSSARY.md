@@ -59,6 +59,24 @@ _Avoid_: timeframe, window
 Income and expense totals for a period, per currency, computed from the saved transactions.
 _Avoid_: report, stats
 
+### Imports
+
+**Statement**:
+A CSV or Excel file of one account's transactions, exported from a bank or card website.
+_Avoid_: bank file, export, passbook
+
+**Import**:
+One upload of a statement into one account, which becomes many transactions after the user confirms the preview. It can be undone as a whole.
+_Avoid_: upload (that is the act), batch, sync
+
+**Statement layout**:
+Which column of an account's statement holds the date, description and amounts, confirmed by the user once and remembered for that account's next import.
+_Avoid_: mapping, template, format
+
+**Likely duplicate**:
+A statement row that matches a transaction the user already has in that account (same date, amount and direction). It is left out of the import unless the user ticks it.
+_Avoid_: dupe, conflict
+
 ### Conversation
 
 **Turn**:
