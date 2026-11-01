@@ -851,6 +851,256 @@
         }
       }
     },
+    "/api/v1/shared-expenses": {
+      "get": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "List Shared Expenses",
+        "operationId": "list_shared_expenses_api_v1_shared_expenses_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedExpenseView"
+                  },
+                  "title": "Response List Shared Expenses Api V1 Shared Expenses Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "Create Shared Expense",
+        "operationId": "create_shared_expense_api_v1_shared_expenses_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedExpenseCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedExpenseView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/shared-expenses/{shared_expense_id}": {
+      "get": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "Get Shared Expense",
+        "operationId": "get_shared_expense_api_v1_shared_expenses__shared_expense_id__get",
+        "parameters": [
+          {
+            "name": "shared_expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shared Expense Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedExpenseView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "Update Shared Expense",
+        "operationId": "update_shared_expense_api_v1_shared_expenses__shared_expense_id__put",
+        "parameters": [
+          {
+            "name": "shared_expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shared Expense Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedExpenseUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedExpenseView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "Delete Shared Expense",
+        "operationId": "delete_shared_expense_api_v1_shared_expenses__shared_expense_id__delete",
+        "parameters": [
+          {
+            "name": "shared_expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shared Expense Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/merchant-rules": {
       "get": {
         "tags": [
@@ -3591,6 +3841,41 @@
         ],
         "title": "Option"
       },
+      "ParticipantInput": {
+        "properties": {
+          "friendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendid"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ParticipantInput",
+        "description": "One person in a shared expense. A null `friend_id` is the user themselves. The amount is\ngiven only for an exact split."
+      },
       "PasswordChange": {
         "properties": {
           "currentPassword": {
@@ -3697,6 +3982,38 @@
           "label"
         ],
         "title": "PeriodView"
+      },
+      "PersonView": {
+        "properties": {
+          "friendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "isYou": {
+            "type": "boolean",
+            "title": "Isyou"
+          }
+        },
+        "type": "object",
+        "required": [
+          "friendId",
+          "name",
+          "isYou"
+        ],
+        "title": "PersonView",
+        "description": "Someone in a shared expense, named the way the recorder knows them."
       },
       "ProfileUpdate": {
         "properties": {
@@ -3918,6 +4235,402 @@
         ],
         "title": "SessionView",
         "description": "One signed-in browser or device, as the user sees it in Settings → Security."
+      },
+      "ShareView": {
+        "properties": {
+          "friendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "isYou": {
+            "type": "boolean",
+            "title": "Isyou"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "title": "Amountminor"
+          },
+          "amountFormatted": {
+            "type": "string",
+            "title": "Amountformatted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "friendId",
+          "name",
+          "isYou",
+          "amount",
+          "amountMinor",
+          "amountFormatted"
+        ],
+        "title": "ShareView",
+        "description": "One participant's share."
+      },
+      "SharedExpenseCreate": {
+        "properties": {
+          "total": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Total"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "occurredOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredon"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "payerFriendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payerfriendid"
+          },
+          "split": {
+            "type": "string",
+            "enum": [
+              "equal",
+              "exact"
+            ],
+            "title": "Split",
+            "default": "equal"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantInput"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Participants"
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoryid"
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "total",
+          "participants"
+        ],
+        "title": "SharedExpenseCreate",
+        "description": "A new shared expense. Category and account tag the user's own share."
+      },
+      "SharedExpenseUpdate": {
+        "properties": {
+          "total": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Total"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "occurredOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredon"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "payerFriendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payerfriendid"
+          },
+          "split": {
+            "type": "string",
+            "enum": [
+              "equal",
+              "exact"
+            ],
+            "title": "Split",
+            "default": "equal"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantInput"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Participants"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "total",
+          "participants"
+        ],
+        "title": "SharedExpenseUpdate",
+        "description": "A full replacement of the bill and split. The user's own category and account are\nchanged on their share transaction, not here."
+      },
+      "SharedExpenseView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Total"
+          },
+          "totalMinor": {
+            "type": "integer",
+            "title": "Totalminor"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "totalFormatted": {
+            "type": "string",
+            "title": "Totalformatted"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "payer": {
+            "$ref": "#/components/schemas/PersonView"
+          },
+          "paidByYou": {
+            "type": "boolean",
+            "title": "Paidbyyou"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/ShareView"
+            },
+            "type": "array",
+            "title": "Shares"
+          },
+          "myTransactionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mytransactionid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "total",
+          "totalMinor",
+          "currency",
+          "totalFormatted",
+          "occurredOn",
+          "description",
+          "merchant",
+          "payer",
+          "paidByYou",
+          "shares",
+          "myTransactionId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "SharedExpenseView",
+        "description": "A shared expense: the total, the payer and every share."
       },
       "SpendingSummary": {
         "properties": {
@@ -4615,6 +5328,18 @@
             ],
             "title": "Source"
           },
+          "sharedExpenseId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharedexpenseid"
+          },
           "version": {
             "type": "integer",
             "title": "Version"
@@ -4647,6 +5372,7 @@
           "paymentMethod",
           "notes",
           "source",
+          "sharedExpenseId",
           "version",
           "createdAt",
           "updatedAt"

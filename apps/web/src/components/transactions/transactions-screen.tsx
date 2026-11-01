@@ -4,6 +4,7 @@ import type { TransactionType, TransactionView } from "@moneymoney/contracts";
 import { Plus, Search } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
 
+import { SharedExpenseDialog } from "@/components/transactions/shared-expense-dialog";
 import { TransactionDialog } from "@/components/transactions/transaction-dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
@@ -34,6 +35,8 @@ export function TransactionsScreen() {
     open: false,
     transaction: null,
   });
+  // The shared expense open on top of the transactions page, if any.
+  const [sharedId, setSharedId] = useState<string | null>(null);
   const deferredQuery = useDeferredValue(query.trim());
   const categories = useCategories();
   // Archived accounts too: their past transactions are still worth finding.
@@ -192,6 +195,11 @@ export function TransactionsScreen() {
                       >
                         {isTransfer ? transferRoute(tx) : (tx.description ?? tx.category?.name ?? "Transaction")}
                       </button>
+                      {tx.sharedExpenseId ? (
+                        <span className="ml-2 rounded-full bg-lavender-wash px-2 py-0.5 text-xs font-medium text-lavender-ink">
+                          Shared
+                        </span>
+                      ) : null}
                       <span className="block text-xs text-ink-faint">
                         {[isTransfer ? tx.description : null, tx.merchant, tx.source === "chat" ? "from chat" : null].filter(Boolean).join(" · ") || " "}
                       </span>
@@ -234,7 +242,12 @@ export function TransactionsScreen() {
         open={dialog.open}
         transaction={dialog.transaction}
         onClose={() => setDialog({ open: false, transaction: null })}
+        onOpenShared={(id) => {
+          setDialog({ open: false, transaction: null });
+          setSharedId(id);
+        }}
       />
+      <SharedExpenseDialog sharedExpenseId={sharedId} onClose={() => setSharedId(null)} />
     </div>
   );
 }

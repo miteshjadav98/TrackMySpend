@@ -9,6 +9,7 @@ import type {
   ConversationPage,
   MerchantRulePage,
   MeView,
+  SharedExpenseView,
   SpendingSummary,
   TransactionPage,
   TransactionType,
@@ -32,6 +33,7 @@ export const keys = {
   transactions: (filters: TransactionFilters) => ["transactions", filters] as const,
   friends: ["friends"] as const,
   friendInvites: ["friend-invites"] as const,
+  sharedExpense: (id: string) => ["shared-expense", id] as const,
   merchantRules: (search: string) => ["merchant-rules", search] as const,
 };
 
@@ -40,6 +42,7 @@ export function invalidateLedger(client: QueryClient): Promise<unknown> {
   return Promise.all([
     client.invalidateQueries({ queryKey: ["summary"] }),
     client.invalidateQueries({ queryKey: ["transactions"] }),
+    client.invalidateQueries({ queryKey: ["shared-expense"] }),
     client.invalidateQueries({ queryKey: keys.categories }),
     // Every save can teach or use a merchant rule.
     client.invalidateQueries({ queryKey: ["merchant-rules"] }),
@@ -188,4 +191,18 @@ export function invalidateFriends(client: QueryClient): Promise<unknown> {
     client.invalidateQueries({ queryKey: keys.friends }),
     client.invalidateQueries({ queryKey: keys.friendInvites }),
   ]);
+}
+
+/** One shared expense the user recorded: the total, the payer and every share. */
+export function useSharedExpense(id: string | null) {
+  return useQuery({
+    queryKey: keys.sharedExpense(id ?? ""),
+    enabled: id !== null,
+    queryFn: () =>
+      unwrap<SharedExpenseView>(
+        api.GET("/api/v1/shared-expenses/{shared_expense_id}", {
+          params: { path: { shared_expense_id: id ?? "" } },
+        }),
+      ),
+  });
 }
