@@ -60,6 +60,7 @@ def render_understand_prompt(request: UnderstandRequest) -> str:
         expense_categories=expense or "(none)",
         income_categories=income or "(none)",
         accounts=", ".join(request.accounts) or "(none yet)",
+        friends=", ".join(request.friends) or "(none yet)",
         pending_block=pending_block,
     )
 

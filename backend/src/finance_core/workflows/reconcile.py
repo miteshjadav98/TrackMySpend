@@ -129,12 +129,20 @@ def _as_transfer(
     )
 
 
+_SHARING_FIELDS = ("participants", "payer", "split", "shares")
+
+
 def _fill(tx: ExtractedTransaction, hint: ExtractedTransaction) -> ExtractedTransaction:
     updates = {
         f: getattr(hint, f) for f in _FILLABLE if getattr(tx, f) is None and getattr(hint, f)
     }
     if hint.type == "transfer":
         updates["type"] = "transfer"  # the parser's transfer phrasings are exact: they win
+    if hint.participants and not tx.participants:
+        # The model read an ordinary expense where the user named friends and a split. The
+        # four sharing fields describe one thing, so they are taken together or not at all.
+        updates.update({f: getattr(hint, f) for f in _SHARING_FIELDS})
+        updates["type"] = "expense"
     kind = updates.get("type") or tx.type
     if tx.category is None and hint.category:
         definition = system_category(hint.category)
@@ -171,6 +179,13 @@ def _account_not_merchant(
     return tx
 
 
+def _participant_not_merchant(tx: ExtractedTransaction) -> ExtractedTransaction:
+    """A friend the expense is shared with is never the merchant ("pizza with Jaymin")."""
+    if tx.merchant and tx.merchant.casefold() in {p.casefold() for p in tx.participants}:
+        return tx.model_copy(update={"merchant": None})
+    return tx
+
+
 def reconcile(
     understanding: TurnUnderstanding,
     text: str,
@@ -178,10 +193,11 @@ def reconcile(
     today: date,
     locale: str,
     account_names: Sequence[str] = (),
+    friend_names: Sequence[str] = (),
 ) -> TurnUnderstanding:
     if understanding.intent == "record_transactions" and understanding.transactions:
         transactions = _drop_duplicates(_merge_fragments(list(understanding.transactions)), text)
-        hints = extract_transactions(text, today, locale, account_names)
+        hints = extract_transactions(text, today, locale, account_names, friend_names)
         unused = list(hints)
         filled = []
         for original in transactions:
@@ -196,7 +212,7 @@ def reconcile(
                 tx = _fill(tx, match)
             elif tx.type == "transfer":
                 tx = _as_transfer(tx, None)
-            filled.append(_account_not_merchant(tx, text, account_names))
+            filled.append(_participant_not_merchant(_account_not_merchant(tx, text, account_names)))
         return understanding.model_copy(update={"transactions": filled})
 
     if understanding.intent in ("search_transactions", "spending_summary"):

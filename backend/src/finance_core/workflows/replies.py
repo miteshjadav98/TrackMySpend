@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any
 
 from finance_core.dates import format_day
+from finance_core.friends.schemas import SharedExpenseView
 from finance_core.interactions import (
     Interaction,
     SuggestedPrompt,
@@ -90,9 +91,34 @@ def _via_account(tx: TransactionView) -> str:
     return f" {'from' if tx.type == 'expense' else 'into'} {tx.account.name}"
 
 
+def _summary_item(tx: TransactionView, shared_by_id: dict[Any, SharedExpenseView]) -> str:
+    """One entry of "Saved 3 transactions: ...": amount and what it was for, or the route."""
+    expense = shared_by_id.get(tx.shared_expense_id)
+    if expense is not None:
+        friends = _join([share.name for share in expense.shares if not share.is_you])
+        return f"{expense.total_formatted} {tx.description or 'expense'} shared with {friends}"
+    what = (
+        _route(tx)
+        if tx.type == "transfer"
+        else tx.description or (tx.category.name if tx.category else "")
+    )
+    return f"{tx.amount_formatted} {what}".strip()
+
+
 def _unmatched_account_note(names: Sequence[str]) -> str:
     quoted = _join([f"“{name}”" for name in names])
     return f"I couldn't match {quoted} to one of your accounts, so I saved it without an account."
+
+
+def _shared_note(expense: SharedExpenseView) -> str:
+    """ "You paid. Shares: You ₹500.00, Jaymin ₹500.00." from the saved shared expense."""
+    payer = "You" if expense.paid_by_you else expense.payer.name
+    shares = ", ".join(f"{share.name} {share.amount_formatted}" for share in expense.shares)
+    return f"{payer} paid. Shares: {shares}."
+
+
+def _added_friends_note(names: Sequence[str]) -> str:
+    return f"I added {_join(list(names))} to your friends."
 
 
 def compose_saved(
@@ -104,8 +130,12 @@ def compose_saved(
     interaction_id: str,
     filed_by_merchant_rule: frozenset[str] = frozenset(),
     unmatched_accounts: Sequence[str] = (),
+    shared: Sequence[dict[str, Any]] = (),
+    added_friends: Sequence[str] = (),
 ) -> tuple[str, list[Interaction]]:
     views = [TransactionView.model_validate(item) for item in saved]
+    shared_views = [SharedExpenseView.model_validate(item) for item in shared]
+    shared_by_id = {expense.id: expense for expense in shared_views}
     by_rule = [tx for tx in views if str(tx.id) in filed_by_merchant_rule]
     totals: dict[str, int] = defaultdict(int)
     if len({view.type for view in views}) == 1:  # only total like with like
@@ -123,7 +153,13 @@ def compose_saved(
         )
         day = format_day(tx.occurred_on, today)
         when = day if day in ("today", "yesterday") else f"on {day}"
-        if tx.type == "transfer":
+        if tx.shared_expense_id in shared_by_id:
+            expense = shared_by_id[tx.shared_expense_id]
+            text = (
+                f"Saved {expense.total_formatted} shared expense{what}{category}"
+                f"{_via_account(tx)} {when}. {_shared_note(expense)}"
+            )
+        elif tx.type == "transfer":
             source = tx.account.name if tx.account else "?"
             target = tx.to_account.name if tx.to_account else "?"
             text = f"Saved {tx.amount_formatted} transfer from {source} to {target} {when}."
@@ -131,13 +167,12 @@ def compose_saved(
             noun = "expense" if tx.type == "expense" else "income"
             text = f"Saved {tx.amount_formatted} {noun}{what}{category}{_via_account(tx)} {when}{paid}."
     else:
-        items = [
-            f"{tx.amount_formatted} {_route(tx) if tx.type == 'transfer' else tx.description or (tx.category.name if tx.category else '')}".strip()
-            for tx in views
-        ]
+        items = [_summary_item(tx, shared_by_id) for tx in views]
         text = f"Saved {len(views)} transactions: {_join(items)}."
     for tx in by_rule:
         text += " " + _merchant_rule_note(tx)
+    if added_friends:
+        text += " " + _added_friends_note(added_friends)
     if unmatched_accounts:
         text += " " + _unmatched_account_note(unmatched_accounts)
     if abandoned:
@@ -147,7 +182,9 @@ def compose_saved(
         if len(views) > 1
         else []
     )
-    card = TransactionsSavedInteraction(id=interaction_id, transactions=views, totals=total_amounts)
+    card = TransactionsSavedInteraction(
+        id=interaction_id, transactions=views, totals=total_amounts, shared=shared_views
+    )
     return text, [card]
 
 

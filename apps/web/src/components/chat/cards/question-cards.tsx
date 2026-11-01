@@ -23,6 +23,8 @@ function DraftLine({ draft }: { draft: DraftPreview }) {
   const route = draft.account || draft.toAccount ? `${draft.account ?? "?"} → ${draft.toAccount ?? "?"}` : null;
   const parts = [
     draft.type === "transfer" ? route : draft.description,
+    draft.sharedWith.length ? `shared with ${draft.sharedWith.join(", ")}` : null,
+    draft.paidBy ? `${draft.paidBy} paid` : null,
     draft.category,
     draft.occurredOnLabel,
     draft.paymentMethod,

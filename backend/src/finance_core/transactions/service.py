@@ -551,11 +551,14 @@ class TransactionService:
         shared_expense_id: uuid.UUID,
         learn_merchant: bool = True,
         request_id: str | None = None,
+        source: str = "api",
+        source_ref: str | None = None,
     ) -> uuid.UUID:
         """Add a user's share of a shared expense as an ordinary expense.
 
         The recorder's share teaches the merchant rule like any other save. A friend's
         share does not (`learn_merchant=False`): they did not pick its category.
+        `source_ref` lets a retried chat message find the share it already saved.
         """
         row = Transaction(
             id=uuid7(),
@@ -571,14 +574,15 @@ class TransactionService:
             merchant=new.merchant,
             payment_method=new.payment_method,
             notes=new.notes,
-            source="api",
+            source=source,
+            source_ref=source_ref,
             version=1,
         )
         self._session.add(row)
         record_audit(
             self._session, user_id=user_id, actor="user", action="transaction.created",
             entity_type="transaction", entity_id=row.id,
-            data={**_audit_snapshot(new), "source": "api", "sharedExpenseId": str(shared_expense_id)},
+            data={**_audit_snapshot(new), "source": source, "sharedExpenseId": str(shared_expense_id)},
             request_id=request_id,
         )  # fmt: skip
         if learn_merchant:

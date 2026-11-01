@@ -20,7 +20,7 @@ from finance_core.dates import (
     resolve_date_expression,
 )
 from finance_core.llm.rules import item_segment
-from finance_core.llm.schemas import ExtractedTransaction
+from finance_core.llm.schemas import ExtractedShare, ExtractedTransaction
 from finance_core.money import (
     SUPPORTED_CURRENCIES,
     MoneyError,
@@ -32,8 +32,34 @@ from finance_core.money import (
 from finance_core.workflows.category_choice import CategorySource
 
 IssueField = Literal[
-    "amount", "amount_confirm", "currency", "type", "category", "account", "to_account", "date"
-]
+    "amount", "amount_confirm", "currency", "type", "friend", "payer", "split", "category",
+    "account", "to_account", "date",
+]  # fmt: skip
+
+
+class DraftPerson(BaseModel):
+    """A friend a shared expense is split with, from the name the user said to the friend it means.
+
+    `friend_id` is set once the name matches exactly one of the user's friends. A name matching
+    several is `ambiguous`; one matching none stays unresolved until the user agrees to add
+    them (`is_new`), and the friend is then created at save.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    said: str
+    friend_id: str | None = None
+    name: str | None = None  # the friend's saved name, or the name to add
+    is_new: bool = False
+    ambiguous: bool = False
+    paid: bool = False  # this friend paid the bill
+    amount: str | None = None  # what they had, for an exact split
+
+    def is_resolved(self) -> bool:
+        return self.friend_id is not None or self.is_new
+
+    def display_name(self) -> str:
+        return self.name or self.said
 
 
 class TransactionDraft(BaseModel):
@@ -73,6 +99,27 @@ class TransactionDraft(BaseModel):
     to_account_id: str | None = None
     to_account_name: str | None = None
     to_account_new: bool = False
+    # A shared expense: the friends it is split with (never the user), how, and the user's own
+    # amount when the split is exact. Empty `people` means the expense is not shared.
+    people: list[DraftPerson] = []
+    split: Literal["equal", "exact"] = "equal"
+    my_amount: str | None = None
+
+    def is_shared(self) -> bool:
+        return self.type == "expense" and bool(self.people)
+
+    def payer_is_friend(self) -> bool:
+        return any(person.paid for person in self.people)
+
+    def exact_amounts_added(self) -> Decimal | None:
+        """What the exact amounts add up to, or None while someone's amount is missing."""
+        given = [self.my_amount, *(person.amount for person in self.people)]
+        if None in given:
+            return None
+        try:
+            return sum((Decimal(a) for a in given if a is not None), Decimal(0))
+        except InvalidOperation:
+            return None
 
     def has_account(self) -> bool:
         return self.account_id is not None or self.account_new
@@ -146,7 +193,7 @@ def draft_from_extraction(
     if assumed:
         resolved = today
 
-    return TransactionDraft(
+    draft = TransactionDraft(
         id=draft_id,
         origin_message_id=origin_message_id,
         source_text=source_text,
@@ -165,6 +212,50 @@ def draft_from_extraction(
         account=_clean(extracted.account, 60),
         to_account=_clean(extracted.to_account, 60) if extracted.type == "transfer" else None,
     )
+    return draft.model_copy(update=_sharing_fields(extracted))
+
+
+def _sharing_fields(extracted: ExtractedTransaction) -> dict[str, object]:
+    """The draft's shared-expense fields from what the model read; empty if not shared."""
+    if extracted.type in ("income", "transfer") or not extracted.participants:
+        return {}
+    names = [_clean(name, 80) for name in extracted.participants]
+    people = _unique_people([name for name in names if name])
+    payer = _clean(extracted.payer, 80)
+    if payer and payer.casefold() not in {p.said.casefold() for p in people}:
+        people.append(DraftPerson(said=payer))  # whoever paid is sharing too
+    exact = extracted.split == "exact"
+    return {
+        "type": "expense",
+        "people": [
+            p.model_copy(
+                update={
+                    "paid": bool(payer) and p.said.casefold() == (payer or "").casefold(),
+                    "amount": _amount_for(p.said, extracted.shares) if exact else None,
+                }
+            )
+            for p in people
+        ],
+        "split": "exact" if exact else "equal",
+        "my_amount": _amount_for("me", extracted.shares) if exact else None,
+    }
+
+
+def _unique_people(names: list[str]) -> list[DraftPerson]:
+    people: list[DraftPerson] = []
+    for name in names:
+        if name.casefold() not in {p.said.casefold() for p in people}:
+            people.append(DraftPerson(said=name))
+    return people
+
+
+def _amount_for(person: str, shares: list[ExtractedShare]) -> str | None:
+    """What the user said `person` had, as a plain number string; None if they did not say."""
+    for share in shares:
+        if share.person.strip().casefold() == person.casefold():
+            parsed = normalize_amount(share.amount)
+            return format(parsed[0].normalize(), "f") if parsed else None
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,8 +268,9 @@ def first_issue(draft: TransactionDraft, *, base_currency: str, today: date) -> 
     """The single most important thing to ask next, or None if the draft is complete.
 
     Order: amount, then confirming an unverified amount, currency, type (needed to offer
-    the right categories), category, and finally the date. A transfer has no category; it
-    asks for the account the money left, then the one it went to, before the date.
+    the right categories), the friends of a shared expense, category, and finally the date. A
+    transfer has no category; it asks for the account the money left, then the one it went to,
+    before the date.
     """
     value = draft.decimal_amount()
     if value is None or value <= 0:
@@ -194,6 +286,8 @@ def first_issue(draft: TransactionDraft, *, base_currency: str, today: date) -> 
         return Issue("amount_confirm", "unverified")
     if draft.type is None:
         return Issue("type", "missing")
+    if draft.is_shared() and (sharing_issue := _sharing_issue(draft)) is not None:
+        return sharing_issue
     if draft.type == "transfer":
         if not draft.has_account():
             return Issue("account", "unknown" if draft.account else "missing")
@@ -211,3 +305,33 @@ def first_issue(draft: TransactionDraft, *, base_currency: str, today: date) -> 
     if occurred < EARLIEST_ALLOWED_DATE:
         return Issue("date", "too_old")
     return None
+
+
+def _sharing_issue(draft: TransactionDraft) -> Issue | None:
+    """What a shared expense still needs: every friend known, a payer the service accepts, and
+    exact amounts that add up to the total."""
+    for person in draft.people:
+        if not person.is_resolved():
+            return Issue("friend", "ambiguous" if person.ambiguous else "unknown")
+    if draft.payer_is_friend() and len(draft.people) > 1:
+        return Issue("payer", "too_many")  # a friend paid: only that friend can share it
+    if draft.split == "exact":
+        added = draft.exact_amounts_added()
+        if added is None:
+            return Issue("split", "missing")
+        if added != draft.decimal_amount():
+            return Issue("split", "mismatch")
+    return None
+
+
+def merge_repeated_people(people: list[DraftPerson]) -> list[DraftPerson]:
+    """Two names that turn out to be the same friend ("Jaymin" and "Jaymin Shah") count once;
+    a friend counts as the payer if either name said so."""
+    kept: list[DraftPerson] = []
+    for person in people:
+        twin = next((k for k in kept if person.friend_id and k.friend_id == person.friend_id), None)
+        if twin is None:
+            kept.append(person)
+        elif person.paid and not twin.paid:
+            kept[kept.index(twin)] = twin.model_copy(update={"paid": True})
+    return kept

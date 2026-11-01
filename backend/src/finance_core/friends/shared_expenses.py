@@ -84,9 +84,16 @@ class SharedExpenseService:
     # -- writes ---------------------------------------------------------------------------
 
     async def create(
-        self, ctx: UserContext, data: SharedExpenseCreate, *, request_id: str | None = None
+        self,
+        ctx: UserContext,
+        data: SharedExpenseCreate,
+        *,
+        request_id: str | None = None,
+        source: str = "api",
+        source_ref: str | None = None,
     ) -> SharedExpenseView:
-        """Record a shared expense and the recorder's share of it."""
+        """Record a shared expense and the recorder's share of it. The chat passes its message
+        as `source_ref`, so a retried message finds the share it already saved."""
         plan = await self._plan(ctx, data, existing=None)
         my_share = await self._transactions.resolve(
             ctx,
@@ -116,7 +123,7 @@ class SharedExpenseService:
         self._add_shares(expense.id, plan.shares)
         linked = await self._linked_users(plan.shares)
         await self._create_share_transactions(
-            ctx, expense, my_share, plan.shares, linked, request_id
+            ctx, expense, my_share, plan.shares, linked, request_id, source, source_ref
         )
         self._audit_all(
             [ctx.user_id, *linked.values()], "shared_expense.created", expense.id,
@@ -250,11 +257,14 @@ class SharedExpenseService:
         shares: dict[PersonKey, int],
         linked: dict[uuid.UUID, uuid.UUID],
         request_id: str | None,
+        source: str,
+        source_ref: str | None,
     ) -> None:
         """Give the recorder and every participant who is a linked user their share."""
         await self._transactions.add_share_row(
-            ctx.user_id, my_share, shared_expense_id=expense.id, request_id=request_id
-        )
+            ctx.user_id, my_share, shared_expense_id=expense.id, request_id=request_id,
+            source=source, source_ref=source_ref,
+        )  # fmt: skip
         # Flushed so the friends' delivery can read the category the recorder chose.
         await self._session.flush()
         for friend_id, user_id in linked.items():

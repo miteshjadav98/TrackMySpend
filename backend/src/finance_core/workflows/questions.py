@@ -7,6 +7,8 @@ from datetime import date
 from finance_core.accounts.schemas import AccountView
 from finance_core.categories.schemas import CategoryView
 from finance_core.dates import format_day, parse_iso_date
+from finance_core.friends.names import matching_friends
+from finance_core.friends.schemas import FriendView
 from finance_core.interactions import (
     ClarificationInteraction,
     ConfirmationInteraction,
@@ -51,6 +53,8 @@ def preview(
         payment_method=PAYMENT_METHOD_LABELS.get(draft.payment_method or ""),
         account=draft.account_name or draft.account,
         to_account=draft.to_account_name or draft.to_account,
+        shared_with=[person.display_name() for person in draft.people] if draft.is_shared() else [],
+        paid_by=next((p.display_name() for p in draft.people if p.paid), None),
     )
 
 
@@ -84,6 +88,7 @@ def build_question(
     today: date,
     category_options: list[CategoryView],
     account_options: list[AccountView] | None = None,
+    friend_options: list[FriendView] | None = None,
     notice: str | None = None,
 ) -> ClarificationInteraction | ConfirmationInteraction:
     interaction_id = f"q-{draft.id[:8]}-{issue.field}-{round_number}"
@@ -176,6 +181,12 @@ def build_question(
             **common,
         )
 
+    if issue.field in ("friend", "payer", "split"):
+        return _sharing_question(
+            issue, draft, prefix=prefix, base_currency=base_currency, locale=locale,
+            friends=friend_options or [], common=common,
+        )  # fmt: skip
+
     if issue.field in ("account", "to_account"):
         return _account_question(
             issue, draft, prefix=prefix, amount_text=amount_text,
@@ -196,6 +207,73 @@ def build_question(
         field="date",
         input_kind="date",
         max_date=today,
+        **common,
+    )
+
+
+def _sharing_question(
+    issue: Issue,
+    draft: TransactionDraft,
+    *,
+    prefix: str,
+    base_currency: str,
+    locale: str,
+    friends: list[FriendView],
+    common: dict[str, object],
+) -> ClarificationInteraction:
+    """What a shared expense still needs: which friend a name means, who it is split with when
+    a friend paid, or what each person had."""
+    if issue.field == "friend":
+        person = next(p for p in draft.people if not p.is_resolved())
+        if issue.reason == "ambiguous":
+            options = [
+                Option(label=f.name, value=str(f.id), description=f.email)
+                for f in matching_friends(person.said, friends)
+            ]
+            message = f"Which {person.said} do you mean?"
+        else:
+            # Existing friends stay on offer, so a misspelt name is one tap from the right person.
+            options = [Option(label=f"Yes, add {person.display_name()}", value="add")] + [
+                Option(label=f.name, value=str(f.id), description=f.email)
+                for f in friends[:_MAX_FRIEND_OPTIONS]
+            ]
+            message = f"Add {person.display_name()} as a new friend?"
+        return ClarificationInteraction(
+            message=prefix + message, field="friend", input_kind="single_select",
+            options=options, **common,
+        )  # fmt: skip
+    if issue.field == "payer":
+        payer = next(p.display_name() for p in draft.people if p.paid)
+        return ClarificationInteraction(
+            message=(
+                f"{prefix}A bill {payer} paid can only be split between you and the friend who "
+                "paid. What should I do?"
+            ),
+            field="payer",
+            input_kind="single_select",
+            options=[
+                Option(label="I paid it, split with everyone", value="i_paid"),
+                Option(label=f"Split only between me and {payer}", value="only_payer"),
+            ],
+            **common,
+        )
+    # split
+    currency = draft.effective_currency(base_currency)
+    added = draft.exact_amounts_added()
+    total = _formatted_amount(draft, base_currency, locale)
+    if issue.reason == "mismatch" and added is not None and currency in SUPPORTED_CURRENCIES:
+        shown = format_money(to_minor(added, currency), currency, locale)
+        message = f"Those add up to {shown}, but the total is {total}. What did each of you have?"
+    else:
+        message = "What did each of you have?"
+    first_friend = draft.people[0].display_name()
+    return ClarificationInteraction(
+        message=prefix + message,
+        field="split",
+        input_kind="single_select",
+        options=[Option(label="Split it equally", value="equal")],
+        allow_custom_input=True,
+        placeholder=f"e.g. I had 400, {first_friend} 600",
         **common,
     )
 
@@ -249,6 +327,7 @@ def _account_question(
 
 
 _MAX_ACCOUNT_OPTIONS = 8
+_MAX_FRIEND_OPTIONS = 8
 _CASH_NAME = "Cash"
 _ACCOUNT_ICONS = {
     "bank": "landmark", "credit_card": "credit-card", "wallet": "wallet", "cash": "banknote",

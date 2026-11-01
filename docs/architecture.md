@@ -271,6 +271,22 @@ MoneyMoney remembers the category you use for each merchant (`merchants/`).
 - **Reports.** Summaries, category totals and the monthly tally leave transfers out of
   income and expense; tests pin that.
 
+### Shared expenses in chat
+
+- Each extracted transaction can carry `participants` (the friends, as named, never the
+  user), `payer` (a friend's name, else null for the user), `split` (`equal` or `exact`) and
+  `shares` (what each person had, the user as "me"). The offline parser (`llm/sharing.py`)
+  reads "me and X spent N on Y, split it", "X paid N for Y, split it", "me, X and Z spent N",
+  and "dinner N with X, I had A and he had B".
+- The draft keeps one `DraftPerson` per friend. Names resolve like account names
+  (`friends/names.py`): exact ignoring case, else word containment. Several matches ask which
+  friend (options show emails); no match asks "Add X as a new friend?", and the friend is
+  created at save only if the user agreed. A friend who paid can only share with the user,
+  so more people ask the user to narrow it down. Exact amounts that do not add up ask again.
+- Save goes through `SharedExpenseService.create`, keyed by the chat message in
+  `source_ref`, so a retried message finds the share it already saved. The model never
+  calculates a share: `friends/splits.py` does, and the save card shows its figures.
+
 ### Accounts and transfers in chat
 
 - The understanding schema has `transfer` as a type and two fields on each transaction:
@@ -309,8 +325,9 @@ MoneyMoney remembers the category you use for each merchant (`merchants/`).
   `stream_reply()` returns text. Gemini and the offline rules engine both implement it.
 - **Gemini:** `gemini-3.5-flash-lite` with thinking level `low`, using JSON-schema
   structured output. Prompts are versioned files (`llm/prompts/`), and the version is
-  logged with every call. The understand prompt is `understand_v2` (transfers and
-  accounts); `understand_v1` stays beside it.
+  logged with every call. The understand prompt is `understand_v3` (shared expenses,
+  with the user's friend names in the context block); `understand_v1` and `understand_v2`
+  stay beside it.
 - **Reconciliation** (`workflows/reconcile.py`): the model's output is merged with the
   deterministic rules parse. This step:
   - fills gaps
