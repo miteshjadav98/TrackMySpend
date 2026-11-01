@@ -28,12 +28,14 @@ from finance_core.categories.defaults import (
 from finance_core.dates import MONTHS, WEEKDAYS, day_first_for_locale, resolve_date_expression
 from finance_core.llm.base import ReplyRequest, UnderstandRequest, UnderstandResult
 from finance_core.llm.schemas import (
+    ExtractedShare,
     ExtractedTransaction,
     Intent,
     PeriodSpec,
     SearchSpec,
     TurnUnderstanding,
 )
+from finance_core.llm.sharing import Sharing, read_sharing
 from finance_core.money import AmountMention, find_amounts
 
 _I = re.IGNORECASE
@@ -289,9 +291,57 @@ def _paid_from_account(segment: str, account_names: Sequence[str]) -> tuple[str,
     return None
 
 
+def _shared_expense(
+    text: str, sharing: Sharing, today: date, locale: str, account_names: Sequence[str]
+) -> ExtractedTransaction:
+    """One expense shared with friends, from a message that is entirely about the sharing."""
+    # The total is the first amount that is not someone's own share ("1000" in "dinner 1000
+    # with Jaymin, I had 400 and he had 600").
+    in_shares = {(m.start, m.end) for m in sharing.share_mentions}
+    totals = [m for m in find_amounts(_strip_dates(text)) if (m.start, m.end) not in in_shares]
+    mention = _choose_amount(totals) if totals else None
+    date_text = find_date_expression(text)
+    resolved = (
+        resolve_date_expression(date_text, today, day_first=day_first_for_locale(locale))
+        if date_text
+        else None
+    )
+    found = infer_category(text, "expense")
+    category, keyword = (found[0].slug, found[1]) if found else (None, None)
+    paid_from = _paid_from_account(text, account_names)
+    merchant = detect_merchant(text)
+    if merchant and merchant.casefold() in {p.casefold() for p in sharing.participants}:
+        merchant = None
+    return ExtractedTransaction(
+        type="expense",
+        amount=_plain(mention.value) if mention else None,
+        currency=mention.currency if mention else None,
+        category=category,
+        date_text=date_text,
+        date=resolved.isoformat() if resolved else None,
+        description=_description(text, keyword, merchant, category),
+        merchant=merchant,
+        payment_method=detect_payment_method(text),
+        account=paid_from[0] if paid_from else None,
+        participants=sharing.participants,
+        payer=sharing.payer,
+        split=sharing.split,
+        shares=[
+            ExtractedShare(person=person, amount=_plain(amount))
+            for person, amount in sharing.shares
+        ],
+    )
+
+
 def extract_transactions(
-    text: str, today: date, locale: str, account_names: Sequence[str] = ()
+    text: str,
+    today: date,
+    locale: str,
+    account_names: Sequence[str] = (),
+    friend_names: Sequence[str] = (),
 ) -> list[ExtractedTransaction]:
+    if sharing := read_sharing(text, friend_names):
+        return [_shared_expense(text, sharing, today, locale, account_names)]
     global_date = find_date_expression(text)
     global_type = detect_type(text)
     global_payment = detect_payment_method(text)
@@ -431,7 +481,7 @@ class RulesLLMClient:
         understanding = TurnUnderstanding(intent=intent)
         if intent == "record_transactions":
             understanding.transactions = extract_transactions(
-                request.text, request.today, request.locale, request.accounts
+                request.text, request.today, request.locale, request.accounts, request.friends
             )
         elif intent in ("spending_summary", "search_transactions"):
             understanding.period = extract_period(request.text, request.today)

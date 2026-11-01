@@ -752,7 +752,7 @@ export interface components {
              * Field
              * @enum {string}
              */
-            field: "type" | "amount" | "currency" | "category" | "date" | "description" | "payment_method" | "account" | "to_account";
+            field: "type" | "amount" | "currency" | "category" | "date" | "description" | "payment_method" | "account" | "to_account" | "friend" | "payer" | "split";
             /**
              * Inputkind
              * @enum {string}
@@ -913,6 +913,10 @@ export interface components {
             account: string | null;
             /** Toaccount */
             toAccount: string | null;
+            /** Sharedwith */
+            sharedWith: string[];
+            /** Paidby */
+            paidBy: string | null;
             /** Occurredon */
             occurredOn: string | null;
             /** Occurredonlabel */
@@ -1686,6 +1690,8 @@ export interface components {
             transactions: components["schemas"]["TransactionView"][];
             /** Totals */
             totals: components["schemas"]["MoneyAmount"][];
+            /** Shared */
+            shared: components["schemas"]["SharedExpenseView"][];
         };
         /** TurnResult */
         TurnResult: {

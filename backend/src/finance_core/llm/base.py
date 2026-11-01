@@ -50,6 +50,7 @@ class UnderstandRequest:
     locale: str
     categories: Sequence[CategoryHint]
     accounts: Sequence[str] = ()  # names of the user's active accounts
+    friends: Sequence[str] = ()  # names of the user's active friends
     history: Sequence[HistoryItem] = ()
     pending: PendingQuestion | None = None
 

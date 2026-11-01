@@ -2734,7 +2734,10 @@
               "description",
               "payment_method",
               "account",
-              "to_account"
+              "to_account",
+              "friend",
+              "payer",
+              "split"
             ],
             "title": "Field"
           },
@@ -3208,6 +3211,24 @@
             ],
             "title": "Toaccount"
           },
+          "sharedWith": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sharedwith"
+          },
+          "paidBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paidby"
+          },
           "occurredOn": {
             "anyOf": [
               {
@@ -3274,6 +3295,8 @@
           "category",
           "account",
           "toAccount",
+          "sharedWith",
+          "paidBy",
           "occurredOn",
           "occurredOnLabel",
           "description",
@@ -5404,6 +5427,13 @@
             },
             "type": "array",
             "title": "Totals"
+          },
+          "shared": {
+            "items": {
+              "$ref": "#/components/schemas/SharedExpenseView"
+            },
+            "type": "array",
+            "title": "Shared"
           }
         },
         "type": "object",
@@ -5411,7 +5441,8 @@
           "type",
           "id",
           "transactions",
-          "totals"
+          "totals",
+          "shared"
         ],
         "title": "TransactionsSavedInteraction"
       },

@@ -158,6 +158,62 @@ CASES: list[dict[str, Any]] = [
         "transactions": [{"type": "expense", "amount": "250", "category": "transport",
                           "account": None}],
     },
+    # -- shared expenses (Phase 3) --
+    {
+        "text": "me and Jaymin spent 1000 on pizza, split it",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "1000", "category": "food",
+                          "participants": ["Jaymin"], "payer": None, "split": "equal"}],
+    },
+    {
+        "text": "Jaymin paid 1000 for pizza, split it",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "1000", "category": "food",
+                          "participants": ["Jaymin"], "payer": "Jaymin", "split": "equal"}],
+    },
+    {
+        "text": "me, Jaymin and Riya spent 1500 on cab, split it",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "1500", "category": "transport",
+                          "participants": ["Jaymin", "Riya"], "payer": None, "split": "equal"}],
+    },
+    {
+        "text": "dinner 1000 with Jaymin, I had 400 and he had 600",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "1000", "category": "food",
+                          "participants": ["Jaymin"], "split": "exact",
+                          "shares": [{"person": "me", "amount": "400"},
+                                     {"person": "Jaymin", "amount": "600"}]}],
+    },
+    {
+        "text": "split 1200 for movie tickets with Riya",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "1200", "category": "entertainment",
+                          "participants": ["Riya"], "split": "equal"}],
+    },
+    {
+        "text": "I paid 2400 for the hotel, split equally with Jaymin and Riya yesterday",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "2400", "participants": ["Jaymin", "Riya"],
+                          "payer": None, "date": "2026-10-23"}],
+    },
+    {
+        "text": "Riya paid 900 for groceries, split with me",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "900", "category": "groceries",
+                          "participants": ["Riya"], "payer": "Riya"}],
+    },
+    {
+        "text": "me and Jaymin spent 800 on lunch from HDFC, split it",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "800", "category": "food",
+                          "participants": ["Jaymin"], "account": "HDFC"}],
+    },
+    {
+        "text": "coffee with Jaymin 200",
+        "intent": "record_transactions",
+        "transactions": [{"type": "expense", "amount": "200", "participants": []}],
+    },
 ]  # fmt: skip
 
 
@@ -184,6 +240,22 @@ def check(case: dict[str, Any], understanding: Any) -> list[str]:
 
                     if Decimal(actual) != Decimal(value):
                         problems.append(f"tx{index}.amount {actual!r} != {value!r}")
+                    continue
+                if field == "participants":  # names in order, ignoring case
+                    if [n.casefold() for n in actual] != [n.casefold() for n in value]:
+                        problems.append(f"tx{index}.participants {actual!r} != {value!r}")
+                    continue
+                if field == "payer":
+                    if (actual or "").casefold() != (value or "").casefold():
+                        problems.append(f"tx{index}.payer {actual!r} != {value!r}")
+                    continue
+                if field == "shares":  # who had what, ignoring case and number formatting
+                    from decimal import Decimal
+
+                    got_shares = {(x.person.casefold(), Decimal(x.amount)) for x in actual}
+                    want_shares = {(x["person"].casefold(), Decimal(x["amount"])) for x in value}
+                    if got_shares != want_shares:
+                        problems.append(f"tx{index}.shares {sorted(got_shares)} != {sorted(want_shares)}")
                     continue
                 if field in ("account", "to_account") and isinstance(value, str):
                     if (actual or "").casefold() != value.casefold():  # names ignore case
