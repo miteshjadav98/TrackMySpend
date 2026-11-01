@@ -296,7 +296,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Friend */
+        get: operations["get_friend_api_v1_friends__friend_id__get"];
         put?: never;
         post?: never;
         /** Remove Friend */
@@ -353,6 +354,41 @@ export interface paths {
         /** Decline Invite */
         post: operations["decline_invite_api_v1_friend_invites__invite_id__decline_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Settlements */
+        get: operations["list_settlements_api_v1_settlements_get"];
+        put?: never;
+        /** Create Settlement */
+        post: operations["create_settlement_api_v1_settlements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settlements/{settlement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Settlement */
+        delete: operations["delete_settlement_api_v1_settlements__settlement_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -666,6 +702,22 @@ export interface components {
              */
             updatedAt: string;
         };
+        /**
+         * BalanceView
+         * @description What is owed between the user and a friend in one currency. Positive means the friend
+         *     owes the user; negative means the user owes the friend. `formatted` is the size of the
+         *     balance without a sign. Settled-up currencies are left out.
+         */
+        BalanceView: {
+            /** Currency */
+            currency: string;
+            /** Amountminor */
+            amountMinor: number;
+            /** Amount */
+            amount: number | string;
+            /** Formatted */
+            formatted: string;
+        };
         /** CategoryCreate */
         CategoryCreate: {
             /** Name */
@@ -939,6 +991,15 @@ export interface components {
             email?: string | null;
         };
         /**
+         * FriendDetail
+         * @description A friend with their balances and every shared expense and settlement between you.
+         */
+        FriendDetail: {
+            friend: components["schemas"]["FriendView"];
+            /** History */
+            history: components["schemas"]["HistoryEntry"][];
+        };
+        /**
          * FriendInviteView
          * @description An invite waiting for the signed-in user to accept or decline.
          */
@@ -971,7 +1032,8 @@ export interface components {
         /**
          * FriendView
          * @description A friend as clients see them. `invite_status` is set while an invite is waiting for an
-         *     answer or was declined; a linked friend has none.
+         *     answer or was declined; a linked friend has none. `balances` has one entry per currency
+         *     that is not settled up.
          */
         FriendView: {
             /**
@@ -987,6 +1049,8 @@ export interface components {
             isLinked: boolean;
             /** Invitestatus */
             inviteStatus: ("pending" | "declined") | null;
+            /** Balances */
+            balances: components["schemas"]["BalanceView"][];
             /**
              * Createdat
              * Format: date-time
@@ -1002,6 +1066,36 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HistoryEntry
+         * @description One line in a friend's history. `effect_minor` is how it moved the balance: positive
+         *     means the friend owes the user more, negative means less.
+         */
+        HistoryEntry: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "shared_expense" | "settlement";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Occurredon
+             * Format: date
+             */
+            occurredOn: string;
+            /** Label */
+            label: string | null;
+            /** Currency */
+            currency: string;
+            /** Effectminor */
+            effectMinor: number;
+            /** Effectformatted */
+            effectFormatted: string;
         };
         /**
          * InteractionResponse
@@ -1339,6 +1433,126 @@ export interface components {
              * @description True for the session making this request.
              */
             isCurrent: boolean;
+        };
+        /**
+         * SettlementCreate
+         * @description Money that changed hands between the user and one friend, in either direction.
+         */
+        SettlementCreate: {
+            /**
+             * Friendid
+             * Format: uuid
+             */
+            friendId: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "friend_paid_you" | "you_paid_friend";
+            /** Amount */
+            amount: number | string;
+            /** Currency */
+            currency?: string | null;
+            /** Occurredon */
+            occurredOn?: string | null;
+            /** Accountid */
+            accountId?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * SettlementCreated
+         * @description The reply to recording a settlement. `exceeds_balance` is true when it was more than
+         *     was owed in that direction, so the balance now points the other way; `warning` says so.
+         */
+        SettlementCreated: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            friend: components["schemas"]["SettlementFriend"];
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "friend_paid_you" | "you_paid_friend";
+            /** Amount */
+            amount: number | string;
+            /** Amountminor */
+            amountMinor: number;
+            /** Currency */
+            currency: string;
+            /** Amountformatted */
+            amountFormatted: string;
+            /**
+             * Occurredon
+             * Format: date
+             */
+            occurredOn: string;
+            /** Note */
+            note: string | null;
+            account: components["schemas"]["AccountRef"] | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Exceedsbalance */
+            exceedsBalance: boolean;
+            /** Warning */
+            warning: string | null;
+        };
+        /**
+         * SettlementFriend
+         * @description The friend a settlement is with, named as the user knows them.
+         */
+        SettlementFriend: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * SettlementView
+         * @description A settlement as its recorder sees it.
+         */
+        SettlementView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            friend: components["schemas"]["SettlementFriend"];
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "friend_paid_you" | "you_paid_friend";
+            /** Amount */
+            amount: number | string;
+            /** Amountminor */
+            amountMinor: number;
+            /** Currency */
+            currency: string;
+            /** Amountformatted */
+            amountFormatted: string;
+            /**
+             * Occurredon
+             * Format: date
+             */
+            occurredOn: string;
+            /** Note */
+            note: string | null;
+            account: components["schemas"]["AccountRef"] | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
         };
         /**
          * ShareView
@@ -2331,6 +2545,37 @@ export interface operations {
             };
         };
     };
+    get_friend_api_v1_friends__friend_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                friend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     remove_friend_api_v1_friends__friend_id__delete: {
         parameters: {
             query?: never;
@@ -2452,6 +2697,100 @@ export interface operations {
             header?: never;
             path: {
                 invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_settlements_api_v1_settlements_get: {
+        parameters: {
+            query?: {
+                friendId?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_settlement_api_v1_settlements_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettlementCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_settlement_api_v1_settlements__settlement_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                settlement_id: string;
             };
             cookie?: never;
         };

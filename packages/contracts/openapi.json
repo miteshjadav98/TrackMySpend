@@ -661,6 +661,47 @@
       }
     },
     "/api/v1/friends/{friend_id}": {
+      "get": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Get Friend",
+        "operationId": "get_friend_api_v1_friends__friend_id__get",
+        "parameters": [
+          {
+            "name": "friend_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friend Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "friends"
@@ -831,6 +872,147 @@
               "type": "string",
               "format": "uuid",
               "title": "Invite Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settlements": {
+      "get": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "List Settlements",
+        "operationId": "list_settlements_api_v1_settlements_get",
+        "parameters": [
+          {
+            "name": "friendId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Friendid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SettlementView"
+                  },
+                  "title": "Response List Settlements Api V1 Settlements Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Create Settlement",
+        "operationId": "create_settlement_api_v1_settlements_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlementCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settlements/{settlement_id}": {
+      "delete": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Delete Settlement",
+        "operationId": "delete_settlement_api_v1_settlements__settlement_id__delete",
+        "parameters": [
+          {
+            "name": "settlement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Settlement Id"
             }
           }
         ],
@@ -2521,6 +2703,42 @@
         "title": "AccountView",
         "description": "An account as clients see it. An archived account stays on past transactions."
       },
+      "BalanceView": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "title": "Amountminor"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "formatted": {
+            "type": "string",
+            "title": "Formatted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "amountMinor",
+          "amount",
+          "formatted"
+        ],
+        "title": "BalanceView",
+        "description": "What is owed between the user and a friend in one currency. Positive means the friend\nowes the user; negative means the user owes the friend. `formatted` is the size of the\nbalance without a sign. Settled-up currencies are left out."
+      },
       "CategoryCreate": {
         "properties": {
           "name": {
@@ -3333,6 +3551,27 @@
         "title": "FriendCreate",
         "description": "A new friend. With an email, an invite goes to whoever owns that email."
       },
+      "FriendDetail": {
+        "properties": {
+          "friend": {
+            "$ref": "#/components/schemas/FriendView"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "friend",
+          "history"
+        ],
+        "title": "FriendDetail",
+        "description": "A friend with their balances and every shared expense and settlement between you."
+      },
       "FriendInviteView": {
         "properties": {
           "id": {
@@ -3438,6 +3677,13 @@
             ],
             "title": "Invitestatus"
           },
+          "balances": {
+            "items": {
+              "$ref": "#/components/schemas/BalanceView"
+            },
+            "type": "array",
+            "title": "Balances"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -3456,11 +3702,12 @@
           "email",
           "isLinked",
           "inviteStatus",
+          "balances",
           "createdAt",
           "updatedAt"
         ],
         "title": "FriendView",
-        "description": "A friend as clients see them. `invite_status` is set while an invite is waiting for an\nanswer or was declined; a linked friend has none."
+        "description": "A friend as clients see them. `invite_status` is set while an invite is waiting for an\nanswer or was declined; a linked friend has none. `balances` has one entry per currency\nthat is not settled up."
       },
       "HTTPValidationError": {
         "properties": {
@@ -3474,6 +3721,63 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HistoryEntry": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "shared_expense",
+              "settlement"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "effectMinor": {
+            "type": "integer",
+            "title": "Effectminor"
+          },
+          "effectFormatted": {
+            "type": "string",
+            "title": "Effectformatted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "occurredOn",
+          "label",
+          "currency",
+          "effectMinor",
+          "effectFormatted"
+        ],
+        "title": "HistoryEntry",
+        "description": "One line in a friend's history. `effect_minor` is how it moved the balance: positive\nmeans the friend owes the user more, negative means less."
       },
       "InteractionResponse": {
         "properties": {
@@ -4258,6 +4562,310 @@
         ],
         "title": "SessionView",
         "description": "One signed-in browser or device, as the user sees it in Settings → Security."
+      },
+      "SettlementCreate": {
+        "properties": {
+          "friendId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Friendid"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "friend_paid_you",
+              "you_paid_friend"
+            ],
+            "title": "Direction"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "occurredOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredon"
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "friendId",
+          "direction",
+          "amount"
+        ],
+        "title": "SettlementCreate",
+        "description": "Money that changed hands between the user and one friend, in either direction."
+      },
+      "SettlementCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "friend": {
+            "$ref": "#/components/schemas/SettlementFriend"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "friend_paid_you",
+              "you_paid_friend"
+            ],
+            "title": "Direction"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "title": "Amountminor"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "amountFormatted": {
+            "type": "string",
+            "title": "Amountformatted"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "exceedsBalance": {
+            "type": "boolean",
+            "title": "Exceedsbalance"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "friend",
+          "direction",
+          "amount",
+          "amountMinor",
+          "currency",
+          "amountFormatted",
+          "occurredOn",
+          "note",
+          "account",
+          "createdAt",
+          "exceedsBalance",
+          "warning"
+        ],
+        "title": "SettlementCreated",
+        "description": "The reply to recording a settlement. `exceeds_balance` is true when it was more than\nwas owed in that direction, so the balance now points the other way; `warning` says so."
+      },
+      "SettlementFriend": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SettlementFriend",
+        "description": "The friend a settlement is with, named as the user knows them."
+      },
+      "SettlementView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "friend": {
+            "$ref": "#/components/schemas/SettlementFriend"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "friend_paid_you",
+              "you_paid_friend"
+            ],
+            "title": "Direction"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "title": "Amountminor"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "amountFormatted": {
+            "type": "string",
+            "title": "Amountformatted"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "friend",
+          "direction",
+          "amount",
+          "amountMinor",
+          "currency",
+          "amountFormatted",
+          "occurredOn",
+          "note",
+          "account",
+          "createdAt"
+        ],
+        "title": "SettlementView",
+        "description": "A settlement as its recorder sees it."
       },
       "ShareView": {
         "properties": {
