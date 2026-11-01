@@ -59,7 +59,7 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
 
 **Phase 1 is complete.** The user tested the web app in the browser: no issues.
 
-## Phase 2 (built, code review next, branch `phase-2/integration`)
+## Phase 2 (built and reviewed, ready for `main`, branch `phase-2/integration`)
 
 Decided on 2026-10-27:
 
@@ -86,13 +86,18 @@ from HDFC" in chat (10), and dark mode. `uv run pytest`: 332 passed, 1 skipped. 
 (ticket 10), misses all model or provider noise, p50 about 1.1 s. Report:
 [phase-2-report.md](phase-2-report.md).
 
+Code review 2026-11-01 over the whole branch: approve with minor follow-ups, all fixed in
+ticket 12. A category word in a merchant's name or said about another item no longer
+overrides a merchant rule, plurals count as naming a category, "idk"/"skip" no longer
+becomes an account or category, the account question offers "Cash", a new account in a
+transfer takes the other end's currency and commits together with the transfer, and a blank
+model reading is filled from the offline parser. `uv run pytest`: 357 passed, 1 skipped.
+
 ## Next
 
-1. Code review of the whole `phase-2/integration` branch, then fix the findings. (The Phase 2
-   report is written: [phase-2-report.md](phase-2-report.md).)
-2. Merge Phase 2 into `main` after the review. The code is on GitHub
+1. Merge Phase 2 into `main` (waiting for the owner's OK). The code is on GitHub
    (`miteshjadav98/TrackMySpend`): `main` holds Phase 1, `phase-2/integration` holds Phase 2.
-3. Phase 3: split expenses with friends (Splitwise-style). Start from
+2. Phase 3: split expenses with friends (Splitwise-style). Start from
    `.scratch/phase-3/brief.md`: grill the open questions, then write the spec and tickets.
 
 ## Resume
