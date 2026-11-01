@@ -225,7 +225,7 @@ def _account_question(
     other = None if source else draft.account_id
     return ClarificationInteraction(
         message=prefix + question,
-        field=issue.field,  # type: ignore[arg-type]
+        field=issue.field,
         input_kind="single_select",
         options=[
             Option(label=a.name, value=str(a.id), icon=_ACCOUNT_ICONS.get(a.kind))
@@ -234,7 +234,7 @@ def _account_question(
         ][:8],
         allow_custom_input=True,
         placeholder="Or type a new account name",
-        **common,  # type: ignore[arg-type]
+        **common,
     )
 
 

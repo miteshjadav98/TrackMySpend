@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from typing import Protocol, TypeVar
+from typing import Protocol
 
 from finance_core.accounts.schemas import AccountKindField
 
@@ -19,6 +19,7 @@ _KIND_WORDS: dict[frozenset[str], AccountKindField] = {
 }
 _WALLETS = re.compile(r"\b(paytm|phone\s?pe|g\s?pay|google pay|amazon pay|mobikwik|wallet)\b")
 
+
 class _Named(Protocol):
     @property
     def name(self) -> str: ...
@@ -26,15 +27,14 @@ class _Named(Protocol):
     def kind(self) -> str: ...
 
 
-AccountLike = TypeVar("AccountLike", bound=_Named)
-
-
 def _words(text: str) -> set[str]:
     # Runs of letters and digits, so "HDFC-Savings" and "hdfc savings" are the same words.
     return set(re.findall(r"[^\W_]+", text.casefold()))
 
 
-def resolve_account_name(name: str, accounts: Sequence[AccountLike]) -> AccountLike | None:
+def resolve_account_name[AccountLike: _Named](
+    name: str, accounts: Sequence[AccountLike]
+) -> AccountLike | None:
     """The one account `name` means, or None when it means none or several.
 
     An exact name, ignoring case, wins. Otherwise one account whose words contain the name's

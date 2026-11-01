@@ -20,8 +20,9 @@ export interface InteractionAnswer {
 export type Respond = (answer: InteractionAnswer, label: string) => void;
 
 function DraftLine({ draft }: { draft: DraftPreview }) {
+  const route = draft.account || draft.toAccount ? `${draft.account ?? "?"} → ${draft.toAccount ?? "?"}` : null;
   const parts = [
-    draft.description,
+    draft.type === "transfer" ? route : draft.description,
     draft.category,
     draft.occurredOnLabel,
     draft.paymentMethod,

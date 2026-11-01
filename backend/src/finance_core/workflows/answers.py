@@ -189,7 +189,7 @@ class AnswerApplier:
                 return _with_type(draft, "income")
             return _invalid("Was it money out (expense) or money in (income)?")
         if field == "category":
-            kind = draft.type or "expense"
+            kind: Literal["expense", "income"] = "income" if draft.type == "income" else "expense"
             category = await self._categories.match(self._user_id, text, kind)
             if category is not None:
                 return _applied(

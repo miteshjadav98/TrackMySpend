@@ -104,7 +104,7 @@ _DESCRIPTION = re.compile(
 _ACCOUNT_NAME = r"(?P<{group}>[A-Za-z][\w&'.-]*(?:\s+(?!{stop}\b)[A-Za-z][\w&'.-]*){{0,3}})"
 _ACCOUNT_STOP = (
     r"(?:to|into|from|on|via|using|with|by|for|at|in|and|today|yesterday|tonight|last|this|"
-    r"ago|account|a/c)"
+    r"ago|account|a/c|atm)"
 )
 _FROM_ACCOUNT = re.compile(
     r"\bfrom\s+(?:my\s+)?" + _ACCOUNT_NAME.format(group="name", stop=_ACCOUNT_STOP), _I
@@ -114,6 +114,8 @@ _TO_ACCOUNT = re.compile(
 )
 _MOVED = re.compile(r"\b(transfer|transferred|transferring|moved|move|moving)\b", _I)
 _WITHDREW = re.compile(r"\b(withdrew|withdrawn|withdraw|withdrawal|atm)\b", _I)
+# "sent" is a transfer only when both ends are named: "sent 500 to Ramesh" is a payment.
+_SENT = re.compile(r"\b(sent|send|sending)\b", _I)
 _CARD_BILL = re.compile(r"\b(credit\s*card|cc)\s+(bill|dues?|payment)\b", _I)
 # Trailing words that belong to the phrase, not the name: "from HDFC account".
 _NAME_TAIL = re.compile(r"\s+(account|a/c|acc|bank account)$", _I)
@@ -249,8 +251,9 @@ def detect_transfer(segment: str) -> tuple[str | None, str | None, str] | None:
         return source, "Credit card", "Credit Card Bill"
     if _WITHDREW.search(segment):
         return source, "Cash", "Cash Withdrawal"
-    if _MOVED.search(segment):
-        return source, _account_after(_TO_ACCOUNT, segment), "Transfer"
+    target = _account_after(_TO_ACCOUNT, segment)
+    if _MOVED.search(segment) or (_SENT.search(segment) and source and target):
+        return source, target, "Transfer"
     return None
 
 

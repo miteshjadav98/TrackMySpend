@@ -75,6 +75,13 @@ def _merchant_rule_note(tx: TransactionView) -> str:
     return f"Filed under {category}, as before for {tx.merchant}."
 
 
+def _route(tx: TransactionView) -> str:
+    """ "HDFC → Paytm" for a transfer, from the two accounts it saved with."""
+    source = tx.account.name if tx.account else "?"
+    target = tx.to_account.name if tx.to_account else "?"
+    return f"{source} → {target}"
+
+
 def compose_saved(
     saved: list[dict[str, Any]],
     *,
@@ -100,13 +107,18 @@ def compose_saved(
             if tx.payment_method and tx.type == "expense"
             else ""
         )
-        noun = "expense" if tx.type == "expense" else "income"
         day = format_day(tx.occurred_on, today)
         when = day if day in ("today", "yesterday") else f"on {day}"
-        text = f"Saved {tx.amount_formatted} {noun}{what}{category} {when}{paid}."
+        if tx.type == "transfer":
+            source = tx.account.name if tx.account else "?"
+            target = tx.to_account.name if tx.to_account else "?"
+            text = f"Saved {tx.amount_formatted} transfer from {source} to {target} {when}."
+        else:
+            noun = "expense" if tx.type == "expense" else "income"
+            text = f"Saved {tx.amount_formatted} {noun}{what}{category} {when}{paid}."
     else:
         items = [
-            f"{tx.amount_formatted} {tx.description or (tx.category.name if tx.category else '')}".strip()
+            f"{tx.amount_formatted} {_route(tx) if tx.type == 'transfer' else tx.description or (tx.category.name if tx.category else '')}".strip()
             for tx in views
         ]
         text = f"Saved {len(views)} transactions: {_join(items)}."

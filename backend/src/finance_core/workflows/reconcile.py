@@ -103,11 +103,36 @@ def _normalise(tx: ExtractedTransaction, *, today: date, locale: str) -> Extract
     return tx.model_copy(update=updates) if updates else tx
 
 
+def _as_transfer(
+    tx: ExtractedTransaction, hint: ExtractedTransaction | None
+) -> ExtractedTransaction:
+    """A transfer has only two accounts: no category, merchant or payment method.
+
+    The parser's accounts fill the ones the model left empty.
+    """
+    fills = {
+        f: getattr(hint, f)
+        for f in ("account", "to_account")
+        if hint is not None and getattr(tx, f) is None and getattr(hint, f)
+    }
+    return tx.model_copy(
+        update={
+            "type": "transfer",
+            "category": None,
+            "merchant": None,
+            "payment_method": None,
+            **fills,
+        }
+    )
+
+
 def _fill(tx: ExtractedTransaction, hint: ExtractedTransaction) -> ExtractedTransaction:
     updates = {
         f: getattr(hint, f) for f in _FILLABLE if getattr(tx, f) is None and getattr(hint, f)
     }
-    kind = tx.type or updates.get("type")
+    if hint.type == "transfer":
+        updates["type"] = "transfer"  # the parser's transfer phrasings are exact: they win
+    kind = updates.get("type") or tx.type
     if tx.category is None and hint.category:
         definition = system_category(hint.category)
         if definition is not None and (kind is None or definition.kind == kind):
@@ -116,7 +141,8 @@ def _fill(tx: ExtractedTransaction, hint: ExtractedTransaction) -> ExtractedTran
         updates["date_text"], updates["date"] = hint.date_text, hint.date
     if tx.description is None and hint.description:
         updates["description"] = hint.description
-    return tx.model_copy(update=updates) if updates else tx
+    filled = tx.model_copy(update=updates) if updates else tx
+    return _as_transfer(filled, hint) if filled.type == "transfer" else filled
 
 
 def reconcile(
@@ -134,6 +160,8 @@ def reconcile(
             if match is not None:
                 unused.remove(match)
                 tx = _fill(tx, match)
+            elif tx.type == "transfer":
+                tx = _as_transfer(tx, None)
             filled.append(tx)
         return understanding.model_copy(update={"transactions": filled})
 
@@ -141,7 +169,10 @@ def reconcile(
         hint = extract_search(text)
         search = understanding.search
         updates: dict[str, object] = {}
-        if hint.category and (search is None or search.category is None):
+        if hint.type == "transfer" and (search is None or search.type != "transfer"):
+            # "transfers" is unambiguous; a category or merchant does not apply to one.
+            updates.update(type="transfer", category=None)
+        elif hint.category and (search is None or search.category is None):
             updates["category"] = hint.category
         if hint.sort == "largest" and (search is None or search.sort != "largest"):
             updates["sort"] = "largest"  # "biggest/largest/highest" is unambiguous
