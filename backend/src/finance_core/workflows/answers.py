@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Literal
 
+from finance_core.accounts.names import resolve_account_name
+from finance_core.accounts.schemas import AccountView
 from finance_core.categories.service import CategoryService
 from finance_core.dates import day_first_for_locale, parse_iso_date, resolve_date_expression
 from finance_core.llm.rules import classify
@@ -34,6 +37,7 @@ _CANCEL_ALL = re.compile(
 _EXPENSE = re.compile(r"\b(expense|spent|spend|paid|out|outgoing|debit|debited)\b", _I)
 _INCOME = re.compile(r"\b(income|received|earned|in|incoming|credit|credited)\b", _I)
 _NAME_LIKE = re.compile(r"^[A-Za-z][A-Za-z &'\-]{0,39}$")
+_ACCOUNT_NAME_LIKE = re.compile(r"^[A-Za-z][\w &'.\-]{0,59}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,9 +69,14 @@ def _plain(value: Any) -> str:
 
 
 def _looks_like_category_name(text: str) -> bool:
+    return _looks_like_a_name(text, _NAME_LIKE)
+
+
+def _looks_like_a_name(text: str, pattern: re.Pattern[str]) -> bool:
+    """Free text that is a short name ("Hobbies", "Axis Bank"), not a request or a yes/no."""
     stripped = text.strip()
     return (
-        bool(_NAME_LIKE.match(stripped))
+        bool(pattern.match(stripped))
         and len(stripped.split()) <= 3
         and not find_amounts(stripped)
         and classify(stripped) in ("help", "smalltalk")
@@ -78,9 +87,16 @@ def _looks_like_category_name(text: str) -> bool:
 
 class AnswerApplier:
     def __init__(
-        self, categories: CategoryService, *, user_id: uuid.UUID, today: date, locale: str
+        self,
+        categories: CategoryService,
+        *,
+        user_id: uuid.UUID,
+        today: date,
+        locale: str,
+        accounts: Sequence[AccountView] = (),
     ) -> None:
         self._categories = categories
+        self._accounts = accounts  # the user's active accounts, for account answers
         self._user_id = user_id
         self._today = today
         self._locale = locale
@@ -134,9 +150,10 @@ class AnswerApplier:
             if _YES.match(text):
                 return _applied(draft, amount_confirmed=True)
             return AnswerOutcome("not_an_answer")
-        outcome = await self.apply_value(
-            field, text, draft, allow_custom=field == "category" and _looks_like_category_name(text)
+        allow_custom = (field == "category" and _looks_like_category_name(text)) or (
+            field in ("account", "to_account") and _looks_like_a_name(text, _ACCOUNT_NAME_LIKE)
         )
+        outcome = await self.apply_value(field, text, draft, allow_custom=allow_custom)
         # Free text that does not parse as an answer is more likely a new request.
         return outcome if outcome.kind == "applied" else AnswerOutcome("not_an_answer")
 
@@ -172,7 +189,7 @@ class AnswerApplier:
                 return _with_type(draft, "income")
             return _invalid("Was it money out (expense) or money in (income)?")
         if field == "category":
-            kind = draft.type or "expense"
+            kind: Literal["expense", "income"] = "income" if draft.type == "income" else "expense"
             category = await self._categories.match(self._user_id, text, kind)
             if category is not None:
                 return _applied(
@@ -186,6 +203,8 @@ class AnswerApplier:
             if allow_custom and _NAME_LIKE.match(text):
                 return _applied(draft, category_text=text.title()[:64], category_skipped=False)
             return _invalid("I couldn't match that to a category.")
+        if field in ("account", "to_account"):
+            return self._apply_account(field, text, draft, allow_custom=allow_custom)
         if field == "date":
             occurred = parse_iso_date(text) or resolve_date_expression(
                 text, self._today, day_first=day_first_for_locale(self._locale)
@@ -196,3 +215,22 @@ class AnswerApplier:
                 return _invalid("That date is in the future.")
             return _applied(draft, date=occurred.isoformat(), date_assumed=False)
         return _invalid("Sorry, I didn't follow that.")
+
+    def _apply_account(
+        self, field: str, text: str, draft: TransactionDraft, *, allow_custom: bool
+    ) -> AnswerOutcome:
+        """A tapped account (its id), one of the user's accounts by name, or a new name."""
+        account = next((a for a in self._accounts if str(a.id) == text), None)
+        account = account or resolve_account_name(text, self._accounts)
+        prefix = "account" if field == "account" else "to_account"
+        if account is not None:
+            return _applied(draft, **{
+                f"{prefix}_id": str(account.id), f"{prefix}_name": account.name,
+                f"{prefix}_new": False,
+            })  # fmt: skip
+        if allow_custom and _ACCOUNT_NAME_LIKE.match(text):
+            # Created at save, so a question abandoned halfway leaves no stray account.
+            return _applied(draft, **{
+                f"{prefix}_id": None, f"{prefix}_name": text[:60], f"{prefix}_new": True,
+            })  # fmt: skip
+        return _invalid("I couldn't match that to one of your accounts.")

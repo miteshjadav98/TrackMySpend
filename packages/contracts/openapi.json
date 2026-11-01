@@ -2227,7 +2227,9 @@
               "category",
               "date",
               "description",
-              "payment_method"
+              "payment_method",
+              "account",
+              "to_account"
             ],
             "title": "Field"
           },
@@ -2648,7 +2650,8 @@
                 "type": "string",
                 "enum": [
                   "expense",
-                  "income"
+                  "income",
+                  "transfer"
                 ]
               },
               {
@@ -2677,6 +2680,28 @@
               }
             ],
             "title": "Category"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          },
+          "toAccount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toaccount"
           },
           "occurredOn": {
             "anyOf": [
@@ -2742,6 +2767,8 @@
           "type",
           "amount",
           "category",
+          "account",
+          "toAccount",
           "occurredOn",
           "occurredOnLabel",
           "description",

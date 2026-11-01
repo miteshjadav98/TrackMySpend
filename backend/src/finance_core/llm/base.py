@@ -49,6 +49,7 @@ class UnderstandRequest:
     base_currency: str
     locale: str
     categories: Sequence[CategoryHint]
+    accounts: Sequence[str] = ()  # names of the user's active accounts
     history: Sequence[HistoryItem] = ()
     pending: PendingQuestion | None = None
 

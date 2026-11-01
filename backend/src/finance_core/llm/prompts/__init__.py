@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from importlib.resources import files
 
-UNDERSTAND_PROMPT_VERSION = "understand_v1"
+UNDERSTAND_PROMPT_VERSION = "understand_v2"
 REPLY_PROMPT_VERSION = "reply_v1"
 
 

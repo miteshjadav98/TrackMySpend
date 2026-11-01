@@ -11,6 +11,7 @@ from finance_core.llm.rules import RulesLLMClient
 from tests.evals.understanding_cases import CASES, check
 
 TODAY = date(2026, 10, 24)
+ACCOUNTS = ["HDFC", "Paytm", "SBI", "ICICI"]
 CATEGORIES = [CategoryHint(c.slug, c.name, c.kind) for c in SYSTEM_CATEGORIES]
 
 
@@ -22,6 +23,7 @@ def _request(text: str) -> UnderstandRequest:
         base_currency="INR",
         locale="en-IN",
         categories=CATEGORIES,
+        accounts=ACCOUNTS,
     )
 
 

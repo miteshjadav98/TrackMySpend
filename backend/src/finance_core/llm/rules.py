@@ -49,7 +49,7 @@ _INCOME_WORDS = re.compile(
 )
 _SEARCH = re.compile(
     r"\b(show|list|find|search|display|view|see)\b.*\b(transactions?|expenses?|spends?|spending|"
-    r"payments?|purchases?|income|entries|orders?|bills?)\b"
+    r"payments?|purchases?|income|entries|orders?|bills?|transfers?)\b"
     r"|\b(biggest|largest|highest|most expensive|smallest)\b",
     _I,
 )
@@ -98,6 +98,27 @@ _DESCRIPTION = re.compile(
     r"ago|and|paid|\d)\b|\s*[,.;!?]|\s*$)",
     _I,
 )
+
+# Transfers between the user's own accounts. An account name is one to four words that
+# stop at the next keyword, a date, an amount or punctuation.
+_ACCOUNT_NAME = r"(?P<{group}>[A-Za-z][\w&'.-]*(?:\s+(?!{stop}\b)[A-Za-z][\w&'.-]*){{0,3}})"
+_ACCOUNT_STOP = (
+    r"(?:to|into|from|on|via|using|with|by|for|at|in|and|today|yesterday|tonight|last|this|"
+    r"ago|account|a/c|atm)"
+)
+_FROM_ACCOUNT = re.compile(
+    r"\bfrom\s+(?:my\s+)?" + _ACCOUNT_NAME.format(group="name", stop=_ACCOUNT_STOP), _I
+)
+_TO_ACCOUNT = re.compile(
+    r"\b(?:to|into)\s+(?:my\s+)?" + _ACCOUNT_NAME.format(group="name", stop=_ACCOUNT_STOP), _I
+)
+_MOVED = re.compile(r"\b(transfer|transferred|transferring|moved|move|moving)\b", _I)
+_WITHDREW = re.compile(r"\b(withdrew|withdrawn|withdraw|withdrawal|atm)\b", _I)
+# "sent" is a transfer only when both ends are named: "sent 500 to Ramesh" is a payment.
+_SENT = re.compile(r"\b(sent|send|sending)\b", _I)
+_CARD_BILL = re.compile(r"\b(credit\s*card|cc)\s+(bill|dues?|payment)\b", _I)
+# Trailing words that belong to the phrase, not the name: "from HDFC account".
+_NAME_TAIL = re.compile(r"\s+(account|a/c|acc|bank account)$", _I)
 
 _WEEKDAY_ALT = "|".join(sorted(WEEKDAYS, key=len, reverse=True))
 _MONTH_ALT = "|".join(sorted(MONTHS, key=len, reverse=True))
@@ -213,6 +234,29 @@ def _strip_dates(text: str) -> str:
     return _DATE_EXPRESSIONS.sub(" ", text)
 
 
+def _account_after(pattern: re.Pattern[str], text: str) -> str | None:
+    match = pattern.search(_strip_dates(text))
+    if match is None:
+        return None
+    name = _NAME_TAIL.sub("", match.group("name").strip())
+    return name or None
+
+
+def detect_transfer(segment: str) -> tuple[str | None, str | None, str] | None:
+    """(from account, to account, description) when the segment moves money between the
+    user's own accounts; None for anything else, so "electricity bill 1200" stays an expense.
+    """
+    source = _account_after(_FROM_ACCOUNT, segment)
+    if _CARD_BILL.search(segment):
+        return source, "Credit card", "Credit Card Bill"
+    if _WITHDREW.search(segment):
+        return source, "Cash", "Cash Withdrawal"
+    target = _account_after(_TO_ACCOUNT, segment)
+    if _MOVED.search(segment) or (_SENT.search(segment) and source and target):
+        return source, target, "Transfer"
+    return None
+
+
 def extract_transactions(text: str, today: date, locale: str) -> list[ExtractedTransaction]:
     global_date = find_date_expression(text)
     global_type = detect_type(text)
@@ -224,15 +268,31 @@ def extract_transactions(text: str, today: date, locale: str) -> list[ExtractedT
         if not mentions:
             continue
         mention = _choose_amount(mentions)
+        date_text = find_date_expression(segment) or global_date
+        resolved = (
+            resolve_date_expression(date_text, today, day_first=day_first) if date_text else None
+        )
+        if transfer := detect_transfer(segment):
+            source, target, label = transfer
+            # A transfer has no category, merchant or payment method: only its two accounts.
+            results.append(
+                ExtractedTransaction(
+                    type="transfer",
+                    amount=_plain(mention.value),
+                    currency=mention.currency,
+                    date_text=date_text,
+                    date=resolved.isoformat() if resolved else None,
+                    description=label,
+                    account=source,
+                    to_account=target,
+                )
+            )
+            continue
         kind = detect_type(segment) or global_type
         found = infer_category(segment, kind)
         category, keyword = (found[0].slug, found[1]) if found else (None, None)
         if kind is None and found is not None:
             kind = found[0].kind  # "uber 220" -> transport -> an expense
-        date_text = find_date_expression(segment) or global_date
-        resolved = (
-            resolve_date_expression(date_text, today, day_first=day_first) if date_text else None
-        )
         merchant = detect_merchant(segment)
         results.append(
             ExtractedTransaction(
@@ -282,6 +342,11 @@ def extract_period(text: str, today: date) -> PeriodSpec:
 
 def extract_search(text: str) -> SearchSpec:
     t = text.lower()
+    if re.search(r"\btransfers?\b", t):
+        # A transfer has no category, and its accounts are not a merchant to match.
+        return SearchSpec(
+            type="transfer", sort="largest" if _LARGEST.search(t) else "recent", limit=None
+        )
     kind: CategoryKind | None = None
     if re.search(r"\b(income|earned|received|salary)\b", t):
         kind = "income"

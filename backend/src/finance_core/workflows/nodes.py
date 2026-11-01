@@ -15,6 +15,9 @@ from typing import Any
 from langgraph.runtime import Runtime
 from langgraph.types import Command, interrupt
 
+from finance_core.accounts.names import infer_account_kind, resolve_account_name
+from finance_core.accounts.schemas import AccountCreate, AccountView
+from finance_core.accounts.service import AccountService
 from finance_core.categories.defaults import FALLBACK_SLUG, FALLBACK_SLUGS
 from finance_core.categories.models import Category
 from finance_core.categories.schemas import CategoryCreate
@@ -122,7 +125,13 @@ async def _file_under_category(
     """
     # The type comes first; a typed new category or a skipped question is already the
     # user's answer.
-    if draft.type is None or draft.category_text or draft.category_skipped:
+    # A transfer has no category, and no merchant to look a rule up by.
+    if (
+        draft.type is None
+        or draft.type == "transfer"
+        or draft.category_text
+        or draft.category_skipped
+    ):
         return draft
     suggested = (
         await categories.by_slug(user_id, draft.category_slug, draft.type)
@@ -145,6 +154,50 @@ async def _file_under_category(
             "category_source": choice.source,
         }
     )
+
+
+def _with_accounts_resolved(
+    draft: TransactionDraft, accounts: list[AccountView]
+) -> TransactionDraft:
+    """A transfer's account names, as the user said them, matched to their active accounts.
+
+    A name that matches none or several is left alone, so the draft asks which one is meant.
+    An end the user already answered (picked, or typed as a new account) is never touched.
+    """
+    if draft.type != "transfer":
+        return draft
+    updates: dict[str, Any] = {}
+    for prefix, said in (("account", draft.account), ("to_account", draft.to_account)):
+        answered = getattr(draft, f"{prefix}_id") or getattr(draft, f"{prefix}_new")
+        found = resolve_account_name(said, accounts) if said and not answered else None
+        if found is not None:
+            updates[f"{prefix}_id"] = str(found.id)
+            updates[f"{prefix}_name"] = found.name
+    return draft.model_copy(update=updates) if updates else draft
+
+
+async def _account_for_save(
+    accounts: AccountService,
+    ctx: TurnContext,
+    account_id: str | None,
+    new_name: str | None,
+) -> uuid.UUID | None:
+    """The account a transfer end points at, creating the one the user typed if it is new."""
+    if account_id:
+        return uuid.UUID(account_id)
+    if not new_name:
+        return None
+    try:
+        created = await accounts.create(
+            ctx.user,
+            AccountCreate(name=new_name, kind=infer_account_kind(new_name)),
+            request_id=ctx.request_id,
+        )
+        return created.id
+    except ConflictError:
+        # Created meanwhile, or the same name was typed twice: use the one that exists.
+        existing = resolve_account_name(new_name, await accounts.list_accounts(ctx.user))
+        return existing.id if existing else None
 
 
 def _filed_by_merchant_rule(
@@ -182,6 +235,7 @@ class FinanceNodes:
 
         async with self._deps.session_factory() as session:
             categories = await CategoryService(session).list_visible(ctx.user_id)
+            accounts = await AccountService(session).list_accounts(ctx.user)
         request = UnderstandRequest(
             text=text,
             today=ctx.today,
@@ -189,6 +243,7 @@ class FinanceNodes:
             base_currency=ctx.base_currency,
             locale=ctx.locale,
             categories=[CategoryHint(c.slug, c.name, c.kind) for c in categories],
+            accounts=[account.name for account in accounts],
             history=_history(history, settings.agent_history_window),
             pending=(
                 PendingQuestion(
@@ -297,7 +352,11 @@ class FinanceNodes:
             )
         async with self._deps.session_factory() as session:
             applier = AnswerApplier(
-                CategoryService(session), user_id=ctx.user_id, today=ctx.today, locale=ctx.locale
+                CategoryService(session),
+                user_id=ctx.user_id,
+                today=ctx.today,
+                locale=ctx.locale,
+                accounts=await AccountService(session).list_accounts(ctx.user),
             )
             return await applier.apply_value(
                 field, value, draft, allow_custom=bool(followup.get("allowCustom"))
@@ -318,9 +377,14 @@ class FinanceNodes:
         async with self._deps.session_factory() as session:
             categories = CategoryService(session)
             merchant_rules = MerchantRuleService(session, clock=self._deps.clock)
+            account_service = AccountService(session)
+            active_accounts = await account_service.list_accounts(ctx.user)
             for index, draft in enumerate(drafts):
                 drafts[index] = await _file_under_category(
-                    draft, ctx.user_id, categories, merchant_rules
+                    _with_accounts_resolved(draft, active_accounts),
+                    ctx.user_id,
+                    categories,
+                    merchant_rules,
                 )
 
             for index, draft in enumerate(drafts):
@@ -333,7 +397,7 @@ class FinanceNodes:
                     )
                 options = (
                     await categories.ranked_for_choice(
-                        ctx.user_id, draft.type or "expense", ctx.today
+                        ctx.user_id, "income" if draft.type == "income" else "expense", ctx.today
                     )
                     if issue.field == "category"
                     else []
@@ -348,6 +412,11 @@ class FinanceNodes:
                     locale=ctx.locale,
                     today=ctx.today,
                     category_options=options,
+                    account_options=(
+                        await account_service.ranked_for_choice(ctx.user)
+                        if issue.field in ("account", "to_account")
+                        else None
+                    ),
                     notice=state.get("notice"),
                 )
                 return Command(
@@ -382,7 +451,11 @@ class FinanceNodes:
 
         async with self._deps.session_factory() as session:
             applier = AnswerApplier(
-                CategoryService(session), user_id=ctx.user_id, today=ctx.today, locale=ctx.locale
+                CategoryService(session),
+                user_id=ctx.user_id,
+                today=ctx.today,
+                locale=ctx.locale,
+                accounts=await AccountService(session).list_accounts(ctx.user),
             )
             if payload.get("kind") == "text":
                 outcome = await applier.from_text(
@@ -456,38 +529,26 @@ class FinanceNodes:
                 views = existing
             else:
                 categories = CategoryService(session)
+                accounts = AccountService(session)
                 items = []
                 for draft in drafts:
                     assert draft.type is not None and draft.amount is not None and draft.date
-                    category_id = uuid.UUID(draft.category_id) if draft.category_id else None
-                    if category_id is None and draft.category_text:
-                        try:
-                            created = await categories.create(
-                                ctx.user_id,
-                                CategoryCreate(name=draft.category_text, kind=draft.type),
-                                request_id=ctx.request_id,
-                            )
-                            category_id = created.id
-                        except (ConflictError, ValidationFailedError):
-                            matched = await categories.match(
-                                ctx.user_id, draft.category_text, draft.type
-                            )
-                            category_id = matched.id if matched else None
-                    if category_id is None:
-                        fallback = await categories.by_slug(
-                            ctx.user_id, FALLBACK_SLUG[draft.type], draft.type
+                    if draft.type == "transfer":
+                        data = TransactionCreate(
+                            type="transfer",
+                            amount=Decimal(draft.amount),
+                            currency=draft.currency,
+                            occurred_on=date.fromisoformat(draft.date),
+                            description=draft.description,
+                            account_id=await _account_for_save(
+                                accounts, ctx, draft.account_id, draft.account_name
+                            ),
+                            to_account_id=await _account_for_save(
+                                accounts, ctx, draft.to_account_id, draft.to_account_name
+                            ),
                         )
-                        category_id = fallback.id if fallback else None
-                    data = TransactionCreate(
-                        type=draft.type,
-                        amount=Decimal(draft.amount),
-                        currency=draft.currency,
-                        occurred_on=date.fromisoformat(draft.date),
-                        category_id=category_id,
-                        description=draft.description,
-                        merchant=draft.merchant,
-                        payment_method=draft.payment_method,
-                    )
+                    else:
+                        data = await self._expense_or_income(ctx, categories, draft)
                     try:
                         resolved = await transactions.resolve(ctx.user, data)
                     except ValidationFailedError:
@@ -511,6 +572,37 @@ class FinanceNodes:
             "drafts": [],
             "outcome": "saved",
         }
+
+    async def _expense_or_income(
+        self, ctx: TurnContext, categories: CategoryService, draft: TransactionDraft
+    ) -> TransactionCreate:
+        """The create request for an expense or income, with its category settled."""
+        assert draft.type in ("expense", "income") and draft.amount is not None and draft.date
+        category_id = uuid.UUID(draft.category_id) if draft.category_id else None
+        if category_id is None and draft.category_text:
+            try:
+                created = await categories.create(
+                    ctx.user_id,
+                    CategoryCreate(name=draft.category_text, kind=draft.type),
+                    request_id=ctx.request_id,
+                )
+                category_id = created.id
+            except (ConflictError, ValidationFailedError):
+                matched = await categories.match(ctx.user_id, draft.category_text, draft.type)
+                category_id = matched.id if matched else None
+        if category_id is None:
+            fallback = await categories.by_slug(ctx.user_id, FALLBACK_SLUG[draft.type], draft.type)
+            category_id = fallback.id if fallback else None
+        return TransactionCreate(
+            type=draft.type,
+            amount=Decimal(draft.amount),
+            currency=draft.currency,
+            occurred_on=date.fromisoformat(draft.date),
+            category_id=category_id,
+            description=draft.description,
+            merchant=draft.merchant,
+            payment_method=draft.payment_method,
+        )
 
     # -- insights -------------------------------------------------------------------------
 
@@ -550,7 +642,7 @@ class FinanceNodes:
         async with self._deps.session_factory() as session:
             category_id = None
             category_name = None
-            if spec.category:
+            if spec.category and spec.type != "transfer":
                 categories = CategoryService(session)
                 for kind in [spec.type] if spec.type else ["expense", "income"]:
                     category = await categories.by_slug(ctx.user_id, spec.category, kind)  # type: ignore[arg-type]
@@ -569,7 +661,7 @@ class FinanceNodes:
                     limit=min(spec.limit or 10, MAX_SEARCH_RESULTS),
                 ),
             )
-        noun = {"expense": "expenses", "income": "income entries"}.get(
+        noun = {"expense": "expenses", "income": "income entries", "transfer": "transfers"}.get(
             spec.type or "", "transactions"
         )
         if category_name:

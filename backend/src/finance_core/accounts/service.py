@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from finance_core.audit.service import record_audit
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
 from finance_core.ids import uuid7
 from finance_core.money import SUPPORTED_CURRENCIES
+from finance_core.transactions.models import Transaction
 from finance_core.users.context import UserContext
 
 # Enough for every bank, card and wallet a person really uses; it keeps pickers short and
@@ -133,6 +134,31 @@ class AccountService:
         await self._commit()
         await self._session.refresh(account)  # the database set updated_at
         return to_view(account)
+
+    async def ranked_for_choice(self, ctx: UserContext) -> list[AccountView]:
+        """The user's active accounts, most used first, for the chat's account question.
+
+        Use counts both ends of a transfer; ties keep the name order.
+        """
+        accounts = await self.list_accounts(ctx)
+        uses = func.count(Transaction.id)
+        usage = dict(
+            (
+                await self._session.execute(
+                    select(Account.id, uses)
+                    .join(
+                        Transaction,
+                        or_(
+                            Transaction.account_id == Account.id,
+                            Transaction.to_account_id == Account.id,
+                        ),
+                    )
+                    .where(Account.user_id == ctx.user_id, Transaction.deleted_at.is_(None))
+                    .group_by(Account.id)
+                )
+            ).all()
+        )
+        return sorted(accounts, key=lambda account: -usage.get(account.id, 0))
 
     async def get(self, ctx: UserContext, account_id: uuid.UUID, *, field: str) -> AccountView:
         """One of the user's accounts, archived or not (404 otherwise)."""

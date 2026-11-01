@@ -628,7 +628,7 @@ export interface components {
              * Field
              * @enum {string}
              */
-            field: "type" | "amount" | "currency" | "category" | "date" | "description" | "payment_method";
+            field: "type" | "amount" | "currency" | "category" | "date" | "description" | "payment_method" | "account" | "to_account";
             /**
              * Inputkind
              * @enum {string}
@@ -781,10 +781,14 @@ export interface components {
          */
         DraftPreview: {
             /** Type */
-            type: ("expense" | "income") | null;
+            type: ("expense" | "income" | "transfer") | null;
             amount: components["schemas"]["MoneyAmount"] | null;
             /** Category */
             category: string | null;
+            /** Account */
+            account: string | null;
+            /** Toaccount */
+            toAccount: string | null;
             /** Occurredon */
             occurredOn: string | null;
             /** Occurredonlabel */
