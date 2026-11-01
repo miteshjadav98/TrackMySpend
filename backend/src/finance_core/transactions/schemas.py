@@ -45,6 +45,8 @@ class TransactionView(ApiModel):
     payment_method: PaymentMethodField | None
     notes: str | None
     source: SourceField
+    # Set when this is the owner's share of a shared expense (its amount is then read-only).
+    shared_expense_id: uuid.UUID | None = None
     version: int
     created_at: datetime
     updated_at: datetime

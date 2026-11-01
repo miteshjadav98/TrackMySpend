@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import EmailStr, Field
@@ -47,3 +48,79 @@ class FriendInviteView(ApiModel):
     from_name: str
     from_email: str
     created_at: datetime
+
+
+SplitKindField = Literal["equal", "exact"]
+
+
+class ParticipantInput(ApiInput):
+    """One person in a shared expense. A null `friend_id` is the user themselves. The amount is
+    given only for an exact split."""
+
+    friend_id: uuid.UUID | None = None
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=18)
+
+
+class SharedExpenseWrite(ApiInput):
+    """The recorder's side of a shared expense: the bill, who paid, and how it is split.
+
+    The recorder must be one of the participants. A null `payer_friend_id` means the user
+    paid; when a friend paid, only the user and that friend may take part.
+    """
+
+    total: Decimal = Field(gt=0, max_digits=18)
+    currency: str | None = Field(default=None, min_length=3, max_length=3)
+    occurred_on: date | None = None
+    description: str | None = Field(default=None, max_length=500)
+    merchant: str | None = Field(default=None, max_length=200)
+    payer_friend_id: uuid.UUID | None = None
+    split: SplitKindField = "equal"
+    participants: list[ParticipantInput] = Field(max_length=20)
+
+
+class SharedExpenseCreate(SharedExpenseWrite):
+    """A new shared expense. Category and account tag the user's own share."""
+
+    category_id: uuid.UUID | None = None
+    account_id: uuid.UUID | None = None
+
+
+class SharedExpenseUpdate(SharedExpenseWrite):
+    """A full replacement of the bill and split. The user's own category and account are
+    changed on their share transaction, not here."""
+
+
+class PersonView(ApiModel):
+    """Someone in a shared expense, named the way the recorder knows them."""
+
+    friend_id: uuid.UUID | None
+    name: str
+    is_you: bool
+
+
+class ShareView(PersonView):
+    """One participant's share."""
+
+    amount: Decimal
+    amount_minor: int
+    amount_formatted: str
+
+
+class SharedExpenseView(ApiModel):
+    """A shared expense: the total, the payer and every share."""
+
+    id: uuid.UUID
+    total: Decimal
+    total_minor: int
+    currency: str
+    total_formatted: str
+    occurred_on: date
+    description: str | None
+    merchant: str | None
+    payer: PersonView
+    paid_by_you: bool
+    shares: list[ShareView]
+    # The user's own share as an ordinary expense transaction in their records.
+    my_transaction_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime

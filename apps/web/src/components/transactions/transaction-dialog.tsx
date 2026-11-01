@@ -4,6 +4,7 @@ import type {
   AccountRef,
   AccountView,
   CategoryView,
+  SharedExpenseCreate,
   TransactionCreate,
   TransactionType,
   TransactionUpdate,
@@ -17,12 +18,14 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError, newKey, unwrap } from "@/lib/api";
 import { accountOptionLabel, PAYMENT_METHODS, todayISO } from "@/lib/format";
-import { invalidateLedger, useAccounts, useCategories, useMe, useQueryClient } from "@/lib/queries";
+import { invalidateLedger, useAccounts, useCategories, useFriends, useMe, useQueryClient } from "@/lib/queries";
+import { EMPTY_SPLIT, SplitFields, type SplitState, splitParticipants, splitProblem } from "./split-fields";
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD", "JPY"];
 
 const FIELD_FOR_ERROR: Record<string, string> = {
   amount: "amount",
+  total: "amount",
   occurredOn: "occurredOn",
   currency: "currency",
   categoryId: "categoryId",
@@ -56,10 +59,13 @@ export function TransactionDialog({
   open,
   onClose,
   transaction,
+  onOpenShared,
 }: {
   open: boolean;
   onClose: () => void;
   transaction?: TransactionView | null;
+  /** Opens the shared expense behind a share transaction (the split, payer and total). */
+  onOpenShared?: (sharedExpenseId: string) => void;
 }) {
   return (
     <Dialog
@@ -68,7 +74,12 @@ export function TransactionDialog({
       title={transaction ? "Edit transaction" : "Add a transaction"}
       description={transaction ? undefined : "Or just tell the assistant in chat."}
     >
-      {open ? <TransactionForm key={transaction?.id ?? "new"} transaction={transaction} onDone={onClose} /> : null}
+      {open ? <TransactionForm
+          key={transaction?.id ?? "new"}
+          transaction={transaction}
+          onDone={onClose}
+          onOpenShared={onOpenShared}
+        /> : null}
     </Dialog>
   );
 }
@@ -76,9 +87,11 @@ export function TransactionDialog({
 function TransactionForm({
   transaction,
   onDone,
+  onOpenShared,
 }: {
   transaction?: TransactionView | null;
   onDone: () => void;
+  onOpenShared?: (sharedExpenseId: string) => void;
 }) {
   const me = useMe();
   const categories = useCategories();
@@ -93,6 +106,12 @@ function TransactionForm({
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const friends = useFriends();
+  const [splitting, setSplitting] = useState(false);
+  const [split, setSplit] = useState<SplitState>(EMPTY_SPLIT);
+  const [totalText, setTotalText] = useState("");
+  // A share of a shared expense: its amount, currency, date and type move only with the split.
+  const sharedExpenseId = transaction?.sharedExpenseId ?? null;
 
   const options = useMemo(
     () => (categories.data ?? []).filter((c: CategoryView) => c.kind === type),
@@ -110,6 +129,7 @@ function TransactionForm({
   const baseCurrency = me.data?.profile.baseCurrency ?? "INR";
   const [currency, setCurrency] = useState<string>(transaction?.currency ?? baseCurrency);
   const isTransfer = type === "transfer";
+  const splitProblemText = splitting ? splitProblem(split, totalText, currency) : null;
 
   // A transfer lives in its accounts' currency, so picking the source account sets it.
   function pickFromAccount(id: string) {
@@ -142,7 +162,22 @@ function TransactionForm({
     setBusy(true);
     setError(null);
     try {
-      if (transaction) {
+      if (splitting && !transaction) {
+        const shared: SharedExpenseCreate = {
+          total: body.amount,
+          currency,
+          occurredOn: body.occurredOn,
+          categoryId: body.categoryId,
+          accountId: body.accountId,
+          description: body.description,
+          merchant: body.merchant,
+          payerFriendId: split.payerId || null,
+          split: split.kind,
+          participants: splitParticipants(split),
+        };
+        await unwrap(api.POST("/api/v1/shared-expenses", { body: shared }));
+        toast("Shared expense added");
+      } else if (transaction) {
         const update: TransactionUpdate = { version: transaction.version, ...body };
         await unwrap(
           api.PATCH("/api/v1/transactions/{transaction_id}", {
@@ -202,7 +237,15 @@ function TransactionForm({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
-      <fieldset className="grid grid-cols-3 gap-2">
+      {sharedExpenseId ? (
+        <div className="flex items-center justify-between gap-3 rounded-[10px] bg-lavender-wash px-3 py-2 text-sm text-lavender-ink">
+          <span>Your share of a shared expense. Its amount, date and type change with the split.</span>
+          <Button size="sm" onClick={() => onOpenShared?.(sharedExpenseId)}>
+            See the split
+          </Button>
+        </div>
+      ) : null}
+      <fieldset className="grid grid-cols-3 gap-2" disabled={sharedExpenseId !== null}>
         <legend className="sr-only">Type</legend>
         {(["expense", "income", "transfer"] as const).map((value) => (
           <label
@@ -223,6 +266,7 @@ function TransactionForm({
               onChange={() => {
                 setType(value);
                 setCategoryId("");
+                if (value !== "expense") setSplitting(false); // only an expense can be shared
               }}
               className="sr-only"
             />
@@ -240,6 +284,8 @@ function TransactionForm({
               inputMode="decimal"
               required
               autoFocus={!transaction}
+              readOnly={sharedExpenseId !== null}
+              onChange={(event) => setTotalText(event.target.value)}
               defaultValue={transaction ? String(transaction.amount) : ""}
               placeholder="350"
               pattern="[0-9.,]+"
@@ -251,7 +297,13 @@ function TransactionForm({
         </Field>
         <Field label="Currency" error={fieldError("currency")}>
           {({ id }) => (
-            <Select id={id} name="currency" value={currency} onChange={(event) => setCurrency(event.target.value)}>
+            <Select
+              id={id}
+              name="currency"
+              value={currency}
+              disabled={sharedExpenseId !== null}
+              onChange={(event) => setCurrency(event.target.value)}
+            >
               {Array.from(new Set([baseCurrency, ...CURRENCIES])).map((code) => (
                 <option key={code}>{code}</option>
               ))}
@@ -268,6 +320,7 @@ function TransactionForm({
               name="occurredOn"
               type="date"
               required
+              readOnly={sharedExpenseId !== null}
               max={todayISO()}
               defaultValue={transaction?.occurredOn ?? todayISO()}
               aria-invalid={invalid}
@@ -359,6 +412,8 @@ function TransactionForm({
               </Select>
             )}
           </Field>
+        ) : splitting ? (
+          <span />
         ) : (
           <Field label="Payment method">
             {({ id }) => (
@@ -375,6 +430,17 @@ function TransactionForm({
         )}
       </div>
 
+      {type === "expense" && !transaction ? (
+        <label className="flex items-center gap-2 text-[15px]">
+          <input type="checkbox" checked={splitting} onChange={(event) => setSplitting(event.target.checked)} />
+          Split with friends
+        </label>
+      ) : null}
+      {splitting ? (
+        <SplitFields friends={friends.data ?? []} split={split} onChange={setSplit} total={totalText} currency={currency} />
+      ) : null}
+
+      {splitting ? null : (
       <Field label="Notes">
         {({ id }) => (
           <textarea
@@ -387,6 +453,7 @@ function TransactionForm({
           />
         )}
       </Field>
+      )}
 
       {generalError ? (
         <div role="alert" className="flex items-center justify-between gap-3 rounded-[10px] bg-danger-wash px-3 py-2 text-sm text-danger">
@@ -406,7 +473,9 @@ function TransactionForm({
       ) : null}
 
       <div className="flex items-center justify-between gap-2 pt-1">
-        {transaction ? (
+        {sharedExpenseId ? (
+          <span className="text-xs text-ink-faint">Delete it from the shared expense.</span>
+        ) : transaction ? (
           confirmDelete ? (
             <div className="flex items-center gap-2">
               <Button variant="danger" size="sm" onClick={onDelete} busy={busy}>
@@ -428,8 +497,8 @@ function TransactionForm({
           <Button variant="ghost" onClick={onDone}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" busy={busy}>
-            {transaction ? "Save changes" : "Add transaction"}
+          <Button type="submit" variant="primary" busy={busy} disabled={splitProblemText !== null}>
+            {transaction ? "Save changes" : splitting ? "Add shared expense" : "Add transaction"}
           </Button>
         </div>
       </div>

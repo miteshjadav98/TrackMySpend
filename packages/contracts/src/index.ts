@@ -33,6 +33,12 @@ export type FriendView = S["FriendView"];
 export type FriendCreate = S["FriendCreate"];
 export type FriendUpdate = S["FriendUpdate"];
 export type FriendInviteView = S["FriendInviteView"];
+export type ParticipantInput = S["ParticipantInput"];
+export type PersonView = S["PersonView"];
+export type ShareView = S["ShareView"];
+export type SharedExpenseCreate = S["SharedExpenseCreate"];
+export type SharedExpenseUpdate = S["SharedExpenseUpdate"];
+export type SharedExpenseView = S["SharedExpenseView"];
 
 export type CategoryView = S["CategoryView"];
 export type MoneyAmount = S["MoneyAmount"];

@@ -8,6 +8,7 @@ from finance_api.routes import (
     merchant_rules,
     profile,
     reports,
+    shared_expenses,
     transactions,
 )
 
@@ -18,6 +19,7 @@ ROUTERS = (
     categories.router,
     accounts.router,
     friends.router,
+    shared_expenses.router,
     merchant_rules.router,
     transactions.router,
     reports.router,

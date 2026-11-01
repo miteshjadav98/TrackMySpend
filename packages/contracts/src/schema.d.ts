@@ -358,6 +358,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/shared-expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Shared Expenses */
+        get: operations["list_shared_expenses_api_v1_shared_expenses_get"];
+        put?: never;
+        /** Create Shared Expense */
+        post: operations["create_shared_expense_api_v1_shared_expenses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shared-expenses/{shared_expense_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Shared Expense */
+        get: operations["get_shared_expense_api_v1_shared_expenses__shared_expense_id__get"];
+        /** Update Shared Expense */
+        put: operations["update_shared_expense_api_v1_shared_expenses__shared_expense_id__put"];
+        post?: never;
+        /** Delete Shared Expense */
+        delete: operations["delete_shared_expense_api_v1_shared_expenses__shared_expense_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/merchant-rules": {
         parameters: {
             query?: never;
@@ -1108,6 +1145,17 @@ export interface components {
             icon: string | null;
         };
         /**
+         * ParticipantInput
+         * @description One person in a shared expense. A null `friend_id` is the user themselves. The amount is
+         *     given only for an exact split.
+         */
+        ParticipantInput: {
+            /** Friendid */
+            friendId?: string | null;
+            /** Amount */
+            amount?: number | string | null;
+        };
+        /**
          * PasswordChange
          * @description A signed-in user replacing their password; the current one proves it is them.
          */
@@ -1173,6 +1221,18 @@ export interface components {
             end: string;
             /** Label */
             label: string;
+        };
+        /**
+         * PersonView
+         * @description Someone in a shared expense, named the way the recorder knows them.
+         */
+        PersonView: {
+            /** Friendid */
+            friendId: string | null;
+            /** Name */
+            name: string;
+            /** Isyou */
+            isYou: boolean;
         };
         /** ProfileUpdate */
         ProfileUpdate: {
@@ -1275,6 +1335,126 @@ export interface components {
              * @description True for the session making this request.
              */
             isCurrent: boolean;
+        };
+        /**
+         * ShareView
+         * @description One participant's share.
+         */
+        ShareView: {
+            /** Friendid */
+            friendId: string | null;
+            /** Name */
+            name: string;
+            /** Isyou */
+            isYou: boolean;
+            /** Amount */
+            amount: number | string;
+            /** Amountminor */
+            amountMinor: number;
+            /** Amountformatted */
+            amountFormatted: string;
+        };
+        /**
+         * SharedExpenseCreate
+         * @description A new shared expense. Category and account tag the user's own share.
+         */
+        SharedExpenseCreate: {
+            /** Total */
+            total: number | string;
+            /** Currency */
+            currency?: string | null;
+            /** Occurredon */
+            occurredOn?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Merchant */
+            merchant?: string | null;
+            /** Payerfriendid */
+            payerFriendId?: string | null;
+            /**
+             * Split
+             * @default equal
+             * @enum {string}
+             */
+            split: "equal" | "exact";
+            /** Participants */
+            participants: components["schemas"]["ParticipantInput"][];
+            /** Categoryid */
+            categoryId?: string | null;
+            /** Accountid */
+            accountId?: string | null;
+        };
+        /**
+         * SharedExpenseUpdate
+         * @description A full replacement of the bill and split. The user's own category and account are
+         *     changed on their share transaction, not here.
+         */
+        SharedExpenseUpdate: {
+            /** Total */
+            total: number | string;
+            /** Currency */
+            currency?: string | null;
+            /** Occurredon */
+            occurredOn?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Merchant */
+            merchant?: string | null;
+            /** Payerfriendid */
+            payerFriendId?: string | null;
+            /**
+             * Split
+             * @default equal
+             * @enum {string}
+             */
+            split: "equal" | "exact";
+            /** Participants */
+            participants: components["schemas"]["ParticipantInput"][];
+        };
+        /**
+         * SharedExpenseView
+         * @description A shared expense: the total, the payer and every share.
+         */
+        SharedExpenseView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Total */
+            total: number | string;
+            /** Totalminor */
+            totalMinor: number;
+            /** Currency */
+            currency: string;
+            /** Totalformatted */
+            totalFormatted: string;
+            /**
+             * Occurredon
+             * Format: date
+             */
+            occurredOn: string;
+            /** Description */
+            description: string | null;
+            /** Merchant */
+            merchant: string | null;
+            payer: components["schemas"]["PersonView"];
+            /** Paidbyyou */
+            paidByYou: boolean;
+            /** Shares */
+            shares: components["schemas"]["ShareView"][];
+            /** Mytransactionid */
+            myTransactionId: string | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
         };
         /**
          * SpendingSummary
@@ -1478,6 +1658,8 @@ export interface components {
              * @enum {string}
              */
             source: "chat" | "manual" | "import" | "api";
+            /** Sharedexpenseid */
+            sharedExpenseId: string | null;
             /** Version */
             version: number;
             /**
@@ -2264,6 +2446,167 @@ export interface operations {
             header?: never;
             path: {
                 invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shared_expenses_api_v1_shared_expenses_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedExpenseView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_shared_expense_api_v1_shared_expenses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedExpenseCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedExpenseView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_shared_expense_api_v1_shared_expenses__shared_expense_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shared_expense_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedExpenseView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_shared_expense_api_v1_shared_expenses__shared_expense_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shared_expense_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedExpenseUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedExpenseView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_shared_expense_api_v1_shared_expenses__shared_expense_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shared_expense_id: string;
             };
             cookie?: never;
         };

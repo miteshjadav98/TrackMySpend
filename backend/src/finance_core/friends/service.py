@@ -23,7 +23,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_core.audit.service import record_audit
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
-from finance_core.friends.models import ACTIVE_EMAIL_INDEX, Friend, FriendInvite
+from finance_core.friends.models import (
+    ACTIVE_EMAIL_INDEX,
+    Friend,
+    FriendInvite,
+    SharedExpense,
+    SharedExpenseShare,
+)
 from finance_core.friends.schemas import (
     FriendCreate,
     FriendInviteView,
@@ -155,13 +161,16 @@ class FriendService:
         await self._commit()
 
     async def _has_shared_history(self, friend: Friend) -> bool:
-        """True when the friend appears in a shared expense or settlement or has a balance.
+        """True when the friend is in a shared expense.
 
-        This is the seam for shared expenses: until they exist nobody has history, so
-        removing always deletes. Once they do, a friend with history is archived instead,
-        which keeps past expenses and balances correct.
+        Such a friend is archived instead of deleted, which keeps past expenses (and later
+        balances and settlements) correct. Settlements will extend this check.
         """
-        return False
+        in_a_share = select(SharedExpenseShare.id).where(SharedExpenseShare.friend_id == friend.id)
+        paid_one = select(SharedExpense.id).where(SharedExpense.payer_friend_id == friend.id)
+        return (await self._session.scalar(in_a_share.limit(1))) is not None or (
+            await self._session.scalar(paid_one.limit(1))
+        ) is not None
 
     # -- invites --------------------------------------------------------------------------
 

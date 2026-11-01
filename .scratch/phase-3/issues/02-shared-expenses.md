@@ -14,16 +14,22 @@ ADR: `docs/adr/0001-shares-are-each-users-own-expense.md`.
 
 **Status:** ready-for-agent
 
-- [ ] Alembic revision for shared expenses and shares, plus a nullable shared-expense link on transactions, chained on the single head.
-- [ ] Split arithmetic as pure functions with unit tests: an equal split gives each share the floor and the payer's share the leftover minor units; exact amounts must sum to the total, otherwise a validation error.
-- [ ] When a friend is the payer, only the user and that friend may be participants (validation error otherwise).
-- [ ] API: create, read, update, delete and list shared expenses. Creating saves the shared expense, the shares and the recorder's share transaction in one database transaction with audit events.
-- [ ] The recorder's share transaction is an ordinary expense with the share amount; its amount, currency, date and type are read-only through the transaction endpoints (a clear error), while category, account and notes stay editable.
-- [ ] Editing a shared expense updates its shares and the recorder's share transaction together; deleting removes both.
-- [ ] Summaries and category totals count the user's share, not the total (integration test with a 1000 split two ways shows 500).
-- [ ] Removing a friend who is in any shared expense archives them instead of deleting; archived friends cannot be added to new shared expenses.
-- [ ] Shared-expense creation teaches the merchant rule from the recorder's category, like other saves.
-- [ ] Web: a "Split" option in the add-transaction flow (friends picker, payer, equal or exact amounts with a live check that they add up), a shared marker on transaction rows, and a shared-expense detail view with edit and delete for the recorder.
-- [ ] `npm run contracts` committed; API checks, full pytest, and web typecheck, lint and build pass.
+- [x] Alembic revision for shared expenses and shares, plus a nullable shared-expense link on transactions, chained on the single head.
+- [x] Split arithmetic as pure functions with unit tests: an equal split gives each share the floor and the payer's share the leftover minor units; exact amounts must sum to the total, otherwise a validation error.
+- [x] When a friend is the payer, only the user and that friend may be participants (validation error otherwise).
+- [x] API: create, read, update, delete and list shared expenses. Creating saves the shared expense, the shares and the recorder's share transaction in one database transaction with audit events.
+- [x] The recorder's share transaction is an ordinary expense with the share amount; its amount, currency, date and type are read-only through the transaction endpoints (a clear error), while category, account and notes stay editable.
+- [x] Editing a shared expense updates its shares and the recorder's share transaction together; deleting removes both.
+- [x] Summaries and category totals count the user's share, not the total (integration test with a 1000 split two ways shows 500).
+- [x] Removing a friend who is in any shared expense archives them instead of deleting; archived friends cannot be added to new shared expenses.
+- [x] Shared-expense creation teaches the merchant rule from the recorder's category, like other saves.
+- [x] Web: a "Split" option in the add-transaction flow (friends picker, payer, equal or exact amounts with a live check that they add up), a shared marker on transaction rows, and a shared-expense detail view with edit and delete for the recorder.
+- [x] `npm run contracts` committed; API checks, full pytest, and web typecheck, lint and build pass.
 
 ## Comments
+
+- Implementer (t02): shared expenses are API at `/api/v1/shared-expenses` (list, create, read, PUT, delete). The recorder's share is an ordinary expense transaction linked by `transactions.shared_expense_id`; `TransactionService` refuses changes to its amount, currency, date and type, and its delete, with 409 `shared_expense_locked`.
+- Deleting a shared expense is a hard delete of the expense, its shares and the share transaction (the audit log keeps the snapshot), so there is nothing to restore and a friend with no remaining shared expenses can be deleted again.
+- The shares-sum rule is enforced in the service and by split arithmetic only; no deferred database check was added.
+- Seam for ticket 04: `SharedExpenseService._create_share_transactions` (one share transaction per participant who is a user; today only the recorder).
+- Editing is a full `PUT` of the bill and split. The edit form opens an existing split as exact amounts.

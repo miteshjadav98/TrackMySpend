@@ -1,11 +1,21 @@
-"""The friends and friend_invites tables."""
+"""The friends, friend_invites, shared_expenses and shared_expense_shares tables."""
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from finance_core.database.base import (
@@ -84,3 +94,76 @@ class FriendInvite(Base):
     status: Mapped[str] = mapped_column(String(16), default="pending")
     created_at: Mapped[datetime] = created_at_column()
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SharedExpense(Base):
+    """One bill split among the recorder and some of their friends.
+
+    It holds the whole bill (total, payer, every share). Only the recorder's share is a
+    transaction in the recorder's records, so summaries count the share, not the total.
+    Deleting one is a hard delete; the audit log keeps what it was.
+    """
+
+    __tablename__ = "shared_expenses"
+    __table_args__ = (
+        CheckConstraint("total_minor > 0 AND total_minor <= 1000000000000000", name="total"),
+        CheckConstraint("currency ~ '^[A-Z]{3}$'", name="currency"),
+        Index(
+            "ix_shared_expenses_recorder_date",
+            "recorder_id",
+            text("occurred_on DESC"),
+            text("id DESC"),
+        ),
+        {"schema": SCHEMA_LEDGER},
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    recorder_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA_IDENTITY}.users.id", ondelete="CASCADE")
+    )
+    # The recorder's friend who paid; null means the recorder paid. NO ACTION, like accounts:
+    # a friend in a shared expense is archived, never hard-deleted.
+    payer_friend_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.friends.id")
+    )
+    total_minor: Mapped[int] = mapped_column(BigInteger)
+    currency: Mapped[str] = mapped_column(String(3))
+    occurred_on: Mapped[date] = mapped_column(Date)
+    description: Mapped[str | None] = mapped_column(String(500))
+    merchant: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = created_at_column()
+    updated_at: Mapped[datetime] = updated_at_column()
+
+
+class SharedExpenseShare(Base):
+    """What one participant owes of a shared expense, in minor units."""
+
+    __tablename__ = "shared_expense_shares"
+    __table_args__ = (
+        CheckConstraint("amount_minor > 0", name="amount"),
+        # One share per person. Two indexes because a null friend (the recorder) never
+        # collides in a plain unique index.
+        Index(
+            "uq_shared_expense_shares_friend",
+            "shared_expense_id",
+            "friend_id",
+            unique=True,
+            postgresql_where=text("friend_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_shared_expense_shares_recorder",
+            "shared_expense_id",
+            unique=True,
+            postgresql_where=text("friend_id IS NULL"),
+        ),
+        Index("ix_shared_expense_shares_friend", "friend_id"),
+        {"schema": SCHEMA_LEDGER},
+    )
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    shared_expense_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.shared_expenses.id", ondelete="CASCADE")
+    )
+    # The recorder's friend, or null for the recorder's own share.
+    friend_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(f"{SCHEMA_LEDGER}.friends.id"))
+    amount_minor: Mapped[int] = mapped_column(BigInteger)
