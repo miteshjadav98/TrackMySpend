@@ -545,20 +545,24 @@ class TransactionService:
 
     async def add_share_row(
         self,
-        ctx: UserContext,
+        user_id: uuid.UUID,
         new: NewTransaction,
         *,
         shared_expense_id: uuid.UUID,
+        learn_merchant: bool = True,
         request_id: str | None = None,
         source: str = "api",
         source_ref: str | None = None,
     ) -> uuid.UUID:
-        """Add the user's share of a shared expense as an ordinary expense. Teaches the
-        merchant rule like any other save. `source_ref` lets a retried chat message find the
-        share it already saved."""
+        """Add a user's share of a shared expense as an ordinary expense.
+
+        The recorder's share teaches the merchant rule like any other save. A friend's
+        share does not (`learn_merchant=False`): they did not pick its category.
+        `source_ref` lets a retried chat message find the share it already saved.
+        """
         row = Transaction(
             id=uuid7(),
-            user_id=ctx.user_id,
+            user_id=user_id,
             type=new.type,
             amount_minor=new.amount_minor,
             currency=new.currency,
@@ -576,21 +580,22 @@ class TransactionService:
         )
         self._session.add(row)
         record_audit(
-            self._session, user_id=ctx.user_id, actor="user", action="transaction.created",
+            self._session, user_id=user_id, actor="user", action="transaction.created",
             entity_type="transaction", entity_id=row.id,
             data={**_audit_snapshot(new), "source": source, "sharedExpenseId": str(shared_expense_id)},
             request_id=request_id,
         )  # fmt: skip
-        await self._merchant_rules.learn(
-            ctx.user_id, type=new.type, merchant=new.merchant, category_id=new.category_id
-        )
+        if learn_merchant:
+            await self._merchant_rules.learn(
+                user_id, type=new.type, merchant=new.merchant, category_id=new.category_id
+            )
         return row.id
 
-    async def share_row(self, ctx: UserContext, shared_expense_id: uuid.UUID) -> Transaction:
-        """The user's share transaction of this shared expense."""
+    async def share_row(self, user_id: uuid.UUID, shared_expense_id: uuid.UUID) -> Transaction:
+        """A user's share transaction of this shared expense."""
         row = await self._session.scalar(
             select(Transaction).where(
-                Transaction.user_id == ctx.user_id,
+                Transaction.user_id == user_id,
                 Transaction.shared_expense_id == shared_expense_id,
             )
         )
@@ -600,7 +605,7 @@ class TransactionService:
 
     def change_share_row(
         self,
-        ctx: UserContext,
+        user_id: uuid.UUID,
         row: Transaction,
         *,
         amount_minor: int,
@@ -625,18 +630,18 @@ class TransactionService:
                 setattr(row, attr, new)
         if changes:
             record_audit(
-                self._session, user_id=ctx.user_id, actor="user", action="transaction.updated",
+                self._session, user_id=user_id, actor="user", action="transaction.updated",
                 entity_type="transaction", entity_id=row.id,
                 data={"before": before, "changes": changes}, request_id=request_id,
             )  # fmt: skip
 
     async def remove_share_row(
-        self, ctx: UserContext, row: Transaction, *, request_id: str | None = None
+        self, user_id: uuid.UUID, row: Transaction, *, request_id: str | None = None
     ) -> None:
         """Delete a share transaction for good. The shared expense it belonged to is gone,
         so there is nothing for a restore to bring back."""
         record_audit(
-            self._session, user_id=ctx.user_id, actor="user", action="transaction.deleted",
+            self._session, user_id=user_id, actor="user", action="transaction.deleted",
             entity_type="transaction", entity_id=row.id, data={"before": _audit_snapshot(row)},
             request_id=request_id,
         )  # fmt: skip
