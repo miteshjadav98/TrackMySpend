@@ -78,9 +78,16 @@ class SharedExpenseService:
     # -- writes ---------------------------------------------------------------------------
 
     async def create(
-        self, ctx: UserContext, data: SharedExpenseCreate, *, request_id: str | None = None
+        self,
+        ctx: UserContext,
+        data: SharedExpenseCreate,
+        *,
+        request_id: str | None = None,
+        source: str = "api",
+        source_ref: str | None = None,
     ) -> SharedExpenseView:
-        """Record a shared expense and the recorder's share of it."""
+        """Record a shared expense and the recorder's share of it. The chat passes its message
+        as `source_ref`, so a retried message finds the share it already saved."""
         plan = await self._plan(ctx, data, existing=None)
         my_share = await self._transactions.resolve(
             ctx,
@@ -108,7 +115,9 @@ class SharedExpenseService:
         self._session.add(expense)
         await self._session.flush()  # the expense row must exist before shares point at it
         self._add_shares(expense.id, plan.shares)
-        await self._create_share_transactions(ctx, expense, my_share, request_id)
+        await self._create_share_transactions(
+            ctx, expense, my_share, request_id, source, source_ref
+        )
         self._audit(ctx, "shared_expense.created", expense.id, self._snapshot(expense, plan.shares),
                     request_id)  # fmt: skip
         await self._session.commit()
@@ -225,6 +234,8 @@ class SharedExpenseService:
         expense: SharedExpense,
         my_share: NewTransaction,
         request_id: str | None,
+        source: str,
+        source_ref: str | None,
     ) -> None:
         """Give every participant who is a user their share as an expense transaction.
 
@@ -232,8 +243,9 @@ class SharedExpenseService:
         side of the feature, which will add its own loop over the linked participants here.
         """
         await self._transactions.add_share_row(
-            ctx, my_share, shared_expense_id=expense.id, request_id=request_id
-        )
+            ctx, my_share, shared_expense_id=expense.id, request_id=request_id,
+            source=source, source_ref=source_ref,
+        )  # fmt: skip
 
     # -- planning: who takes part and what each owes ---------------------------------------
 

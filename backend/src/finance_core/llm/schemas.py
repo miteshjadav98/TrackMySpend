@@ -32,6 +32,13 @@ class _Lenient(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class ExtractedShare(_Lenient):
+    person: str = Field(
+        description="'me' for the user, else the friend's name exactly as the user said it"
+    )
+    amount: str = Field(description="What that person had, as a plain number string")
+
+
 class ExtractedTransaction(_Lenient):
     type: Literal["expense", "income", "transfer"] | None = Field(
         default=None,
@@ -65,6 +72,25 @@ class ExtractedTransaction(_Lenient):
     )
     to_account: str | None = Field(
         default=None, description="For a transfer only: the account the money went to"
+    )
+    participants: list[str] = Field(
+        default_factory=list,
+        description="For a shared expense only: the friends sharing it, as the user named them, "
+        "never the user themselves; empty when the expense is not shared",
+    )
+    payer: str | None = Field(
+        default=None,
+        description="For a shared expense only: the friend's name if a friend paid the bill; "
+        "null when the user paid or did not say",
+    )
+    split: Literal["equal", "exact"] | None = Field(
+        default=None,
+        description="For a shared expense only: 'exact' when the user said what each person "
+        "had, else 'equal'",
+    )
+    shares: list[ExtractedShare] = Field(
+        default_factory=list,
+        description="For an exact split only: what each person had, as the user said it",
     )
 
 

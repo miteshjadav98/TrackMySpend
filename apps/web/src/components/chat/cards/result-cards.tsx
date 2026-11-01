@@ -2,6 +2,7 @@
 
 import type {
   CurrencySummary,
+  SharedExpenseView,
   SummaryInteraction,
   TransactionListInteraction,
   TransactionsSavedInteraction,
@@ -11,6 +12,7 @@ import { ArrowRight, Pencil, RotateCcw, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+import { SharedExpenseDialog } from "@/components/transactions/shared-expense-dialog";
 import { TransactionDialog } from "@/components/transactions/transaction-dialog";
 import { NamedIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
@@ -27,20 +29,50 @@ function Amount({ tx, className = "" }: { tx: TransactionView; className?: strin
   );
 }
 
+/** The total, who paid and every share of a shared expense, in one short block. */
+function SharedSplit({ shared }: { shared: SharedExpenseView }) {
+  return (
+    <div className="mt-1.5 flex flex-col gap-0.5 text-xs text-ink-soft">
+      <p>
+        Shared · total <span className="figure font-semibold text-ink">{shared.totalFormatted}</span> ·{" "}
+        {shared.paidByYou ? "You paid" : `${shared.payer.name} paid`}
+      </p>
+      <p className="flex flex-wrap gap-x-3">
+        {shared.shares.map((share) => (
+          <span key={share.friendId ?? "you"}>
+            {share.name} <span className="figure font-semibold text-ink">{share.amountFormatted}</span>
+          </span>
+        ))}
+      </p>
+    </div>
+  );
+}
+
 /** A saved entry, shown as a ledger slip with Undo and Edit right where it landed. */
 export function SavedCard({ interaction }: { interaction: TransactionsSavedInteraction }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [editing, setEditing] = useState<TransactionView | null>(null);
+  const [openShared, setOpenShared] = useState<string | null>(null);
+  const sharedById = new Map(interaction.shared.map((shared) => [shared.id, shared]));
 
   async function undo(tx: TransactionView) {
     try {
-      await unwrap(
-        api.DELETE("/api/v1/transactions/{transaction_id}", {
-          params: { path: { transaction_id: tx.id } },
-        }),
-      );
+      // A share is undone with its shared expense, which takes every share with it.
+      if (tx.sharedExpenseId) {
+        await unwrap<unknown>(
+          api.DELETE("/api/v1/shared-expenses/{shared_expense_id}", {
+            params: { path: { shared_expense_id: tx.sharedExpenseId } },
+          }),
+        );
+      } else {
+        await unwrap(
+          api.DELETE("/api/v1/transactions/{transaction_id}", {
+            params: { path: { transaction_id: tx.id } },
+          }),
+        );
+      }
       setRemoved((current) => new Set(current).add(tx.id));
       await invalidateLedger(queryClient);
     } catch (error) {
@@ -72,6 +104,7 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
         {interaction.transactions.map((tx) => {
           const gone = removed.has(tx.id);
           const isTransfer = tx.type === "transfer";
+          const shared = tx.sharedExpenseId ? sharedById.get(tx.sharedExpenseId) : undefined;
           const meta = [
             isTransfer ? "Transfer" : (tx.category?.name ?? "Uncategorised"),
             formatDay(tx.occurredOn),
@@ -90,10 +123,11 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
                   {isTransfer ? transferRoute(tx) : (tx.description ?? tx.category?.name ?? "Transaction")}
                 </p>
                 <p className="truncate text-xs text-ink-faint">{gone ? "Removed from your books" : meta}</p>
+                {shared && !gone ? <SharedSplit shared={shared} /> : null}
               </div>
               <Amount tx={tx} className={`text-lg ${gone ? "line-through" : ""}`} />
               <div className="flex shrink-0 gap-0.5">
-                {gone ? (
+                {gone && tx.sharedExpenseId ? null : gone ? (
                   <button
                     type="button"
                     onClick={() => restore(tx)}
@@ -107,7 +141,7 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
                   <>
                     <button
                       type="button"
-                      onClick={() => setEditing(tx)}
+                      onClick={() => (tx.sharedExpenseId ? setOpenShared(tx.sharedExpenseId) : setEditing(tx))}
                       className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash hover:text-ink"
                       aria-label={`Edit ${tx.amountFormatted}`}
                       title="Edit"
@@ -140,6 +174,7 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
         </div>
       ) : null}
       <TransactionDialog open={editing !== null} transaction={editing} onClose={() => setEditing(null)} />
+      <SharedExpenseDialog sharedExpenseId={openShared} onClose={() => setOpenShared(null)} />
     </div>
   );
 }
