@@ -75,6 +75,11 @@ class Transaction(Base):
             "source_ref",
             postgresql_where=text("source_ref IS NOT NULL"),
         ),
+        Index(
+            "ix_transactions_shared_expense",
+            "shared_expense_id",
+            postgresql_where=text("shared_expense_id IS NOT NULL"),
+        ),
         # The account filter on the transaction list.
         Index(
             "ix_transactions_user_account",
@@ -109,6 +114,11 @@ class Transaction(Base):
     # Where a transfer's money went; NULL for expense and income.
     to_account_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(f"{SCHEMA_LEDGER}.accounts.id")
+    )
+    # Set when this row is the owner's share of a shared expense. Its amount, currency, date
+    # and type then change only through the shared expense.
+    shared_expense_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.shared_expenses.id", ondelete="SET NULL")
     )
     description: Mapped[str | None] = mapped_column(String(500))
     merchant: Mapped[str | None] = mapped_column(String(200))

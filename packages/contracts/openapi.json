@@ -596,6 +596,895 @@
         }
       }
     },
+    "/api/v1/friends": {
+      "get": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "List Friends",
+        "operationId": "list_friends_api_v1_friends_get",
+        "parameters": [
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FriendView"
+                  },
+                  "title": "Response List Friends Api V1 Friends Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Add Friend",
+        "operationId": "add_friend_api_v1_friends_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friends/{friend_id}": {
+      "get": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Get Friend",
+        "operationId": "get_friend_api_v1_friends__friend_id__get",
+        "parameters": [
+          {
+            "name": "friend_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friend Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Update Friend",
+        "operationId": "update_friend_api_v1_friends__friend_id__patch",
+        "parameters": [
+          {
+            "name": "friend_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friend Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Remove Friend",
+        "operationId": "remove_friend_api_v1_friends__friend_id__delete",
+        "parameters": [
+          {
+            "name": "friend_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friend Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friends/{friend_id}/unarchive": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Unarchive Friend",
+        "operationId": "unarchive_friend_api_v1_friends__friend_id__unarchive_post",
+        "parameters": [
+          {
+            "name": "friend_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friend Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friend-invites": {
+      "get": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "List Incoming Invites",
+        "operationId": "list_incoming_invites_api_v1_friend_invites_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FriendInviteView"
+                  },
+                  "type": "array",
+                  "title": "Response List Incoming Invites Api V1 Friend Invites Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friend-invites/{invite_id}/code": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Send Invite Code",
+        "description": "Email a one-time code to the invited address; accepting needs it.",
+        "operationId": "send_invite_code_api_v1_friend_invites__invite_id__code_post",
+        "parameters": [
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invite Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteCodeSent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friend-invites/{invite_id}/accept": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Accept Invite",
+        "operationId": "accept_invite_api_v1_friend_invites__invite_id__accept_post",
+        "parameters": [
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invite Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteAccept"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friend-invites/{invite_id}/decline": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Decline Invite",
+        "operationId": "decline_invite_api_v1_friend_invites__invite_id__decline_post",
+        "parameters": [
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invite Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settlements": {
+      "get": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "List Settlements",
+        "operationId": "list_settlements_api_v1_settlements_get",
+        "parameters": [
+          {
+            "name": "friendId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Friendid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SettlementView"
+                  },
+                  "title": "Response List Settlements Api V1 Settlements Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Create Settlement",
+        "operationId": "create_settlement_api_v1_settlements_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:-]{8,100}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Client-generated key; repeating it returns the original settlement.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Client-generated key; repeating it returns the original settlement."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlementCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementCreated"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementCreated"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/settlements/{settlement_id}": {
+      "patch": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Tag Settlement Account",
+        "description": "A linked friend's own account on a settlement the other person recorded.",
+        "operationId": "tag_settlement_account_api_v1_settlements__settlement_id__patch",
+        "parameters": [
+          {
+            "name": "settlement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Settlement Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlementAccountTag"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Delete Settlement",
+        "operationId": "delete_settlement_api_v1_settlements__settlement_id__delete",
+        "parameters": [
+          {
+            "name": "settlement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Settlement Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/shared-expenses": {
+      "get": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "List Shared Expenses",
+        "operationId": "list_shared_expenses_api_v1_shared_expenses_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedExpenseView"
+                  },
+                  "title": "Response List Shared Expenses Api V1 Shared Expenses Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "Create Shared Expense",
+        "operationId": "create_shared_expense_api_v1_shared_expenses_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedExpenseCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedExpenseView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/shared-expenses/{shared_expense_id}": {
+      "get": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "Get Shared Expense",
+        "operationId": "get_shared_expense_api_v1_shared_expenses__shared_expense_id__get",
+        "parameters": [
+          {
+            "name": "shared_expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shared Expense Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedExpenseView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "Update Shared Expense",
+        "operationId": "update_shared_expense_api_v1_shared_expenses__shared_expense_id__put",
+        "parameters": [
+          {
+            "name": "shared_expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shared Expense Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharedExpenseUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedExpenseView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "shared-expenses"
+        ],
+        "summary": "Delete Shared Expense",
+        "operationId": "delete_shared_expense_api_v1_shared_expenses__shared_expense_id__delete",
+        "parameters": [
+          {
+            "name": "shared_expense_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shared Expense Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/merchant-rules": {
       "get": {
         "tags": [
@@ -770,6 +1659,92 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notices": {
+      "get": {
+        "tags": [
+          "notices"
+        ],
+        "summary": "List Notices",
+        "operationId": "list_notices_api_v1_notices_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notices/read": {
+      "post": {
+        "tags": [
+          "notices"
+        ],
+        "summary": "Mark Notices Read",
+        "operationId": "mark_notices_read_api_v1_notices_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticesRead"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCount"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -2016,6 +2991,42 @@
         "title": "AccountView",
         "description": "An account as clients see it. An archived account stays on past transactions."
       },
+      "BalanceView": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "title": "Amountminor"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "formatted": {
+            "type": "string",
+            "title": "Formatted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "amountMinor",
+          "amount",
+          "formatted"
+        ],
+        "title": "BalanceView",
+        "description": "What is owed between the user and a friend in one currency. Positive means the friend\nowes the user; negative means the user owes the friend. `formatted` is the size of the\nbalance without a sign. Settled-up currencies are left out."
+      },
       "CategoryCreate": {
         "properties": {
           "name": {
@@ -2229,7 +3240,10 @@
               "description",
               "payment_method",
               "account",
-              "to_account"
+              "to_account",
+              "friend",
+              "payer",
+              "split"
             ],
             "title": "Field"
           },
@@ -2703,6 +3717,24 @@
             ],
             "title": "Toaccount"
           },
+          "sharedWith": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sharedwith"
+          },
+          "paidBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paidby"
+          },
           "occurredOn": {
             "anyOf": [
               {
@@ -2769,12 +3801,206 @@
           "category",
           "account",
           "toAccount",
+          "sharedWith",
+          "paidBy",
           "occurredOn",
           "occurredOnLabel",
           "description",
           "merchant",
           "paymentMethod"
         ]
+      },
+      "FriendCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "FriendCreate",
+        "description": "A new friend. With an email, an invite goes to whoever owns that email."
+      },
+      "FriendDetail": {
+        "properties": {
+          "friend": {
+            "$ref": "#/components/schemas/FriendView"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "friend",
+          "history"
+        ],
+        "title": "FriendDetail",
+        "description": "A friend with their balances and every shared expense and settlement between you."
+      },
+      "FriendInviteView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "fromName": {
+            "type": "string",
+            "title": "Fromname"
+          },
+          "fromEmail": {
+            "type": "string",
+            "title": "Fromemail"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fromName",
+          "fromEmail",
+          "createdAt"
+        ],
+        "title": "FriendInviteView",
+        "description": "An invite waiting for the signed-in user to accept or decline."
+      },
+      "FriendUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "email"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FriendUpdate",
+        "description": "Partial update. A name left out stays; an email sent as null is cleared."
+      },
+      "FriendView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "isLinked": {
+            "type": "boolean",
+            "title": "Islinked"
+          },
+          "inviteStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "declined"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitestatus"
+          },
+          "isArchived": {
+            "type": "boolean",
+            "title": "Isarchived"
+          },
+          "balances": {
+            "items": {
+              "$ref": "#/components/schemas/BalanceView"
+            },
+            "type": "array",
+            "title": "Balances"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "isLinked",
+          "inviteStatus",
+          "isArchived",
+          "balances",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "FriendView",
+        "description": "A friend as clients see them. `invite_status` is set while an invite is waiting for an\nanswer or was declined; a linked friend has none. `balances` has one entry per currency\nthat is not settled up."
       },
       "HTTPValidationError": {
         "properties": {
@@ -2788,6 +4014,63 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HistoryEntry": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "shared_expense",
+              "settlement"
+            ],
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "effectMinor": {
+            "type": "integer",
+            "title": "Effectminor"
+          },
+          "effectFormatted": {
+            "type": "string",
+            "title": "Effectformatted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "occurredOn",
+          "label",
+          "currency",
+          "effectMinor",
+          "effectFormatted"
+        ],
+        "title": "HistoryEntry",
+        "description": "One line in a friend's history. `effect_minor` is how it moved the balance: positive\nmeans the friend owes the user more, negative means less."
       },
       "InteractionResponse": {
         "properties": {
@@ -2840,6 +4123,36 @@
         ],
         "title": "InteractionResponse",
         "description": "The user's answer to a pending clarification or confirmation."
+      },
+      "InviteAccept": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "InviteAccept",
+        "description": "The 6-digit code from the email, which proves the user owns the invited address."
+      },
+      "InviteCodeSent": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "InviteCodeSent",
+        "description": "The address a one-time code was emailed to, so the screen can say where to look."
       },
       "LoginRequest": {
         "properties": {
@@ -3132,6 +4445,100 @@
         "title": "MoneyAmount",
         "description": "An exact amount. `amount` is a decimal string; never parse it as a float."
       },
+      "NoticeList": {
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "title": "Unreadcount"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NoticeView"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unreadCount",
+          "items"
+        ],
+        "title": "NoticeList",
+        "description": "The latest notices and the number still unread (which may exceed what is listed)."
+      },
+      "NoticeView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "friendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendid"
+          },
+          "isRead": {
+            "type": "boolean",
+            "title": "Isread"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "message",
+          "friendId",
+          "isRead",
+          "createdAt"
+        ],
+        "title": "NoticeView",
+        "description": "One \"Shared with you\" notice, worded for the reader. `friend_id` is the reader's own\nfriend row for the person behind it, so clients can link to that friend; null when the\nreader has no such row yet (a pending invite)."
+      },
+      "NoticesRead": {
+        "properties": {
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NoticesRead",
+        "description": "Which notices to mark read; leave `ids` out to mark every unread one."
+      },
       "Option": {
         "properties": {
           "label": {
@@ -3177,6 +4584,41 @@
           "icon"
         ],
         "title": "Option"
+      },
+      "ParticipantInput": {
+        "properties": {
+          "friendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendid"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ParticipantInput",
+        "description": "One person in a shared expense. A null `friend_id` is the user themselves. The amount is\ngiven only for an exact split."
       },
       "PasswordChange": {
         "properties": {
@@ -3284,6 +4726,38 @@
           "label"
         ],
         "title": "PeriodView"
+      },
+      "PersonView": {
+        "properties": {
+          "friendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "isYou": {
+            "type": "boolean",
+            "title": "Isyou"
+          }
+        },
+        "type": "object",
+        "required": [
+          "friendId",
+          "name",
+          "isYou"
+        ],
+        "title": "PersonView",
+        "description": "Someone in a shared expense, named the way the recorder knows them."
       },
       "ProfileUpdate": {
         "properties": {
@@ -3505,6 +4979,739 @@
         ],
         "title": "SessionView",
         "description": "One signed-in browser or device, as the user sees it in Settings → Security."
+      },
+      "SettlementAccountTag": {
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "accountId"
+        ],
+        "title": "SettlementAccountTag",
+        "description": "Sets or clears the user's own account on a settlement, from the user's own side."
+      },
+      "SettlementCreate": {
+        "properties": {
+          "friendId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Friendid"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "friend_paid_you",
+              "you_paid_friend"
+            ],
+            "title": "Direction"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "occurredOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredon"
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "friendId",
+          "direction",
+          "amount"
+        ],
+        "title": "SettlementCreate",
+        "description": "Money that changed hands between the user and one friend, in either direction."
+      },
+      "SettlementCreated": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "friend": {
+            "$ref": "#/components/schemas/SettlementFriend"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "friend_paid_you",
+              "you_paid_friend"
+            ],
+            "title": "Direction"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "title": "Amountminor"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "amountFormatted": {
+            "type": "string",
+            "title": "Amountformatted"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recordedByYou": {
+            "type": "boolean",
+            "title": "Recordedbyyou"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "exceedsBalance": {
+            "type": "boolean",
+            "title": "Exceedsbalance"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "friend",
+          "direction",
+          "amount",
+          "amountMinor",
+          "currency",
+          "amountFormatted",
+          "occurredOn",
+          "note",
+          "account",
+          "recordedByYou",
+          "createdAt",
+          "exceedsBalance",
+          "warning"
+        ],
+        "title": "SettlementCreated",
+        "description": "The reply to recording a settlement. `exceeds_balance` is true when it was more than\nwas owed in that direction, so the balance now points the other way; `warning` says so."
+      },
+      "SettlementFriend": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SettlementFriend",
+        "description": "The friend a settlement is with, named as the user knows them."
+      },
+      "SettlementView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "friend": {
+            "$ref": "#/components/schemas/SettlementFriend"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "friend_paid_you",
+              "you_paid_friend"
+            ],
+            "title": "Direction"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "title": "Amountminor"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "amountFormatted": {
+            "type": "string",
+            "title": "Amountformatted"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recordedByYou": {
+            "type": "boolean",
+            "title": "Recordedbyyou"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "friend",
+          "direction",
+          "amount",
+          "amountMinor",
+          "currency",
+          "amountFormatted",
+          "occurredOn",
+          "note",
+          "account",
+          "recordedByYou",
+          "createdAt"
+        ],
+        "title": "SettlementView",
+        "description": "A settlement as its recorder sees it."
+      },
+      "ShareView": {
+        "properties": {
+          "friendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "isYou": {
+            "type": "boolean",
+            "title": "Isyou"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "amountMinor": {
+            "type": "integer",
+            "title": "Amountminor"
+          },
+          "amountFormatted": {
+            "type": "string",
+            "title": "Amountformatted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "friendId",
+          "name",
+          "isYou",
+          "amount",
+          "amountMinor",
+          "amountFormatted"
+        ],
+        "title": "ShareView",
+        "description": "One participant's share."
+      },
+      "SharedExpenseCreate": {
+        "properties": {
+          "total": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Total"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "occurredOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredon"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "payerFriendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payerfriendid"
+          },
+          "split": {
+            "type": "string",
+            "enum": [
+              "equal",
+              "exact"
+            ],
+            "title": "Split",
+            "default": "equal"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantInput"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Participants"
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoryid"
+          },
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "total",
+          "participants"
+        ],
+        "title": "SharedExpenseCreate",
+        "description": "A new shared expense. Category and account tag the user's own share."
+      },
+      "SharedExpenseUpdate": {
+        "properties": {
+          "total": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Total"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 3,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "occurredOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurredon"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "payerFriendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payerfriendid"
+          },
+          "split": {
+            "type": "string",
+            "enum": [
+              "equal",
+              "exact"
+            ],
+            "title": "Split",
+            "default": "equal"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/ParticipantInput"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Participants"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "total",
+          "participants"
+        ],
+        "title": "SharedExpenseUpdate",
+        "description": "A full replacement of the bill and split. The user's own category and account are\nchanged on their share transaction, not here."
+      },
+      "SharedExpenseView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Total"
+          },
+          "totalMinor": {
+            "type": "integer",
+            "title": "Totalminor"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "totalFormatted": {
+            "type": "string",
+            "title": "Totalformatted"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "merchant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchant"
+          },
+          "payer": {
+            "$ref": "#/components/schemas/PersonView"
+          },
+          "paidByYou": {
+            "type": "boolean",
+            "title": "Paidbyyou"
+          },
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/ShareView"
+            },
+            "type": "array",
+            "title": "Shares"
+          },
+          "myTransactionId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mytransactionid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "total",
+          "totalMinor",
+          "currency",
+          "totalFormatted",
+          "occurredOn",
+          "description",
+          "merchant",
+          "payer",
+          "paidByYou",
+          "shares",
+          "myTransactionId",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "SharedExpenseView",
+        "description": "A shared expense: the total, the payer and every share."
       },
       "SpendingSummary": {
         "properties": {
@@ -4202,6 +6409,18 @@
             ],
             "title": "Source"
           },
+          "sharedExpenseId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharedexpenseid"
+          },
           "version": {
             "type": "integer",
             "title": "Version"
@@ -4234,6 +6453,7 @@
           "paymentMethod",
           "notes",
           "source",
+          "sharedExpenseId",
           "version",
           "createdAt",
           "updatedAt"
@@ -4265,6 +6485,13 @@
             },
             "type": "array",
             "title": "Totals"
+          },
+          "shared": {
+            "items": {
+              "$ref": "#/components/schemas/SharedExpenseView"
+            },
+            "type": "array",
+            "title": "Shared"
           }
         },
         "type": "object",
@@ -4272,7 +6499,8 @@
           "type",
           "id",
           "transactions",
-          "totals"
+          "totals",
+          "shared"
         ],
         "title": "TransactionsSavedInteraction"
       },
@@ -4330,6 +6558,20 @@
           "replayed"
         ],
         "title": "TurnResult"
+      },
+      "UnreadCount": {
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "title": "Unreadcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unreadCount"
+        ],
+        "title": "UnreadCount",
+        "description": "How many notices are still unread."
       },
       "UserView": {
         "properties": {

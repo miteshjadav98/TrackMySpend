@@ -3,10 +3,17 @@
 import type {
   AccountView,
   CategoryView,
+  FriendDetail,
+  FriendInviteView,
+  FriendView,
   ConversationDetail,
   ConversationPage,
   MerchantRulePage,
+  NoticeList,
+  UnreadCount,
   MeView,
+  SettlementView,
+  SharedExpenseView,
   SpendingSummary,
   TransactionPage,
   TransactionType,
@@ -28,6 +35,14 @@ export const keys = {
   categories: ["categories"] as const,
   accounts: (includeArchived: boolean) => ["accounts", { includeArchived }] as const,
   transactions: (filters: TransactionFilters) => ["transactions", filters] as const,
+  friends: ["friends"] as const,
+  archivedFriends: ["friends", "archived"] as const,
+  // Under the friends key, so changing friends also refreshes every friend's page.
+  friend: (id: string) => ["friends", id] as const,
+  friendSettlements: (id: string) => ["friends", id, "settlements"] as const,
+  friendInvites: ["friend-invites"] as const,
+  notices: ["notices"] as const,
+  sharedExpense: (id: string) => ["shared-expense", id] as const,
   merchantRules: (search: string) => ["merchant-rules", search] as const,
 };
 
@@ -36,6 +51,7 @@ export function invalidateLedger(client: QueryClient): Promise<unknown> {
   return Promise.all([
     client.invalidateQueries({ queryKey: ["summary"] }),
     client.invalidateQueries({ queryKey: ["transactions"] }),
+    client.invalidateQueries({ queryKey: ["shared-expense"] }),
     client.invalidateQueries({ queryKey: keys.categories }),
     // Every save can teach or use a merchant rule.
     client.invalidateQueries({ queryKey: ["merchant-rules"] }),
@@ -160,3 +176,85 @@ export function useMerchantRules(search: string) {
 }
 
 export { useQueryClient };
+
+
+/** The user's friends list. */
+export function useFriends() {
+  return useQuery({
+    queryKey: keys.friends,
+    queryFn: () => unwrap<FriendView[]>(api.GET("/api/v1/friends")),
+  });
+}
+
+/** The settlements with one friend from the user's side, with the account each is tagged with. */
+export function useFriendSettlements(id: string) {
+  return useQuery({
+    queryKey: keys.friendSettlements(id),
+    queryFn: () =>
+      unwrap<SettlementView[]>(api.GET("/api/v1/settlements", { params: { query: { friendId: id } } })),
+  });
+}
+
+/** Friends the user removed, which can be brought back. */
+export function useArchivedFriends() {
+  return useQuery({
+    queryKey: keys.archivedFriends,
+    queryFn: () =>
+      unwrap<FriendView[]>(api.GET("/api/v1/friends", { params: { query: { archived: true } } })),
+  });
+}
+
+/** One friend with their balances and the shared expenses and settlements between you. */
+export function useFriendDetail(id: string) {
+  return useQuery({
+    queryKey: keys.friend(id),
+    queryFn: () =>
+      unwrap<FriendDetail>(
+        api.GET("/api/v1/friends/{friend_id}", { params: { path: { friend_id: id } } }),
+      ),
+  });
+}
+
+/** Friend invites sent to the user, waiting for an answer. */
+export function useFriendInvites() {
+  return useQuery({
+    queryKey: keys.friendInvites,
+    queryFn: () => unwrap<FriendInviteView[]>(api.GET("/api/v1/friend-invites")),
+  });
+}
+
+/** After any friend or invite change: both lists can move (accepting adds a friend). */
+export function invalidateFriends(client: QueryClient): Promise<unknown> {
+  return Promise.all([
+    client.invalidateQueries({ queryKey: keys.friends }),
+    client.invalidateQueries({ queryKey: keys.friendInvites }),
+  ]);
+}
+
+/** One shared expense the user recorded: the total, the payer and every share. */
+export function useSharedExpense(id: string | null) {
+  return useQuery({
+    queryKey: keys.sharedExpense(id ?? ""),
+    enabled: id !== null,
+    queryFn: () =>
+      unwrap<SharedExpenseView>(
+        api.GET("/api/v1/shared-expenses/{shared_expense_id}", {
+          params: { path: { shared_expense_id: id ?? "" } },
+        }),
+      ),
+  });
+}
+
+/** The "Shared with you" notices and how many are unread. The nav badge and the cards share it. */
+export function useNotices() {
+  return useQuery({
+    queryKey: keys.notices,
+    queryFn: () => unwrap<NoticeList>(api.GET("/api/v1/notices", { params: { query: { limit: 20 } } })),
+  });
+}
+
+/** Mark notices read (every unread one when no ids are given), then refresh the count. */
+export async function markNoticesRead(client: QueryClient, ids?: string[]): Promise<void> {
+  await unwrap<UnreadCount>(api.POST("/api/v1/notices/read", { body: { ids: ids ?? null } }));
+  await client.invalidateQueries({ queryKey: keys.notices });
+}

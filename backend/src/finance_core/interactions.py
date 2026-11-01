@@ -16,6 +16,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
+from finance_core.friends.schemas import SharedExpenseView
 from finance_core.reports.schemas import PeriodView, SpendingSummary
 from finance_core.schemas import ApiInput, ApiModel, MoneyAmount
 from finance_core.transactions.schemas import TransactionView
@@ -24,7 +25,7 @@ INTERACTION_VERSION = 1
 
 ClarifiableField = Literal[
     "type", "amount", "currency", "category", "date", "description", "payment_method",
-    "account", "to_account",
+    "account", "to_account", "friend", "payer", "split",
 ]  # fmt: skip
 InputKind = Literal["single_select", "multi_select", "text", "amount", "date"]
 
@@ -53,6 +54,8 @@ class DraftPreview(ApiModel):
     category: str | None = None
     account: str | None = None  # a transfer's ends, by name
     to_account: str | None = None
+    shared_with: list[str] = Field(default_factory=list)  # friends a shared expense is split with
+    paid_by: str | None = None  # the friend who paid a shared expense, when it was not the user
     occurred_on: date | None = None
     occurred_on_label: str | None = None
     description: str | None = None
@@ -95,6 +98,8 @@ class TransactionsSavedInteraction(ApiModel):
     id: str
     transactions: list[TransactionView]
     totals: list[MoneyAmount]  # one per currency
+    # The shared expenses among the saved transactions: the total, the payer and every share.
+    shared: list[SharedExpenseView] = Field(default_factory=list)
 
 
 class SummaryInteraction(ApiModel):

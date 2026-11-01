@@ -12,6 +12,7 @@ from tests.evals.understanding_cases import CASES, check
 
 TODAY = date(2026, 10, 24)
 ACCOUNTS = ["HDFC", "Paytm", "SBI", "ICICI"]
+FRIENDS = ["Jaymin", "Riya"]
 CATEGORIES = [CategoryHint(c.slug, c.name, c.kind) for c in SYSTEM_CATEGORIES]
 
 
@@ -24,6 +25,7 @@ def _request(text: str) -> UnderstandRequest:
         locale="en-IN",
         categories=CATEGORIES,
         accounts=ACCOUNTS,
+        friends=FRIENDS,
     )
 
 
@@ -53,6 +55,7 @@ async def test_gemini_understanding_eval() -> None:
             today=TODAY,
             locale="en-IN",
             account_names=ACCOUNTS,
+            friend_names=FRIENDS,
         )
         problems = check(case, understanding)
         if problems:

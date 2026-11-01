@@ -51,7 +51,7 @@ backend/finance_core
   ├── agents/               chat turn lifecycle, LangGraph runtime, checkpointer, retention
   ├── workflows/            the graph: nodes, state, drafts, questions, reconciliation
   ├── llm/                  provider-neutral client, Gemini, rules engine, resilience
-  ├── transactions/ accounts/ merchants/ reports/ categories/ users/ auth/ conversations/ audit/
+  ├── transactions/ accounts/ merchants/ friends/ reports/ categories/ users/ auth/ conversations/ audit/
   │                         domain services (no HTTP, no LLM, no LangGraph)
   ├── email_sender.py       the EmailSender interface and the console sender
   ├── cache/ database/ observability/
@@ -74,7 +74,7 @@ Five Postgres schemas, each owned by one module:
 | Schema | Tables | Notes |
 | --- | --- | --- |
 | `identity` | `users`, `financial_profiles`, `auth_sessions`, `password_reset_tokens` | Profile holds base currency, timezone and locale. Sessions and reset links store a SHA-256 of the token, never the token itself |
-| `ledger` | `categories`, `transactions`, `accounts`, `merchant_rules` | 23 system categories are seeded with deterministic ids. Users can add their own. See [Merchant rules](#merchant-rules) and [Accounts and transfers](#accounts-and-transfers) |
+| `ledger` | `categories`, `transactions`, `accounts`, `merchant_rules`, `friends`, `friend_invites`, `shared_expenses`, `shared_expense_shares`, `settlements`, `notices` | 23 system categories are seeded with deterministic ids. Users can add their own. See [Merchant rules](#merchant-rules), [Accounts and transfers](#accounts-and-transfers) and [Friends, shared expenses and settlements](#friends-shared-expenses-and-settlements) |
 | `chat` | `conversations`, `messages` | The transcript, including the structured UI each assistant message rendered |
 | `audit` | `audit_events` | Written in the same database transaction as the change it records |
 | `agent` | LangGraph checkpoint tables | Working memory for unfinished turns. Safe to prune |
@@ -112,6 +112,13 @@ Conventions:
 - **Reset tokens:** `identity.password_reset_tokens` holds the SHA-256 of a reset token, its
   expiry (30 minutes), when it was used and the requesting IP. The token itself is never
   stored.
+- **Friends and sharing** (migrations `0008` to `0011`): a `friends` row is one user's own
+  entry for a person (name, optional email, `linked_user_id`, archived flag); two linked users
+  each hold a row for the other. `shared_expenses` holds the whole bill (total, currency,
+  date, payer) and `shared_expense_shares` one row per person. `settlements` records money
+  handed between the recorder and one friend, and `notices` holds the "Shared with you"
+  items. Friend names may repeat, but an active email is unique per user. See
+  [Friends, shared expenses and settlements](#friends-shared-expenses-and-settlements).
 - **Idempotency:** `UNIQUE (user_id, idempotency_key)` with
   `INSERT … ON CONFLICT DO NOTHING`, then the existing row is returned. A retry returns
   200 with the original row instead of creating a duplicate.
@@ -181,8 +188,17 @@ START -> understand --+--> prepare_record <--> clarify (interrupt)
                       |         +--> save --------+--> respond -> END
                       +--> summarize ----------------> respond
                       +--> search -------------------> respond
+                      +--> settle -------------------> respond
+                      +--> balances -----------------> respond
                       +------------------------------> respond
 ```
+
+`settle` records a settlement through `SettlementService`; `balances` answers "who owes whom"
+from `FriendService.list_friends`, whose balances are computed in SQL. The model only reads
+the words: "paid X N" becomes a settlement only when `workflows/settling.py` finds X among
+the user's friends, no purpose ("for his old phone") and a non-zero balance in that currency.
+Otherwise it goes on as an expense with X as merchant. `settle` has no retry policy because a
+settlement has no idempotency key; the chat layer already replays a retried message id.
 
 **State rules** (`workflows/state.py`):
 
@@ -220,6 +236,75 @@ being silently guessed.
 **Retention.** Checkpoints are working memory, not records: the transcript is in
 `chat.messages` and the money is in the ledger. `manage prune-checkpoints` drops threads
 inactive for 30 days, and should be scheduled daily.
+
+## Friends, shared expenses and settlements
+
+[ADR 0001](adr/0001-shares-are-each-users-own-expense.md) is the rule everything here follows:
+a share is an ordinary expense in each user's own records.
+
+**Who can see what.** The shared expense, its shares and settlements are visible only to their
+participants. Each participant who is a user gets an expense transaction for their own share,
+linked to the shared expense by `transactions.shared_expense_id`. Summaries, category totals
+and search add up shares with no change, and a friend's category, account tag and notes stay
+their own. The rule "another user's row is a 404" still holds: a participant reads a shared
+expense through a view that uses their own names for people, never the recorder's friends list.
+
+- **Friends and invites** (`friends/service.py`). A friend is a name and an optional email. If
+  the email belongs to a user, an invite is created. It is matched by email, so one for a
+  person who has not signed up yet needs no hook at sign-up. Statuses are pending, accepted,
+  declined and cancelled; changing a friend's email cancels the old invite and sends a new
+  one. Accepting links both friend rows (`linked_user_id`) and brings over shared expenses
+  already recorded between the two, once. A linked friend's email cannot change (409
+  `friend_linked`). A friend who is in a shared expense is archived on removal, not deleted.
+- **Shared expenses** (`friends/shared_expenses.py`). The recorder gives the total, the payer
+  (the recorder unless a friend paid) and the split. `friends/splits.py` does the arithmetic on
+  integer minor units: equal, with the payer's share taking any leftover unit, or exact amounts
+  that must add up to the total. When a friend paid, only the recorder and that friend take
+  part. Creating, editing or deleting one writes every participant's share transaction in the
+  same database transaction as its audit event. Editing is a full `PUT` of the bill and split.
+  A share transaction's amount, currency, date and type are read-only through the transaction
+  endpoints (409 `shared_expense_locked`). Deleting is a hard delete of the bill, its shares
+  and the share transactions; the audit log keeps the snapshot.
+- **Linked friends** (`friends/share_delivery.py`). A linked friend's share lands in their
+  records at once. Their category is the first that applies: their own merchant rule, their
+  category with the same slug as the recorder's (built-in ones only), then "Other". The
+  recorder's account and notes are never copied, and the share does not teach the friend's
+  merchant rules.
+- **Balances** (`friends/balances.py`). Every share and settlement is one signed line in a
+  single SQL query; a balance is the sum per friend and currency, and a friend's history is the
+  same lines listed by date, so the two cannot disagree. A linked friend's own records add
+  mirror lines, so both sides show the same number. Balances are per currency (no conversion)
+  and zero balances are left out. `GET /friends` carries the balances and `GET /friends/{id}`
+  the history.
+- **Settlements** (`friends/settlements.py`). "Jaymin paid me 500" or "I paid Jaymin 500". A
+  settlement is not a transaction, so it is never spending or income. It may carry the
+  recorder's account. One larger than the balance is saved with `exceedsBalance: true` and a
+  warning sentence, not refused. Archived friends take no new settlements (404).
+- **Notices** (`friends/notices.py`). `NoticeWriter` adds a row in the caller's own database
+  session, next to the audit event, so a notice exists exactly when the change committed. A
+  notice stores facts (kind, actor name, friend, subject, amount); the sentence is worded when
+  it is read, in the reader's locale. They are in-app only: `GET /notices` and
+  `POST /notices/read`.
+
+### Settlements and balances in chat
+
+Shared expenses in chat are described under [Shared expenses in
+chat](#shared-expenses-in-chat). Prompt `understand_v4` adds two intents and a flag:
+
+- **`record_settlement`** (`settle` node, `workflows/settling.py`). The model only reads the
+  words. "X paid me N" is always a settlement. "I paid X N" is one only when X is one of the
+  friends, no purpose is given ("for his old phone"), and the balance with X in that currency
+  is not zero; otherwise it goes on as an expense with X as merchant. The node calls
+  `SettlementService.create`, so a linked friend gets a notice with no extra work. A name that
+  matches no friend, or several, gets a plain reply (add the friend, or say the full name) and
+  nothing is saved.
+- **`balance_question`** (`balances` node). "Does Jaymin owe me?" and "who owes me?" are
+  answered from `FriendService.list_friends`, whose balances come from SQL. The reply is text
+  only, no card.
+- **`shared` on search.** "Show my shared expenses" reuses the transaction list through a
+  `shared_only` filter on `TransactionQuery`.
+- The offline parser reads the same phrasings (`llm/sharing.py` and `llm/settling.py`), so a
+  degraded turn still works.
 
 ## Merchant rules
 
@@ -271,6 +356,22 @@ MoneyMoney remembers the category you use for each merchant (`merchants/`).
 - **Reports.** Summaries, category totals and the monthly tally leave transfers out of
   income and expense; tests pin that.
 
+### Shared expenses in chat
+
+- Each extracted transaction can carry `participants` (the friends, as named, never the
+  user), `payer` (a friend's name, else null for the user), `split` (`equal` or `exact`) and
+  `shares` (what each person had, the user as "me"). The offline parser (`llm/sharing.py`)
+  reads "me and X spent N on Y, split it", "X paid N for Y, split it", "me, X and Z spent N",
+  and "dinner N with X, I had A and he had B".
+- The draft keeps one `DraftPerson` per friend. Names resolve like account names
+  (`friends/names.py`): exact ignoring case, else word containment. Several matches ask which
+  friend (options show emails); no match asks "Add X as a new friend?", and the friend is
+  created at save only if the user agreed. A friend who paid can only share with the user,
+  so more people ask the user to narrow it down. Exact amounts that do not add up ask again.
+- Save goes through `SharedExpenseService.create`, keyed by the chat message in
+  `source_ref`, so a retried message finds the share it already saved. The model never
+  calculates a share: `friends/splits.py` does, and the save card shows its figures.
+
 ### Accounts and transfers in chat
 
 - The understanding schema has `transfer` as a type and two fields on each transaction:
@@ -309,8 +410,9 @@ MoneyMoney remembers the category you use for each merchant (`merchants/`).
   `stream_reply()` returns text. Gemini and the offline rules engine both implement it.
 - **Gemini:** `gemini-3.5-flash-lite` with thinking level `low`, using JSON-schema
   structured output. Prompts are versioned files (`llm/prompts/`), and the version is
-  logged with every call. The understand prompt is `understand_v2` (transfers and
-  accounts); `understand_v1` stays beside it.
+  logged with every call. The understand prompt is `understand_v4` (settlements, balance
+  questions and shared-expense lists, on top of v3's shared expenses and friend names in
+  the context block); `understand_v1` to `understand_v3` stay beside it.
 - **Reconciliation** (`workflows/reconcile.py`): the model's output is merged with the
   deterministic rules parse. This step:
   - fills gaps
@@ -530,6 +632,12 @@ Where the system bends first, and what to do about it:
 | Multi-region | 99.9% single-region is the target | Contractual availability above 99.95%, or users across continents |
 | Account balances | Most transactions carry no account yet, so a balance would be wrong. Opening balances come with it | Imports (Phase 4) and debt tracking (Phase 7) put an account on most transactions |
 | Cross-currency transfers | They need an exchange rate and a rule for which rate. Both accounts and the amount must share one currency | A decision on the multi-currency policy (Phase 5) |
+| Groups | Phase 3 is between the user and individual friends. A group needs its own membership and balances across members | Users asking to split one trip across many people repeatedly |
+| Percentage and share-count splits | Equal and exact amounts cover the common cases | Users asking for "60/40" or "2 shares" splits |
+| Currency conversion for balances | Each balance is per currency, which is exact; conversion needs a rate source and a policy | The multi-currency policy (Phase 5) |
+| Push or email notices | Notices are in-app only, shown when the friend next opens the app | An email provider exists, and users say they miss changes |
+| Undo for a deleted shared expense | Deleting is a hard delete; the audit log keeps the snapshot but nothing restores it | Users deleting by mistake |
+| A friend tagging their own account on a settlement | `friend_account_id` is read but nothing sets it | A request, or when account balances arrive |
 | Email provider | Only the console sender exists: it prints the email in the API log outside production and sends nothing in production | Before real users need "Forgot password?" to work |
 | Two-factor sign-in | Out of scope for Phase 2; sessions and password reset came first | After an email provider exists, or an authenticator-app option is chosen |
 | Hand-made merchant rules | Rules are only learned from saves; there is no "never learn this merchant" switch | Users asking to teach or block a merchant |

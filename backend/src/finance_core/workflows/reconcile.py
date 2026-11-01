@@ -22,8 +22,8 @@ from decimal import Decimal, InvalidOperation
 from finance_core.accounts.names import could_mean_an_account, same_account_name
 from finance_core.categories.defaults import FALLBACK_SLUG, system_category
 from finance_core.dates import day_first_for_locale, resolve_date_expression
-from finance_core.llm.rules import extract_search, extract_transactions
-from finance_core.llm.schemas import ExtractedTransaction, TurnUnderstanding
+from finance_core.llm.rules import extract_search, extract_settlement, extract_transactions
+from finance_core.llm.schemas import ExtractedTransaction, SettlementSpec, TurnUnderstanding
 from finance_core.money import find_amounts, parse_amount
 
 _FILLABLE = ("amount", "type", "currency", "payment_method", "merchant", "account")
@@ -129,12 +129,20 @@ def _as_transfer(
     )
 
 
+_SHARING_FIELDS = ("participants", "payer", "split", "shares")
+
+
 def _fill(tx: ExtractedTransaction, hint: ExtractedTransaction) -> ExtractedTransaction:
     updates = {
         f: getattr(hint, f) for f in _FILLABLE if getattr(tx, f) is None and getattr(hint, f)
     }
     if hint.type == "transfer":
         updates["type"] = "transfer"  # the parser's transfer phrasings are exact: they win
+    if hint.participants and not tx.participants:
+        # The model read an ordinary expense where the user named friends and a split. The
+        # four sharing fields describe one thing, so they are taken together or not at all.
+        updates.update({f: getattr(hint, f) for f in _SHARING_FIELDS})
+        updates["type"] = "expense"
     kind = updates.get("type") or tx.type
     if tx.category is None and hint.category:
         definition = system_category(hint.category)
@@ -171,6 +179,44 @@ def _account_not_merchant(
     return tx
 
 
+def _participant_not_merchant(tx: ExtractedTransaction) -> ExtractedTransaction:
+    """A friend the expense is shared with is never the merchant ("pizza with Jaymin")."""
+    if tx.merchant and tx.merchant.casefold() in {p.casefold() for p in tx.participants}:
+        return tx.model_copy(update={"merchant": None})
+    return tx
+
+
+def _settlement_as_written(
+    spec: SettlementSpec,
+    text: str,
+    today: date,
+    locale: str,
+    account_names: Sequence[str],
+    friend_names: Sequence[str],
+) -> SettlementSpec:
+    """The model's settlement with its amount held to what the user wrote.
+
+    The parser's reading wins when the model's amount is not one of the amounts in the message,
+    and fills a missing direction, friend, account or date.
+    """
+    hint = extract_settlement(text, today, locale, account_names, friend_names)
+    written = {mention.value for mention in find_amounts(text)}
+    updates: dict[str, object] = {}
+    try:
+        grounded = spec.amount is not None and Decimal(spec.amount) in written
+    except InvalidOperation:
+        grounded = False
+    if hint is not None:
+        if not grounded:
+            updates["amount"] = hint.amount
+        for field in ("friend", "direction", "account", "date_text", "date"):
+            if getattr(spec, field) is None and getattr(hint, field) is not None:
+                updates[field] = getattr(hint, field)
+    elif not grounded:
+        updates["amount"] = None
+    return spec.model_copy(update=updates) if updates else spec
+
+
 def reconcile(
     understanding: TurnUnderstanding,
     text: str,
@@ -178,10 +224,11 @@ def reconcile(
     today: date,
     locale: str,
     account_names: Sequence[str] = (),
+    friend_names: Sequence[str] = (),
 ) -> TurnUnderstanding:
     if understanding.intent == "record_transactions" and understanding.transactions:
         transactions = _drop_duplicates(_merge_fragments(list(understanding.transactions)), text)
-        hints = extract_transactions(text, today, locale, account_names)
+        hints = extract_transactions(text, today, locale, account_names, friend_names)
         unused = list(hints)
         filled = []
         for original in transactions:
@@ -196,13 +243,24 @@ def reconcile(
                 tx = _fill(tx, match)
             elif tx.type == "transfer":
                 tx = _as_transfer(tx, None)
-            filled.append(_account_not_merchant(tx, text, account_names))
+            filled.append(_participant_not_merchant(_account_not_merchant(tx, text, account_names)))
         return understanding.model_copy(update={"transactions": filled})
+
+    if understanding.intent == "record_settlement" and understanding.settlement:
+        return understanding.model_copy(
+            update={
+                "settlement": _settlement_as_written(
+                    understanding.settlement, text, today, locale, account_names, friend_names
+                )
+            }
+        )
 
     if understanding.intent in ("search_transactions", "spending_summary"):
         hint = extract_search(text)
         search = understanding.search
         updates: dict[str, object] = {}
+        if hint.shared and (search is None or not search.shared):
+            updates["shared"] = True  # "shared expenses" is unambiguous
         if hint.type == "transfer" and (search is None or search.type != "transfer"):
             # "transfers" is unambiguous; a category or merchant does not apply to one.
             updates.update(type="transfer", category=None)

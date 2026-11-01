@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 import uuid
@@ -131,9 +132,30 @@ class Outbox:
         return [message for message in self.sent if message.to == address]
 
 
+# One outbox for the whole test run, so helpers that only hold an HTTP client can read the
+# one-time codes the app emailed.
+OUTBOX = Outbox()
+
+
 @pytest.fixture(scope="session")
 def outbox() -> Outbox:
-    return Outbox()
+    return OUTBOX
+
+
+async def emailed_invite_code(http: httpx.AsyncClient, invite_id: str) -> str:
+    """Ask for the invite's one-time code and return the code from the email it sends."""
+    asked = await http.post(f"/api/v1/friend-invites/{invite_id}/code")
+    assert asked.status_code == 202, asked.text
+    email = OUTBOX.to(asked.json()["email"])[-1]
+    found = re.search(r"(?<!\d)(\d{6})(?!\d)", email.text)
+    assert found is not None, email.text
+    return found[1]
+
+
+async def accept_invite(http: httpx.AsyncClient, invite_id: str) -> httpx.Response:
+    """Accept an invite the way a person does: get the emailed code, then enter it."""
+    code = await emailed_invite_code(http, invite_id)
+    return await http.post(f"/api/v1/friend-invites/{invite_id}/accept", json={"code": code})
 
 
 # ---------------------------------------------------------------------------------------

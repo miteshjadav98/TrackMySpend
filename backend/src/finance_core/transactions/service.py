@@ -56,6 +56,8 @@ from finance_core.users.context import UserContext
 
 MAX_PAGE_SIZE = 100
 MAX_BATCH = 20
+# What a share transaction cannot change on its own: only the shared expense moves these.
+SHARE_LOCKED_FIELDS = ("type", "amount_minor", "currency", "occurred_on")
 
 
 def to_view(
@@ -91,6 +93,7 @@ def to_view(
         payment_method=row.payment_method,
         notes=row.notes,
         source=row.source,
+        shared_expense_id=row.shared_expense_id,
         version=row.version,
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -124,6 +127,13 @@ def _clean_text(value: str | None) -> str | None:
     return value or None
 
 
+def _share_is_locked() -> ConflictError:
+    return ConflictError(
+        "This is your share of a shared expense. Change or delete the shared expense instead.",
+        code="shared_expense_locked",
+    )
+
+
 def _audit_snapshot(row: Transaction | NewTransaction) -> dict[str, Any]:
     return {
         "type": row.type,
@@ -147,6 +157,8 @@ class TransactionService:
         self._session = session
         self._clock = clock
         self._generation = generation
+        # Users whose summaries changed in a write that is not committed yet.
+        self._unbumped: set[uuid.UUID] = set()
         self._categories = CategoryService(session)
         self._accounts = AccountService(session)
         self._merchant_rules = MerchantRuleService(session, clock=clock)
@@ -313,8 +325,13 @@ class TransactionService:
         actor: Actor = "user",
         request_id: str | None = None,
         strict_idempotency: bool = False,
+        commit: bool = True,
     ) -> list[tuple[TransactionView, bool]]:
         """Insert a batch atomically. Each item may carry an idempotency key.
+
+        With `commit=False` the rows are only flushed, audit events included, so the caller can
+        save them together with other work in one database transaction. The caller then
+        commits and calls `bump_pending_generations`.
 
         A repeated key returns the existing row instead of inserting a duplicate. With
         `strict_idempotency`, reusing a key for *different* data is a 409, which is what
@@ -377,9 +394,13 @@ class TransactionService:
                 )
             results.append((existing.id, False))
 
-        await self._session.commit()
-        if any(created for _, created in results) and self._generation is not None:
-            await self._generation.bump(ctx.user_id)
+        if any(created for _, created in results):
+            self._unbumped.add(ctx.user_id)
+        if commit:
+            await self._session.commit()
+            await self.bump_pending_generations()
+        else:
+            await self._session.flush()
 
         views = await self._views([row_id for row_id, _ in results], ctx.locale)
         return [(views[row_id], created) for row_id, created in results]
@@ -451,6 +472,9 @@ class TransactionService:
                 setattr(row, attr, new)
         if not changes:
             return (await self._views([row.id], ctx.locale))[row.id]
+        if row.shared_expense_id is not None and any(f in changes for f in SHARE_LOCKED_FIELDS):
+            await self._session.rollback()  # discard the attribute changes made above
+            raise _share_is_locked()
         record_audit(
             self._session, user_id=ctx.user_id, actor=actor, action="transaction.updated",
             entity_type="transaction", entity_id=row.id,
@@ -486,6 +510,8 @@ class TransactionService:
     ) -> None:
         """Soft delete: excluded from every list and total, restorable, fully audited."""
         row = await self._live_row(ctx.user_id, transaction_id)
+        if row.shared_expense_id is not None:
+            raise _share_is_locked()
         row.deleted_at = self._clock.now()
         record_audit(
             self._session, user_id=ctx.user_id, actor=actor, action="transaction.deleted",
@@ -522,6 +548,126 @@ class TransactionService:
         if self._generation is not None:
             await self._generation.bump(ctx.user_id)
         return (await self._views([row.id], ctx.locale))[row.id]
+
+    # -- share transactions ---------------------------------------------------------------
+    # The owner's share of a shared expense is a transaction that only the shared expense
+    # service creates, changes and removes. These methods never commit: the caller does, so
+    # the shared expense and its share transactions save or fail together.
+
+    async def add_share_row(
+        self,
+        user_id: uuid.UUID,
+        new: NewTransaction,
+        *,
+        shared_expense_id: uuid.UUID,
+        learn_merchant: bool = True,
+        request_id: str | None = None,
+        source: str = "api",
+        source_ref: str | None = None,
+    ) -> uuid.UUID:
+        """Add a user's share of a shared expense as an ordinary expense.
+
+        The recorder's share teaches the merchant rule like any other save. A friend's
+        share does not (`learn_merchant=False`): they did not pick its category.
+        `source_ref` lets a retried chat message find the share it already saved.
+        """
+        row = Transaction(
+            id=uuid7(),
+            user_id=user_id,
+            type=new.type,
+            amount_minor=new.amount_minor,
+            currency=new.currency,
+            occurred_on=new.occurred_on,
+            category_id=new.category_id,
+            account_id=new.account_id,
+            shared_expense_id=shared_expense_id,
+            description=new.description,
+            merchant=new.merchant,
+            payment_method=new.payment_method,
+            notes=new.notes,
+            source=source,
+            source_ref=source_ref,
+            version=1,
+        )
+        self._session.add(row)
+        record_audit(
+            self._session, user_id=user_id, actor="user", action="transaction.created",
+            entity_type="transaction", entity_id=row.id,
+            data={**_audit_snapshot(new), "source": source, "sharedExpenseId": str(shared_expense_id)},
+            request_id=request_id,
+        )  # fmt: skip
+        if learn_merchant:
+            await self._merchant_rules.learn(
+                user_id, type=new.type, merchant=new.merchant, category_id=new.category_id
+            )
+        return row.id
+
+    async def share_row(self, user_id: uuid.UUID, shared_expense_id: uuid.UUID) -> Transaction:
+        """A user's share transaction of this shared expense."""
+        row = await self._session.scalar(
+            select(Transaction).where(
+                Transaction.user_id == user_id,
+                Transaction.shared_expense_id == shared_expense_id,
+            )
+        )
+        if row is None:
+            raise NotFoundError("Transaction not found")
+        return row
+
+    def change_share_row(
+        self,
+        user_id: uuid.UUID,
+        row: Transaction,
+        *,
+        amount_minor: int,
+        currency: str,
+        occurred_on: date,
+        description: str | None,
+        merchant: str | None,
+        request_id: str | None = None,
+    ) -> None:
+        """Move a share transaction to the shared expense's new amount, date and wording."""
+        before = _audit_snapshot(row)
+        changes: dict[str, list[Any]] = {}
+        for attr, new in (("amount_minor", amount_minor), ("currency", currency),
+                          ("occurred_on", occurred_on), ("description", description),
+                          ("merchant", merchant)):  # fmt: skip
+            old = getattr(row, attr)
+            if old != new:
+                changes[attr] = [
+                    str(old) if old is not None else None,
+                    str(new) if new is not None else None,
+                ]
+                setattr(row, attr, new)
+        if changes:
+            record_audit(
+                self._session, user_id=user_id, actor="user", action="transaction.updated",
+                entity_type="transaction", entity_id=row.id,
+                data={"before": before, "changes": changes}, request_id=request_id,
+            )  # fmt: skip
+
+    async def remove_share_row(
+        self, user_id: uuid.UUID, row: Transaction, *, request_id: str | None = None
+    ) -> None:
+        """Delete a share transaction for good. The shared expense it belonged to is gone,
+        so there is nothing for a restore to bring back."""
+        record_audit(
+            self._session, user_id=user_id, actor="user", action="transaction.deleted",
+            entity_type="transaction", entity_id=row.id, data={"before": _audit_snapshot(row)},
+            request_id=request_id,
+        )  # fmt: skip
+        await self._session.delete(row)
+
+    async def bump_pending_generations(self) -> None:
+        """Tell cached summaries about writes that were committed after `commit=False`."""
+        for user_id in self._unbumped:
+            await self.bump_generation(user_id)
+        self._unbumped.clear()
+
+    async def bump_generation(self, user_id: uuid.UUID) -> None:
+        """Tell cached summaries that this user's transactions changed."""
+        if self._generation is not None:
+            await self._generation.bump(user_id)
 
     # -- reads ----------------------------------------------------------------------------
 
@@ -567,6 +713,8 @@ class TransactionService:
                     Transaction.to_account_id == query.account_id,
                 )
             )
+        if query.shared_only:
+            stmt = stmt.where(Transaction.shared_expense_id.is_not(None))
         if query.date_from:
             stmt = stmt.where(Transaction.occurred_on >= query.date_from)
         if query.date_to:

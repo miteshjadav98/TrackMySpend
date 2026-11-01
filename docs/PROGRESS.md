@@ -59,7 +59,7 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
 
 **Phase 1 is complete.** The user tested the web app in the browser: no issues.
 
-## Phase 2 (built and reviewed, ready for `main`, branch `phase-2/integration`)
+## Phase 2 (done, merged into `main` as 4904002)
 
 Decided on 2026-10-27:
 
@@ -93,12 +93,31 @@ becomes an account or category, the account question offers "Cash", a new accoun
 transfer takes the other end's currency and commits together with the transfer, and a blank
 model reading is filled from the offline parser. `uv run pytest`: 357 passed, 1 skipped.
 
+## Phase 3 (built and reviewed, ready for `main`, branch `phase-3/integration`)
+
+Split expenses with friends. Settled in a grilling session on 2026-11-01; spec
+`.scratch/phase-3/spec.md`, ADR `docs/adr/0001-shares-are-each-users-own-expense.md`, and 8
+tickets in `.scratch/phase-3/issues/` (each `Status:` line says whether it is merged).
+
+Checkpoint 2026-11-01: tickets 01 to 07 merged (friends and invites, shared expenses, balances
+and settlements, the friend's side, "Shared with you" notices, shared expenses in chat with
+`understand_v3`, settlements and balances in chat with `understand_v4`), and ticket 08 (docs)
+written. `uv run pytest`: 588 passed, 1 skipped. Live eval: 100% over five runs of 38 cases
+(v3, p50 about 1.25 s) and 100% over five runs of 50 cases (v4, p50 about 1.37 s; about 0.13 s
+slower than v3 on the same cases). Report: [phase-3-report.md](phase-3-report.md).
+
+Code review 2026-11-01 over the whole branch, all findings fixed in ticket 09 (merge 39d6e7a):
+accepting a friend invite now needs a one-time code sent to the invited email (sign-up never
+proves the email); a friend who still owes money cannot be removed, and removed friends can be
+brought back; a chat message mixing shared and ordinary expenses saves all or nothing; a
+retried settlement request is saved once; a linked friend can tag their own account on a
+settlement; and replies tell two friends with the same name apart by email. `uv run pytest`:
+609 passed, 1 skipped.
+
 ## Next
 
-1. Merge Phase 2 into `main` (waiting for the owner's OK). The code is on GitHub
-   (`miteshjadav98/TrackMySpend`): `main` holds Phase 1, `phase-2/integration` holds Phase 2.
-2. Phase 3: split expenses with friends (Splitwise-style). Start from
-   `.scratch/phase-3/brief.md`: grill the open questions, then write the spec and tickets.
+1. Merge Phase 3 into `main` (waiting for the owner's OK; Phase 2 is already on `main`).
+2. Pick which Phase 3 limitations to fix first (see the report), and choose an email provider.
 
 ## Resume
 

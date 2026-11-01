@@ -1,19 +1,20 @@
 "use client";
 
 import type { ConversationView, MeView } from "@moneymoney/contracts";
-import { List, LogOut, MessageSquare, Plus, Settings, X } from "lucide-react";
+import { List, LogOut, MessageSquare, Plus, Settings, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useToast } from "@/components/ui/toast";
 import { api, unwrap } from "@/lib/api";
 import { formatRelative } from "@/lib/format";
-import { keys, useConversations, useQueryClient } from "@/lib/queries";
+import { keys, useConversations, useNotices, useQueryClient } from "@/lib/queries";
 
 const NAV = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/transactions", label: "Transactions", icon: List },
+  { href: "/friends", label: "Friends", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -24,6 +25,12 @@ export function Sidebar({ me, open, onClose }: { me: MeView; open: boolean; onCl
   const conversations = useConversations();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
+  const unreadNotices = useNotices().data?.unreadCount ?? 0;
+
+  // Every page change is a page showing, so the badge asks the server again each time.
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: keys.notices });
+  }, [pathname, queryClient]);
 
   async function newChat() {
     setCreating(true);
@@ -101,6 +108,14 @@ export function Sidebar({ me, open, onClose }: { me: MeView; open: boolean; onCl
               >
                 <Icon className="size-4" aria-hidden />
                 {label}
+                {href === "/friends" && unreadNotices > 0 ? (
+                  <span
+                    className="ml-auto rounded-full bg-lavender-fill px-2 py-0.5 text-xs font-semibold text-white"
+                    aria-label={`${unreadNotices} unread ${unreadNotices === 1 ? "notice" : "notices"}`}
+                  >
+                    {unreadNotices > 99 ? "99+" : unreadNotices}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

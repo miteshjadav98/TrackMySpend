@@ -17,6 +17,8 @@ Intent = Literal[
     "record_transactions",
     "spending_summary",
     "search_transactions",
+    "record_settlement",
+    "balance_question",
     "help",
     "smalltalk",
     "out_of_scope",
@@ -30,6 +32,13 @@ PaymentMethodLiteral = Literal[
 
 class _Lenient(BaseModel):
     model_config = ConfigDict(extra="ignore")
+
+
+class ExtractedShare(_Lenient):
+    person: str = Field(
+        description="'me' for the user, else the friend's name exactly as the user said it"
+    )
+    amount: str = Field(description="What that person had, as a plain number string")
 
 
 class ExtractedTransaction(_Lenient):
@@ -66,6 +75,56 @@ class ExtractedTransaction(_Lenient):
     to_account: str | None = Field(
         default=None, description="For a transfer only: the account the money went to"
     )
+    participants: list[str] = Field(
+        default_factory=list,
+        description="For a shared expense only: the friends sharing it, as the user named them, "
+        "never the user themselves; empty when the expense is not shared",
+    )
+    payer: str | None = Field(
+        default=None,
+        description="For a shared expense only: the friend's name if a friend paid the bill; "
+        "null when the user paid or did not say",
+    )
+    split: Literal["equal", "exact"] | None = Field(
+        default=None,
+        description="For a shared expense only: 'exact' when the user said what each person "
+        "had, else 'equal'",
+    )
+    shares: list[ExtractedShare] = Field(
+        default_factory=list,
+        description="For an exact split only: what each person had, as the user said it",
+    )
+
+
+class SettlementSpec(_Lenient):
+    """Money that changed hands between the user and one friend to clear what is owed."""
+
+    friend: str | None = Field(default=None, description="The friend's name as the user said it")
+    direction: Literal["friend_paid_me", "i_paid_friend"] | None = Field(
+        default=None, description="Who handed the money to whom"
+    )
+    amount: str | None = Field(
+        default=None, description="Plain number string as stated by the user; null if not stated"
+    )
+    currency: str | None = Field(
+        default=None, description="ISO 4217 code only if the user wrote a currency; else null"
+    )
+    purpose: str | None = Field(
+        default=None,
+        description="What the money was for when the user said ('his old phone'); null when "
+        "it only pays back what is owed",
+    )
+    account: str | None = Field(
+        default=None, description="The user's own account the money went into or left, as named"
+    )
+    date_text: str | None = Field(default=None, description="The user's own words for the date")
+    date: str | None = Field(default=None, description="That date as YYYY-MM-DD; null if none")
+
+
+class BalanceSpec(_Lenient):
+    friend: str | None = Field(
+        default=None, description="The friend asked about; null to ask about every friend"
+    )
 
 
 class PeriodSpec(_Lenient):
@@ -82,6 +141,9 @@ class SearchSpec(_Lenient):
     text: str | None = Field(default=None, description="Merchant or keyword to match, if any")
     sort: Literal["recent", "largest"] = "recent"
     limit: int | None = Field(default=None, description="How many to show, if the user said")
+    shared: bool = Field(
+        default=False, description="True when the user asks only for shared expenses"
+    )
 
 
 class PendingAnswer(_Lenient):
@@ -94,4 +156,6 @@ class TurnUnderstanding(_Lenient):
     transactions: list[ExtractedTransaction] = Field(default_factory=list)
     period: PeriodSpec | None = None
     search: SearchSpec | None = None
+    settlement: SettlementSpec | None = None
+    balance: BalanceSpec | None = None
     pending_answer: PendingAnswer | None = None

@@ -28,12 +28,16 @@ from finance_core.categories.defaults import (
 from finance_core.dates import MONTHS, WEEKDAYS, day_first_for_locale, resolve_date_expression
 from finance_core.llm.base import ReplyRequest, UnderstandRequest, UnderstandResult
 from finance_core.llm.schemas import (
+    ExtractedShare,
     ExtractedTransaction,
     Intent,
     PeriodSpec,
     SearchSpec,
+    SettlementSpec,
     TurnUnderstanding,
 )
+from finance_core.llm.settling import read_balance_question, read_paying_back
+from finance_core.llm.sharing import Sharing, read_sharing
 from finance_core.money import AmountMention, find_amounts
 
 _I = re.IGNORECASE
@@ -289,9 +293,57 @@ def _paid_from_account(segment: str, account_names: Sequence[str]) -> tuple[str,
     return None
 
 
+def _shared_expense(
+    text: str, sharing: Sharing, today: date, locale: str, account_names: Sequence[str]
+) -> ExtractedTransaction:
+    """One expense shared with friends, from a message that is entirely about the sharing."""
+    # The total is the first amount that is not someone's own share ("1000" in "dinner 1000
+    # with Jaymin, I had 400 and he had 600").
+    in_shares = {(m.start, m.end) for m in sharing.share_mentions}
+    totals = [m for m in find_amounts(_strip_dates(text)) if (m.start, m.end) not in in_shares]
+    mention = _choose_amount(totals) if totals else None
+    date_text = find_date_expression(text)
+    resolved = (
+        resolve_date_expression(date_text, today, day_first=day_first_for_locale(locale))
+        if date_text
+        else None
+    )
+    found = infer_category(text, "expense")
+    category, keyword = (found[0].slug, found[1]) if found else (None, None)
+    paid_from = _paid_from_account(text, account_names)
+    merchant = detect_merchant(text)
+    if merchant and merchant.casefold() in {p.casefold() for p in sharing.participants}:
+        merchant = None
+    return ExtractedTransaction(
+        type="expense",
+        amount=_plain(mention.value) if mention else None,
+        currency=mention.currency if mention else None,
+        category=category,
+        date_text=date_text,
+        date=resolved.isoformat() if resolved else None,
+        description=_description(text, keyword, merchant, category),
+        merchant=merchant,
+        payment_method=detect_payment_method(text),
+        account=paid_from[0] if paid_from else None,
+        participants=sharing.participants,
+        payer=sharing.payer,
+        split=sharing.split,
+        shares=[
+            ExtractedShare(person=person, amount=_plain(amount))
+            for person, amount in sharing.shares
+        ],
+    )
+
+
 def extract_transactions(
-    text: str, today: date, locale: str, account_names: Sequence[str] = ()
+    text: str,
+    today: date,
+    locale: str,
+    account_names: Sequence[str] = (),
+    friend_names: Sequence[str] = (),
 ) -> list[ExtractedTransaction]:
+    if sharing := read_sharing(text, friend_names):
+        return [_shared_expense(text, sharing, today, locale, account_names)]
     global_date = find_date_expression(text)
     global_type = detect_type(text)
     global_payment = detect_payment_method(text)
@@ -350,6 +402,41 @@ def extract_transactions(
     return results
 
 
+def extract_settlement(
+    text: str,
+    today: date,
+    locale: str,
+    account_names: Sequence[str] = (),
+    friend_names: Sequence[str] = (),
+) -> SettlementSpec | None:
+    """The settlement in `text` with its account and date, or None if it is not one.
+
+    A message that splits a bill is a shared expense, even when it says "Jaymin paid me".
+    """
+    if read_sharing(text, friend_names):
+        return None
+    found = read_paying_back(text, friend_names)
+    if found is None:
+        return None
+    date_text = find_date_expression(text)
+    resolved = (
+        resolve_date_expression(date_text, today, day_first=day_first_for_locale(locale))
+        if date_text
+        else None
+    )
+    account = _paid_from_account(text, account_names)
+    return SettlementSpec(
+        friend=found.friend,
+        direction=found.direction,
+        amount=_plain(found.amount),
+        currency=found.currency,
+        purpose=found.purpose,
+        account=account[0] if account else None,
+        date_text=date_text,
+        date=resolved.isoformat() if resolved else None,
+    )
+
+
 def extract_period(text: str, today: date) -> PeriodSpec:
     t = text.lower()
     if re.search(r"\byesterday\b", t):
@@ -399,6 +486,7 @@ def extract_search(text: str) -> SearchSpec:
         category=infer_category_slug(text, kind),
         text=merchant,
         sort="largest" if _LARGEST.search(t) else "recent",
+        shared=bool(re.search(r"\bshared\b", t)),
         limit=int(top.group(1))
         if top
         else (1 if _LARGEST.search(t) and "expenses" not in t else None),
@@ -427,11 +515,25 @@ class RulesLLMClient:
 
     async def understand(self, request: UnderstandRequest) -> UnderstandResult:
         started = time.perf_counter()
-        intent = classify(request.text)
+        settlement = extract_settlement(
+            request.text, request.today, request.locale, request.accounts, request.friends
+        )
+        balance = read_balance_question(request.text, request.friends)
+        intent = (
+            "balance_question"
+            if balance
+            else "record_settlement"
+            if settlement
+            else classify(request.text)
+        )
         understanding = TurnUnderstanding(intent=intent)
-        if intent == "record_transactions":
+        if intent == "balance_question":
+            understanding.balance = balance
+        elif intent == "record_settlement":
+            understanding.settlement = settlement
+        elif intent == "record_transactions":
             understanding.transactions = extract_transactions(
-                request.text, request.today, request.locale, request.accounts
+                request.text, request.today, request.locale, request.accounts, request.friends
             )
         elif intent in ("spending_summary", "search_transactions"):
             understanding.period = extract_period(request.text, request.today)

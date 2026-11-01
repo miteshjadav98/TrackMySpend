@@ -12,7 +12,7 @@ One movement of money in the user's records: an expense, an income or a transfer
 _Avoid_: entry, record, txn
 
 **Expense**:
-A transaction where money leaves the user's hands for something outside, such as buying lunch or paying a friend.
+A transaction where money leaves the user's hands for something outside, such as buying lunch or paying a friend for something. Paying a friend back is a settlement.
 _Avoid_: spend, debit, payment
 
 **Income**:
@@ -84,6 +84,44 @@ _Avoid_: rules engine, fallback model
 **Degraded turn**:
 A turn the offline parser answered because the language model was unavailable.
 _Avoid_: fallback turn
+
+### Sharing with friends
+
+**Friend**:
+Someone in a user's friends list: a name, and optionally an email. A friend may or may not have a MoneyMoney login; one who does, and accepts the invite, is a linked friend.
+_Avoid_: contact, buddy, member (there are no groups)
+
+**Shared expense**:
+An expense split between the user and one or more friends, such as a pizza bill split with Jaymin. It has one payer, one currency and one share per person.
+_Avoid_: split bill, group expense, shared transaction
+
+**Payer**:
+The person who paid a shared expense in full: the user, unless the message names a friend.
+_Avoid_: owner, creditor
+
+**Share**:
+The part of a shared expense one person is responsible for. The user's share is what counts in their summaries and category totals, not what they paid.
+_Avoid_: portion, cut, split (that is how the shares are worked out)
+
+**Split**:
+How a shared expense is divided into shares: equally, or by exact amounts. The payer's share takes any leftover paisa so the shares add up exactly.
+_Avoid_: division, distribution
+
+**Balance**:
+What one person owes another across their shared expenses and settlements, per currency, such as "Jaymin owes you ₹500". Accounts still have no balances.
+_Avoid_: debt, due, outstanding
+
+**Settlement**:
+A record that one person paid another to reduce their balance, such as "Jaymin paid me 500". It is never spending or income.
+_Avoid_: repayment, settle-up, transfer (that moves money between the user's own accounts)
+
+**Invite**:
+An offer to link two users as friends, sent when a friend's email belongs to a MoneyMoney user. It is pending until the other user accepts or declines it, and the sender can cancel it by changing the friend's email.
+_Avoid_: request, friend request
+
+**Notice**:
+An in-app message that a linked friend changed something in a record you share, shown on the "Shared with you" card. It is never sent as a push or an email.
+_Avoid_: notification, alert
 
 ### People and access
 

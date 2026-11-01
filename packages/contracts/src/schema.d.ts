@@ -271,6 +271,207 @@ export interface paths {
         patch: operations["update_account_api_v1_accounts__account_id__patch"];
         trace?: never;
     };
+    "/api/v1/friends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Friends */
+        get: operations["list_friends_api_v1_friends_get"];
+        put?: never;
+        /** Add Friend */
+        post: operations["add_friend_api_v1_friends_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friends/{friend_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Friend */
+        get: operations["get_friend_api_v1_friends__friend_id__get"];
+        put?: never;
+        post?: never;
+        /** Remove Friend */
+        delete: operations["remove_friend_api_v1_friends__friend_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Friend */
+        patch: operations["update_friend_api_v1_friends__friend_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/friends/{friend_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Friend */
+        post: operations["unarchive_friend_api_v1_friends__friend_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Incoming Invites */
+        get: operations["list_incoming_invites_api_v1_friend_invites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-invites/{invite_id}/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Invite Code
+         * @description Email a one-time code to the invited address; accepting needs it.
+         */
+        post: operations["send_invite_code_api_v1_friend_invites__invite_id__code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-invites/{invite_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Invite */
+        post: operations["accept_invite_api_v1_friend_invites__invite_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-invites/{invite_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline Invite */
+        post: operations["decline_invite_api_v1_friend_invites__invite_id__decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Settlements */
+        get: operations["list_settlements_api_v1_settlements_get"];
+        put?: never;
+        /** Create Settlement */
+        post: operations["create_settlement_api_v1_settlements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settlements/{settlement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Settlement */
+        delete: operations["delete_settlement_api_v1_settlements__settlement_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Tag Settlement Account
+         * @description A linked friend's own account on a settlement the other person recorded.
+         */
+        patch: operations["tag_settlement_account_api_v1_settlements__settlement_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/shared-expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Shared Expenses */
+        get: operations["list_shared_expenses_api_v1_shared_expenses_get"];
+        put?: never;
+        /** Create Shared Expense */
+        post: operations["create_shared_expense_api_v1_shared_expenses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shared-expenses/{shared_expense_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Shared Expense */
+        get: operations["get_shared_expense_api_v1_shared_expenses__shared_expense_id__get"];
+        /** Update Shared Expense */
+        put: operations["update_shared_expense_api_v1_shared_expenses__shared_expense_id__put"];
+        post?: never;
+        /** Delete Shared Expense */
+        delete: operations["delete_shared_expense_api_v1_shared_expenses__shared_expense_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/merchant-rules": {
         parameters: {
             query?: never;
@@ -304,6 +505,40 @@ export interface paths {
         head?: never;
         /** Change Merchant Rule */
         patch: operations["change_merchant_rule_api_v1_merchant_rules__rule_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notices */
+        get: operations["list_notices_api_v1_notices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notices/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Notices Read */
+        post: operations["mark_notices_read_api_v1_notices_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/transactions": {
@@ -542,6 +777,22 @@ export interface components {
              */
             updatedAt: string;
         };
+        /**
+         * BalanceView
+         * @description What is owed between the user and a friend in one currency. Positive means the friend
+         *     owes the user; negative means the user owes the friend. `formatted` is the size of the
+         *     balance without a sign. Settled-up currencies are left out.
+         */
+        BalanceView: {
+            /** Currency */
+            currency: string;
+            /** Amountminor */
+            amountMinor: number;
+            /** Amount */
+            amount: number | string;
+            /** Formatted */
+            formatted: string;
+        };
         /** CategoryCreate */
         CategoryCreate: {
             /** Name */
@@ -628,7 +879,7 @@ export interface components {
              * Field
              * @enum {string}
              */
-            field: "type" | "amount" | "currency" | "category" | "date" | "description" | "payment_method" | "account" | "to_account";
+            field: "type" | "amount" | "currency" | "category" | "date" | "description" | "payment_method" | "account" | "to_account" | "friend" | "payer" | "split";
             /**
              * Inputkind
              * @enum {string}
@@ -789,6 +1040,10 @@ export interface components {
             account: string | null;
             /** Toaccount */
             toAccount: string | null;
+            /** Sharedwith */
+            sharedWith: string[];
+            /** Paidby */
+            paidBy: string | null;
             /** Occurredon */
             occurredOn: string | null;
             /** Occurredonlabel */
@@ -800,10 +1055,124 @@ export interface components {
             /** Paymentmethod */
             paymentMethod: string | null;
         };
+        /**
+         * FriendCreate
+         * @description A new friend. With an email, an invite goes to whoever owns that email.
+         */
+        FriendCreate: {
+            /** Name */
+            name: string;
+            /** Email */
+            email?: string | null;
+        };
+        /**
+         * FriendDetail
+         * @description A friend with their balances and every shared expense and settlement between you.
+         */
+        FriendDetail: {
+            friend: components["schemas"]["FriendView"];
+            /** History */
+            history: components["schemas"]["HistoryEntry"][];
+        };
+        /**
+         * FriendInviteView
+         * @description An invite waiting for the signed-in user to accept or decline.
+         */
+        FriendInviteView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Fromname */
+            fromName: string;
+            /** Fromemail */
+            fromEmail: string;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
+         * FriendUpdate
+         * @description Partial update. A name left out stays; an email sent as null is cleared.
+         */
+        FriendUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Email */
+            email?: string | null;
+        };
+        /**
+         * FriendView
+         * @description A friend as clients see them. `invite_status` is set while an invite is waiting for an
+         *     answer or was declined; a linked friend has none. `balances` has one entry per currency
+         *     that is not settled up.
+         */
+        FriendView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string | null;
+            /** Islinked */
+            isLinked: boolean;
+            /** Invitestatus */
+            inviteStatus: ("pending" | "declined") | null;
+            /** Isarchived */
+            isArchived: boolean;
+            /** Balances */
+            balances: components["schemas"]["BalanceView"][];
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * HistoryEntry
+         * @description One line in a friend's history. `effect_minor` is how it moved the balance: positive
+         *     means the friend owes the user more, negative means less.
+         */
+        HistoryEntry: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "shared_expense" | "settlement";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Occurredon
+             * Format: date
+             */
+            occurredOn: string;
+            /** Label */
+            label: string | null;
+            /** Currency */
+            currency: string;
+            /** Effectminor */
+            effectMinor: number;
+            /** Effectformatted */
+            effectFormatted: string;
         };
         /**
          * InteractionResponse
@@ -824,6 +1193,22 @@ export interface components {
             action: "submit" | "skip" | "cancel";
             /** Value */
             value?: string | string[] | null;
+        };
+        /**
+         * InviteAccept
+         * @description The 6-digit code from the email, which proves the user owns the invited address.
+         */
+        InviteAccept: {
+            /** Code */
+            code: string;
+        };
+        /**
+         * InviteCodeSent
+         * @description The address a one-time code was emailed to, so the screen can say where to look.
+         */
+        InviteCodeSent: {
+            /** Email */
+            email: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -939,6 +1324,50 @@ export interface components {
             /** Formatted */
             formatted: string;
         };
+        /**
+         * NoticeList
+         * @description The latest notices and the number still unread (which may exceed what is listed).
+         */
+        NoticeList: {
+            /** Unreadcount */
+            unreadCount: number;
+            /** Items */
+            items: components["schemas"]["NoticeView"][];
+        };
+        /**
+         * NoticeView
+         * @description One "Shared with you" notice, worded for the reader. `friend_id` is the reader's own
+         *     friend row for the person behind it, so clients can link to that friend; null when the
+         *     reader has no such row yet (a pending invite).
+         */
+        NoticeView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Message */
+            message: string;
+            /** Friendid */
+            friendId: string | null;
+            /** Isread */
+            isRead: boolean;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
+         * NoticesRead
+         * @description Which notices to mark read; leave `ids` out to mark every unread one.
+         */
+        NoticesRead: {
+            /** Ids */
+            ids?: string[] | null;
+        };
         /** Option */
         Option: {
             /** Label */
@@ -949,6 +1378,17 @@ export interface components {
             description: string | null;
             /** Icon */
             icon: string | null;
+        };
+        /**
+         * ParticipantInput
+         * @description One person in a shared expense. A null `friend_id` is the user themselves. The amount is
+         *     given only for an exact split.
+         */
+        ParticipantInput: {
+            /** Friendid */
+            friendId?: string | null;
+            /** Amount */
+            amount?: number | string | null;
         };
         /**
          * PasswordChange
@@ -1016,6 +1456,18 @@ export interface components {
             end: string;
             /** Label */
             label: string;
+        };
+        /**
+         * PersonView
+         * @description Someone in a shared expense, named the way the recorder knows them.
+         */
+        PersonView: {
+            /** Friendid */
+            friendId: string | null;
+            /** Name */
+            name: string;
+            /** Isyou */
+            isYou: boolean;
         };
         /** ProfileUpdate */
         ProfileUpdate: {
@@ -1118,6 +1570,258 @@ export interface components {
              * @description True for the session making this request.
              */
             isCurrent: boolean;
+        };
+        /**
+         * SettlementAccountTag
+         * @description Sets or clears the user's own account on a settlement, from the user's own side.
+         */
+        SettlementAccountTag: {
+            /** Accountid */
+            accountId: string | null;
+        };
+        /**
+         * SettlementCreate
+         * @description Money that changed hands between the user and one friend, in either direction.
+         */
+        SettlementCreate: {
+            /**
+             * Friendid
+             * Format: uuid
+             */
+            friendId: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "friend_paid_you" | "you_paid_friend";
+            /** Amount */
+            amount: number | string;
+            /** Currency */
+            currency?: string | null;
+            /** Occurredon */
+            occurredOn?: string | null;
+            /** Accountid */
+            accountId?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /**
+         * SettlementCreated
+         * @description The reply to recording a settlement. `exceeds_balance` is true when it was more than
+         *     was owed in that direction, so the balance now points the other way; `warning` says so.
+         */
+        SettlementCreated: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            friend: components["schemas"]["SettlementFriend"];
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "friend_paid_you" | "you_paid_friend";
+            /** Amount */
+            amount: number | string;
+            /** Amountminor */
+            amountMinor: number;
+            /** Currency */
+            currency: string;
+            /** Amountformatted */
+            amountFormatted: string;
+            /**
+             * Occurredon
+             * Format: date
+             */
+            occurredOn: string;
+            /** Note */
+            note: string | null;
+            account: components["schemas"]["AccountRef"] | null;
+            /** Recordedbyyou */
+            recordedByYou: boolean;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /** Exceedsbalance */
+            exceedsBalance: boolean;
+            /** Warning */
+            warning: string | null;
+        };
+        /**
+         * SettlementFriend
+         * @description The friend a settlement is with, named as the user knows them.
+         */
+        SettlementFriend: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * SettlementView
+         * @description A settlement as its recorder sees it.
+         */
+        SettlementView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            friend: components["schemas"]["SettlementFriend"];
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "friend_paid_you" | "you_paid_friend";
+            /** Amount */
+            amount: number | string;
+            /** Amountminor */
+            amountMinor: number;
+            /** Currency */
+            currency: string;
+            /** Amountformatted */
+            amountFormatted: string;
+            /**
+             * Occurredon
+             * Format: date
+             */
+            occurredOn: string;
+            /** Note */
+            note: string | null;
+            account: components["schemas"]["AccountRef"] | null;
+            /** Recordedbyyou */
+            recordedByYou: boolean;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
+         * ShareView
+         * @description One participant's share.
+         */
+        ShareView: {
+            /** Friendid */
+            friendId: string | null;
+            /** Name */
+            name: string;
+            /** Isyou */
+            isYou: boolean;
+            /** Amount */
+            amount: number | string;
+            /** Amountminor */
+            amountMinor: number;
+            /** Amountformatted */
+            amountFormatted: string;
+        };
+        /**
+         * SharedExpenseCreate
+         * @description A new shared expense. Category and account tag the user's own share.
+         */
+        SharedExpenseCreate: {
+            /** Total */
+            total: number | string;
+            /** Currency */
+            currency?: string | null;
+            /** Occurredon */
+            occurredOn?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Merchant */
+            merchant?: string | null;
+            /** Payerfriendid */
+            payerFriendId?: string | null;
+            /**
+             * Split
+             * @default equal
+             * @enum {string}
+             */
+            split: "equal" | "exact";
+            /** Participants */
+            participants: components["schemas"]["ParticipantInput"][];
+            /** Categoryid */
+            categoryId?: string | null;
+            /** Accountid */
+            accountId?: string | null;
+        };
+        /**
+         * SharedExpenseUpdate
+         * @description A full replacement of the bill and split. The user's own category and account are
+         *     changed on their share transaction, not here.
+         */
+        SharedExpenseUpdate: {
+            /** Total */
+            total: number | string;
+            /** Currency */
+            currency?: string | null;
+            /** Occurredon */
+            occurredOn?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Merchant */
+            merchant?: string | null;
+            /** Payerfriendid */
+            payerFriendId?: string | null;
+            /**
+             * Split
+             * @default equal
+             * @enum {string}
+             */
+            split: "equal" | "exact";
+            /** Participants */
+            participants: components["schemas"]["ParticipantInput"][];
+        };
+        /**
+         * SharedExpenseView
+         * @description A shared expense: the total, the payer and every share.
+         */
+        SharedExpenseView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Total */
+            total: number | string;
+            /** Totalminor */
+            totalMinor: number;
+            /** Currency */
+            currency: string;
+            /** Totalformatted */
+            totalFormatted: string;
+            /**
+             * Occurredon
+             * Format: date
+             */
+            occurredOn: string;
+            /** Description */
+            description: string | null;
+            /** Merchant */
+            merchant: string | null;
+            payer: components["schemas"]["PersonView"];
+            /** Paidbyyou */
+            paidByYou: boolean;
+            /** Shares */
+            shares: components["schemas"]["ShareView"][];
+            /** Mytransactionid */
+            myTransactionId: string | null;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
         };
         /**
          * SpendingSummary
@@ -1321,6 +2025,8 @@ export interface components {
              * @enum {string}
              */
             source: "chat" | "manual" | "import" | "api";
+            /** Sharedexpenseid */
+            sharedExpenseId: string | null;
             /** Version */
             version: number;
             /**
@@ -1347,6 +2053,8 @@ export interface components {
             transactions: components["schemas"]["TransactionView"][];
             /** Totals */
             totals: components["schemas"]["MoneyAmount"][];
+            /** Shared */
+            shared: components["schemas"]["SharedExpenseView"][];
         };
         /** TurnResult */
         TurnResult: {
@@ -1359,6 +2067,14 @@ export interface components {
              * @default false
              */
             replayed: boolean;
+        };
+        /**
+         * UnreadCount
+         * @description How many notices are still unread.
+         */
+        UnreadCount: {
+            /** Unreadcount */
+            unreadCount: number;
         };
         /** UserView */
         UserView: {
@@ -1933,6 +2649,613 @@ export interface operations {
             };
         };
     };
+    list_friends_api_v1_friends_get: {
+        parameters: {
+            query?: {
+                archived?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_friend_api_v1_friends_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FriendCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_friend_api_v1_friends__friend_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                friend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_friend_api_v1_friends__friend_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                friend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_friend_api_v1_friends__friend_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                friend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FriendUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_friend_api_v1_friends__friend_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                friend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_incoming_invites_api_v1_friend_invites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendInviteView"][];
+                };
+            };
+        };
+    };
+    send_invite_code_api_v1_friend_invites__invite_id__code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteCodeSent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_invite_api_v1_friend_invites__invite_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteAccept"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_invite_api_v1_friend_invites__invite_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_settlements_api_v1_settlements_get: {
+        parameters: {
+            query?: {
+                friendId?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_settlement_api_v1_settlements_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Client-generated key; repeating it returns the original settlement. */
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettlementCreate"];
+            };
+        };
+        responses: {
+            /** @description Idempotent replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementCreated"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_settlement_api_v1_settlements__settlement_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                settlement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tag_settlement_account_api_v1_settlements__settlement_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                settlement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettlementAccountTag"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_shared_expenses_api_v1_shared_expenses_get: {
+        parameters: {
+            query?: {
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedExpenseView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_shared_expense_api_v1_shared_expenses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedExpenseCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedExpenseView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_shared_expense_api_v1_shared_expenses__shared_expense_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shared_expense_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedExpenseView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_shared_expense_api_v1_shared_expenses__shared_expense_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shared_expense_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SharedExpenseUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedExpenseView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_shared_expense_api_v1_shared_expenses__shared_expense_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shared_expense_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_merchant_rules_api_v1_merchant_rules_get: {
         parameters: {
             query?: {
@@ -2019,6 +3342,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MerchantRuleView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notices_api_v1_notices_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_notices_read_api_v1_notices_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticesRead"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCount"];
                 };
             };
             /** @description Validation Error */

@@ -19,9 +19,12 @@ from finance_core.accounts.names import resolve_account_name
 from finance_core.accounts.schemas import AccountView
 from finance_core.categories.service import CategoryService
 from finance_core.dates import day_first_for_locale, parse_iso_date, resolve_date_expression
+from finance_core.friends.names import resolve_friend_name
+from finance_core.friends.schemas import FriendView
 from finance_core.llm.rules import classify
+from finance_core.llm.sharing import amounts_by_person
 from finance_core.money import find_amounts, normalize_currency, parse_amount_with_currency
-from finance_core.workflows.drafts import TransactionDraft
+from finance_core.workflows.drafts import TransactionDraft, merge_repeated_people
 
 AnswerKind = Literal["applied", "invalid", "cancel_all", "not_an_answer"]
 
@@ -42,6 +45,7 @@ NON_ANSWERS = frozenset({
     "idk", "dk", "dunno", "skip", "not sure", "unsure", "dont know", "no idea", "none",
     "nothing", "whatever", "no clue",
 })  # fmt: skip
+_EQUALLY = re.compile(r"\b(equal|equally|evenly|even|50[/-]50)\b", _I)
 _ACCOUNT_NAME_LIKE = re.compile(r"^[A-Za-z][\w &'.\-]{0,59}$")
 
 
@@ -105,9 +109,11 @@ class AnswerApplier:
         today: date,
         locale: str,
         accounts: Sequence[AccountView] = (),
+        friends: Sequence[FriendView] = (),
     ) -> None:
         self._categories = categories
         self._accounts = accounts  # the user's active accounts, for account answers
+        self._friends = friends  # the user's active friends, for friend answers
         self._user_id = user_id
         self._today = today
         self._locale = locale
@@ -221,6 +227,12 @@ class AnswerApplier:
             return _invalid("I couldn't match that to a category.")
         if field in ("account", "to_account"):
             return self._apply_account(field, text, draft, allow_custom=allow_custom)
+        if field == "friend":
+            return self._apply_friend(text, draft)
+        if field == "payer":
+            return self._apply_payer(text, draft)
+        if field == "split":
+            return self._apply_split(text, draft)
         if field == "date":
             occurred = parse_iso_date(text) or resolve_date_expression(
                 text, self._today, day_first=day_first_for_locale(self._locale)
@@ -252,3 +264,57 @@ class AnswerApplier:
                 f"{prefix}_id": None, f"{prefix}_name": text[:60], f"{prefix}_new": True,
             })  # fmt: skip
         return _invalid("I couldn't match that to one of your accounts.")
+
+    def _apply_friend(self, text: str, draft: TransactionDraft) -> AnswerOutcome:
+        """Settle the first unresolved name: add them as a new friend, or pick an existing one
+        (a tapped friend's id, or their name typed out)."""
+        index = next((i for i, p in enumerate(draft.people) if not p.is_resolved()), None)
+        if index is None:
+            return _invalid("Everyone in that expense is already settled.")
+        person = draft.people[index]
+        if text.casefold() == "add" or _YES.match(text):
+            settled = person.model_copy(
+                update={"is_new": True, "ambiguous": False, "name": _tidy_new_name(person.said)}
+            )
+        else:
+            friend = next((f for f in self._friends if str(f.id) == text), None)
+            friend = friend or resolve_friend_name(text, self._friends)
+            if friend is None:
+                return _invalid("Tap one of your friends, or say yes to add them as a new friend.")
+            settled = person.model_copy(
+                update={"friend_id": str(friend.id), "name": friend.name, "ambiguous": False}
+            )
+        people = [*draft.people[:index], settled, *draft.people[index + 1 :]]
+        return _applied(draft, people=merge_repeated_people(people))
+
+    @staticmethod
+    def _apply_payer(text: str, draft: TransactionDraft) -> AnswerOutcome:
+        """When a friend paid but more than one friend shares: the user paid after all, or the
+        expense is narrowed to the user and the friend who paid."""
+        if text == "i_paid":
+            return _applied(
+                draft, people=[p.model_copy(update={"paid": False}) for p in draft.people]
+            )
+        if text == "only_payer":
+            return _applied(draft, people=[p for p in draft.people if p.paid])
+        return _invalid("Please pick one of the options.")
+
+    @staticmethod
+    def _apply_split(text: str, draft: TransactionDraft) -> AnswerOutcome:
+        """Back to an equal split, or new exact amounts for the user and every friend."""
+        if _EQUALLY.search(text):
+            people = [p.model_copy(update={"amount": None}) for p in draft.people]
+            return _applied(draft, split="equal", my_amount=None, people=people)
+        said = amounts_by_person(text, [p.said for p in draft.people])
+        wanted = ["me", *(p.said.casefold() for p in draft.people)]
+        if any(key not in said for key in wanted):
+            return _invalid("Tell me what each of you had, like “I had 400, Jaymin 600”.")
+        people = [
+            p.model_copy(update={"amount": _plain(said[p.said.casefold()])}) for p in draft.people
+        ]
+        return _applied(draft, split="exact", my_amount=_plain(said["me"]), people=people)
+
+
+def _tidy_new_name(said: str) -> str:
+    # A name typed in lower case is saved capitalised; "McKay" keeps its capitals.
+    return said.title() if said.islower() else said
