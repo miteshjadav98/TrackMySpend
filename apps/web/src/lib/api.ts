@@ -58,5 +58,19 @@ export function isUnauthenticated(error: unknown): boolean {
 
 /** A fresh idempotency key per logical action (reused when that action is retried). */
 export function newKey(): string {
-  return crypto.randomUUID();
+  // Browsers only offer randomUUID on https or localhost, so a phone opening the app over
+  // plain http on the local network needs the fallback below.
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return uuidFromRandomBytes();
+}
+
+/** A version 4 UUID built from getRandomValues, which every browser offers. */
+function uuidFromRandomBytes(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80; // RFC 4122 variant
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
