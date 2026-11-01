@@ -59,7 +59,7 @@ Living checklist for the Phase 1 build. Update it at each checkpoint commit.
 
 **Phase 1 is complete.** The user tested the web app in the browser: no issues.
 
-## Phase 2 (built and reviewed, ready for `main`, branch `phase-2/integration`)
+## Phase 2 (done, merged into `main` as 4904002)
 
 Decided on 2026-10-27:
 
@@ -93,12 +93,26 @@ becomes an account or category, the account question offers "Cash", a new accoun
 transfer takes the other end's currency and commits together with the transfer, and a blank
 model reading is filled from the offline parser. `uv run pytest`: 357 passed, 1 skipped.
 
+## Phase 3 (in progress, branch `phase-3/integration`)
+
+Split expenses with friends. Settled in a grilling session on 2026-11-01; spec
+`.scratch/phase-3/spec.md`, ADR `docs/adr/0001-shares-are-each-users-own-expense.md`, and 8
+tickets in `.scratch/phase-3/issues/` (each `Status:` line says whether it is merged).
+
+Checkpoint 2026-11-01: tickets 01 (friends and invites), 02 (shared expenses on the
+transactions page), 03 (balances and settlements) and 06 (shared expenses in chat, prompt
+`understand_v3`, live eval 100% over five runs of 38 cases, p50 about 1.25 s) are merged.
+`uv run pytest`: 495 passed, 1 skipped. In progress on their own branches: 04 (the friend's
+side, `phase-3/t04-friends-side`) and 07 (settlements and balances in chat,
+`phase-3/t07-settle-in-chat`). Left: 05 (notices, after 04), 08 (docs), then a code review of
+the whole branch and one fix-up ticket.
+
 ## Next
 
-1. Merge Phase 2 into `main` (waiting for the owner's OK). The code is on GitHub
-   (`miteshjadav98/TrackMySpend`): `main` holds Phase 1, `phase-2/integration` holds Phase 2.
-2. Phase 3: split expenses with friends (Splitwise-style). Start from
-   `.scratch/phase-3/brief.md`: grill the open questions, then write the spec and tickets.
+1. Finish 04 and 07 (worktrees under `.claude/worktrees/p3-t04-friends-side` and
+   `p3-t07-chat`), merge them, then 05, then 08.
+2. Code review of `phase-3/integration`, fix the findings, then merge into `main` with the
+   owner's OK.
 
 ## Resume
 
