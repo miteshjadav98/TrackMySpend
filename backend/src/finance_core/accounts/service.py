@@ -75,8 +75,15 @@ class AccountService:
         return [to_view(row) for row in (await self._session.scalars(query)).all()]
 
     async def create(
-        self, ctx: UserContext, data: AccountCreate, *, request_id: str | None = None
+        self,
+        ctx: UserContext,
+        data: AccountCreate,
+        *,
+        request_id: str | None = None,
+        commit: bool = True,
     ) -> AccountView:
+        """Add an account. With `commit=False` it is only flushed (with its audit event), so a
+        caller can save it and something that depends on it in one transaction."""
         await self._ensure_name_is_free(ctx.user_id, data.name)
         await self._ensure_room_for_another_active_account(ctx.user_id)
         account = Account(
@@ -92,7 +99,10 @@ class AccountService:
             ctx, "account.created", account, request_id=request_id,
             data={"name": account.name, "kind": account.kind, "currency": account.currency},
         )  # fmt: skip
-        await self._commit()
+        if commit:
+            await self._commit()
+        else:
+            await self._flush()
         await self._session.refresh(account)  # the database set created_at and updated_at
         return to_view(account)
 
@@ -234,6 +244,15 @@ class AccountService:
             self._session, user_id=ctx.user_id, actor="user", action=action,
             entity_type="account", entity_id=account.id, data=data, request_id=request_id,
         )  # fmt: skip
+
+    async def _flush(self) -> None:
+        try:
+            await self._session.flush()
+        except IntegrityError as error:
+            await self._session.rollback()
+            if _violated_constraint(error) == ACTIVE_NAME_INDEX:
+                raise _name_taken() from None
+            raise
 
     async def _commit(self) -> None:
         # The unique index on active names is the final word: two requests racing past

@@ -223,21 +223,33 @@ def _account_question(
     )
     # The other end is never offered: a transfer needs two different accounts.
     other = None if source else draft.account_id
+    options = [
+        Option(label=a.name, value=str(a.id), icon=_ACCOUNT_ICONS.get(a.kind))
+        for a in accounts
+        if str(a.id) != other
+    ][:_MAX_ACCOUNT_OPTIONS]
+    other_end_name = (draft.to_account_name if source else draft.account_name) or ""
+    if (
+        not any(a.kind == "cash" for a in accounts)
+        and other_end_name.casefold() != _CASH_NAME.casefold()
+    ):
+        # Most people hold cash but never set up an account for it. The option's value is the
+        # name, so picking it is the same as typing "Cash": the account is created at save.
+        # It is appended after the cap, so a long account list never pushes it out.
+        options.append(Option(label=_CASH_NAME, value=_CASH_NAME, icon=_ACCOUNT_ICONS["cash"]))
     return ClarificationInteraction(
         message=prefix + question,
         field=issue.field,
         input_kind="single_select",
-        options=[
-            Option(label=a.name, value=str(a.id), icon=_ACCOUNT_ICONS.get(a.kind))
-            for a in accounts
-            if str(a.id) != other
-        ][:8],
+        options=options,
         allow_custom_input=True,
         placeholder="Or type a new account name",
         **common,
     )
 
 
+_MAX_ACCOUNT_OPTIONS = 8
+_CASH_NAME = "Cash"
 _ACCOUNT_ICONS = {
     "bank": "landmark", "credit_card": "credit-card", "wallet": "wallet", "cash": "banknote",
     "other": "circle-ellipsis",

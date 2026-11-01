@@ -37,6 +37,11 @@ _CANCEL_ALL = re.compile(
 _EXPENSE = re.compile(r"\b(expense|spent|spend|paid|out|outgoing|debit|debited)\b", _I)
 _INCOME = re.compile(r"\b(income|received|earned|in|incoming|credit|credited)\b", _I)
 _NAME_LIKE = re.compile(r"^[A-Za-z][A-Za-z &'\-]{0,39}$")
+# Replies that say "I can't answer" and must never become an account or category name.
+NON_ANSWERS = frozenset({
+    "idk", "dk", "dunno", "skip", "not sure", "unsure", "dont know", "no idea", "none",
+    "nothing", "whatever", "no clue",
+})  # fmt: skip
 _ACCOUNT_NAME_LIKE = re.compile(r"^[A-Za-z][\w &'.\-]{0,59}$")
 
 
@@ -66,6 +71,12 @@ def _invalid(notice: str) -> AnswerOutcome:
 
 def _plain(value: Any) -> str:
     return format(value.normalize(), "f")
+
+
+def is_a_non_answer(text: str) -> bool:
+    """True for "idk", "don't know", "?" and the like, however they are cased or punctuated."""
+    plain = " ".join(re.sub(r"[^\w\s]", "", text.replace("'", "")).casefold().split())
+    return plain in NON_ANSWERS or not plain
 
 
 def _looks_like_category_name(text: str) -> bool:
@@ -153,6 +164,9 @@ class AnswerApplier:
         allow_custom = (field == "category" and _looks_like_category_name(text)) or (
             field in ("account", "to_account") and _looks_like_a_name(text, _ACCOUNT_NAME_LIKE)
         )
+        if field in ("category", "account", "to_account") and is_a_non_answer(text):
+            # Not a new request either: ask the same question again.
+            return await self.apply_value(field, text, draft, allow_custom=True)
         outcome = await self.apply_value(field, text, draft, allow_custom=allow_custom)
         # Free text that does not parse as an answer is more likely a new request.
         return outcome if outcome.kind == "applied" else AnswerOutcome("not_an_answer")
@@ -200,6 +214,8 @@ class AnswerApplier:
                     category_text=None,
                     category_skipped=False,
                 )
+            if allow_custom and is_a_non_answer(text):
+                return _invalid("Tell me a category name, or tap Skip.")
             if allow_custom and _NAME_LIKE.match(text):
                 return _applied(draft, category_text=text.title()[:64], category_skipped=False)
             return _invalid("I couldn't match that to a category.")
@@ -228,6 +244,8 @@ class AnswerApplier:
                 f"{prefix}_id": str(account.id), f"{prefix}_name": account.name,
                 f"{prefix}_new": False,
             })  # fmt: skip
+        if allow_custom and is_a_non_answer(text):
+            return _invalid("Tell me which account, or type a new account name.")
         if allow_custom and _ACCOUNT_NAME_LIKE.match(text):
             # Created at save, so a question abandoned halfway leaves no stray account.
             return _applied(draft, **{

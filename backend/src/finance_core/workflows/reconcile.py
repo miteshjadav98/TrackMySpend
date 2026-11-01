@@ -26,7 +26,7 @@ from finance_core.llm.rules import extract_search, extract_transactions
 from finance_core.llm.schemas import ExtractedTransaction, TurnUnderstanding
 from finance_core.money import find_amounts, parse_amount
 
-_FILLABLE = ("type", "currency", "payment_method", "merchant", "account")
+_FILLABLE = ("amount", "type", "currency", "payment_method", "merchant", "account")
 
 
 def _value(tx: ExtractedTransaction) -> Decimal | None:
@@ -187,6 +187,9 @@ def reconcile(
         for original in transactions:
             value = _value(original)
             match = next((h for h in unused if value is not None and _value(h) == value), None)
+            if match is None and value is None and len(transactions) == len(hints) == 1:
+                # Nothing to match by: the model read no amount, and the parser read the only one.
+                match = unused[0]
             tx = _normalise(original, today=today, locale=locale)
             if match is not None:
                 unused.remove(match)

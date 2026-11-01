@@ -141,10 +141,11 @@ async def _file_under_category(
     )
     rule = await merchant_rules.category_for(user_id, type=draft.type, merchant=draft.merchant)
     choice = choose_category(
-        draft.source_text,
+        draft.item_text or draft.source_text,
         picked=_picked(draft),
         suggested=_option(suggested),
         merchant_rule=_option(rule),
+        merchant=draft.merchant,
     )
     if choice is None:
         return draft
@@ -182,13 +183,45 @@ def _with_accounts_resolved(
     return draft.model_copy(update=updates) if updates else draft
 
 
+class _CannotSave(Exception):
+    """A transfer that cannot be saved, with the reply outcome that explains why."""
+
+    def __init__(self, outcome: str) -> None:
+        super().__init__(outcome)
+        self.outcome = outcome
+
+
+def _currency_for_new_ends(draft: TransactionDraft, active: dict[str, AccountView]) -> str | None:
+    """The currency a transfer's new account takes, checking the existing ends agree with it.
+
+    A new end follows the existing one, so "moved $100 from Wise to Revolut" opens Revolut in
+    USD. None means the user's base currency. Raises before anything is created, so a transfer
+    that cannot be saved leaves no account behind.
+    """
+    existing = [
+        active[account_id]
+        for account_id in (draft.account_id, draft.to_account_id)
+        if account_id and account_id in active
+    ]
+    wanted = draft.currency.upper() if draft.currency else None
+    if wanted is None and existing:
+        wanted = existing[0].currency
+    if any(account.currency != wanted for account in existing):
+        raise _CannotSave("transfer_currency_mismatch")
+    return wanted
+
+
 async def _account_for_save(
     accounts: AccountService,
     ctx: TurnContext,
     account_id: str | None,
     new_name: str | None,
+    currency: str | None,
 ) -> uuid.UUID | None:
-    """The account a transfer end points at, creating the one the user typed if it is new."""
+    """The account a transfer end points at, creating the one the user typed if it is new.
+
+    The new account is only flushed, so it commits (or rolls back) together with the transfer.
+    """
     if account_id:
         return uuid.UUID(account_id)
     if not new_name:
@@ -196,14 +229,18 @@ async def _account_for_save(
     try:
         created = await accounts.create(
             ctx.user,
-            AccountCreate(name=new_name, kind=infer_account_kind(new_name)),
+            AccountCreate(name=new_name, kind=infer_account_kind(new_name), currency=currency),
             request_id=ctx.request_id,
+            commit=False,
         )
         return created.id
     except ConflictError:
         # Created meanwhile, or the same name was typed twice: use the one that exists.
         existing = resolve_account_name(new_name, await accounts.list_accounts(ctx.user))
         return existing.id if existing else None
+    except ValidationFailedError:
+        # The currency is already known to be supported, so what is left is the account limit.
+        raise _CannotSave("account_limit") from None
 
 
 def _unmatched_accounts(drafts: list[TransactionDraft]) -> list[str]:
@@ -552,22 +589,29 @@ class FinanceNodes:
                 categories = CategoryService(session)
                 accounts = AccountService(session)
                 items = []
+                active = {str(a.id): a for a in await accounts.list_accounts(ctx.user)}
                 for draft in drafts:
                     assert draft.type is not None and draft.amount is not None and draft.date
                     if draft.type == "transfer":
-                        data = TransactionCreate(
-                            type="transfer",
-                            amount=Decimal(draft.amount),
-                            currency=draft.currency,
-                            occurred_on=date.fromisoformat(draft.date),
-                            description=draft.description,
-                            account_id=await _account_for_save(
-                                accounts, ctx, draft.account_id, draft.account_name
-                            ),
-                            to_account_id=await _account_for_save(
-                                accounts, ctx, draft.to_account_id, draft.to_account_name
-                            ),
-                        )
+                        try:
+                            new_end_currency = _currency_for_new_ends(draft, active)
+                            data = TransactionCreate(
+                                type="transfer",
+                                amount=Decimal(draft.amount),
+                                currency=draft.currency,
+                                occurred_on=date.fromisoformat(draft.date),
+                                description=draft.description,
+                                account_id=await _account_for_save(
+                                    accounts, ctx, draft.account_id, draft.account_name,
+                                    new_end_currency,
+                                ),
+                                to_account_id=await _account_for_save(
+                                    accounts, ctx, draft.to_account_id, draft.to_account_name,
+                                    new_end_currency,
+                                ),
+                            )  # fmt: skip
+                        except _CannotSave as stop:
+                            return {"outcome": stop.outcome, "drafts": []}
                     else:
                         data = await self._expense_or_income(ctx, categories, draft)
                     try:

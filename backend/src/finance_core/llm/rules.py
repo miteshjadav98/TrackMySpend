@@ -238,6 +238,18 @@ def _segments(text: str) -> list[str]:
     return segments
 
 
+def item_segment(text: str, amount: Decimal) -> str:
+    """The part of a multi-item message that holds this amount: "swiggy 300" out of
+    "swiggy 300 and dinner food 400". The whole text when it is one item or nothing fits."""
+    segments = _segments(text)
+    if len(segments) < 2:
+        return text
+    for segment in segments:
+        if any(m.value == amount for m in find_amounts(_strip_dates(segment))):
+            return segment
+    return text
+
+
 def _strip_dates(text: str) -> str:
     return _DATE_EXPRESSIONS.sub(" ", text)
 

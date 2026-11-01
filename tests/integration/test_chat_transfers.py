@@ -27,6 +27,14 @@ async def _open(client: httpx.AsyncClient, name: str, kind: str = "bank") -> dic
     return response.json()  # type: ignore[no-any-return]
 
 
+async def _open_in(client: httpx.AsyncClient, name: str, currency: str) -> dict[str, Any]:
+    response = await client.post(
+        ACCOUNTS, json={"name": name, "kind": "bank", "currency": currency}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()  # type: ignore[no-any-return]
+
+
 async def _accounts(client: httpx.AsyncClient) -> dict[str, dict[str, Any]]:
     return {a["name"]: a for a in (await client.get(ACCOUNTS)).json()}
 
@@ -78,7 +86,7 @@ async def test_a_missing_account_is_asked_with_the_users_accounts_as_options(
 
     first = (await say(client, chat, "moved 5000 to Paytm"))["pendingInteraction"]
     assert first["field"] == "account" and first["allowCustomInput"] is True
-    assert {o["value"] for o in first["options"]} == {hdfc["id"], paytm["id"]}
+    assert {o["value"] for o in first["options"]} == {hdfc["id"], paytm["id"], "Cash"}
 
     [tx] = _saved(await say(client, chat, answer=_answer(first, hdfc["id"])))
     assert (tx["account"]["name"], tx["toAccount"]["name"]) == ("HDFC", "Paytm")
@@ -210,3 +218,57 @@ async def test_a_transfer_in_chat_teaches_no_merchant_rule(
     await say(client, chat, "moved 5000 from HDFC to Paytm")
 
     assert (await client.get(RULES)).json()["items"] == []
+
+
+async def test_a_new_account_in_a_transfer_takes_the_other_ends_currency(
+    client: httpx.AsyncClient, chat: str
+) -> None:
+    await _open_in(client, "Wise", "USD")
+    question = (await say(client, chat, "moved $100 from Wise to Revolut"))["pendingInteraction"]
+    assert question["field"] == "to_account"
+
+    [tx] = _saved(await say(client, chat, "Revolut"))
+
+    assert (await _accounts(client))["Revolut"]["currency"] == "USD"
+    assert (tx["currency"], tx["amountMinor"]) == ("USD", 10000)
+
+
+async def test_a_currency_mismatch_in_a_transfer_gets_its_own_reply_and_leaves_no_account(
+    client: httpx.AsyncClient, chat: str
+) -> None:
+    await _open_in(client, "Wise", "USD")
+    await say(client, chat, "moved ₹100 from Wise to Revolut")
+
+    result = await say(client, chat, "Revolut")
+
+    assert "different currencies" in result["assistantMessage"]["content"]
+    assert "Revolut" not in await _accounts(client)
+    assert await _transactions(client) == []
+
+
+async def test_the_account_limit_in_chat_gets_a_clear_reply_and_saves_nothing(
+    client: httpx.AsyncClient, chat: str
+) -> None:
+    await _open(client, "Alpha")
+    for number in range(49):
+        await _open(client, f"Filler {number:02d}")
+    question = (await say(client, chat, "moved 300 from Alpha to Brand New"))["pendingInteraction"]
+    assert question["field"] == "to_account"
+
+    result = await say(client, chat, "Brand New")
+
+    assert "limit of active accounts" in result["assistantMessage"]["content"]
+    assert "Brand New" not in await _accounts(client)
+
+
+async def test_the_cash_option_creates_a_cash_account_when_picked(
+    client: httpx.AsyncClient, chat: str
+) -> None:
+    await _open(client, "SBI")
+    question = (await say(client, chat, "moved 2000 from SBI"))["pendingInteraction"]
+    cash_option = next(o for o in question["options"] if o["label"] == "Cash")
+
+    [tx] = _saved(await say(client, chat, answer=_answer(question, cash_option["value"])))
+
+    created = (await _accounts(client))["Cash"]
+    assert created["kind"] == "cash" and tx["toAccount"]["id"] == created["id"]

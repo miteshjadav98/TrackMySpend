@@ -260,5 +260,13 @@ STATIC_REPLIES: dict[str, str] = {
         "I'm having trouble understanding messages right now. You can still add "
         "transactions from the Transactions page."
     ),
+    "transfer_currency_mismatch": (
+        "Transfers between accounts in different currencies aren't supported. "
+        "Both accounts, and the amount, need to be in the same currency."
+    ),
+    "account_limit": (
+        "You've reached the limit of active accounts, so I couldn't add a new one. "
+        "Archive an account you no longer use, then try again."
+    ),
     "save_failed": "I couldn't save that because something changed. Please try again.",
 }

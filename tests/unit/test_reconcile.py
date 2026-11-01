@@ -170,3 +170,14 @@ def test_a_search_for_transfers_wins_over_the_models_type() -> None:
         locale="en-IN",
     )
     assert result.search is not None and result.search.type == "transfer"
+
+
+def test_an_empty_model_transaction_is_filled_from_the_parser() -> None:
+    result = reconcile(
+        record(ExtractedTransaction()),
+        "spent 250 on lunch",
+        today=TODAY,
+        locale="en-IN",
+    )
+    [tx] = result.transactions
+    assert (tx.amount, tx.type) == ("250", "expense")
