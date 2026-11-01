@@ -27,4 +27,4 @@ Spec: `../spec.md` → User Stories 1-11, Implementation Decisions → Model (fr
 
 Implemented on `phase-3/t01-friends`. Decisions: an invite is matched to the invited user by email only, so one waiting for a sign-up needs no hook at sign-up. Invites have statuses pending, accepted, declined and cancelled; changing a friend's email cancels the old invite and sends a new one. A linked friend's email cannot change (409 `friend_linked`). Accepting also cancels the accepter's own pending invite to the inviter. The ticket 02 seam is `FriendService._has_shared_history` (always False now): when True, `remove` archives instead of deleting. Friends live in the `ledger` schema (migration 0008).
 
-Merged into phase-3/integration. After merge: 372 passed, 1 skipped; API and web checks, web build, contracts and alembic check all clean.
+Merged into phase-3/integration as 21f3bd5. After merge: 372 passed, 1 skipped; API and web checks, web build, contracts and alembic check all clean.
