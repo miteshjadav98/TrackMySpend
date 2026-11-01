@@ -30,6 +30,18 @@ together, and [docs/phase-1-report.md](docs/phase-1-report.md) and
   category, I use it; otherwise I use what you used last time for that merchant; otherwise I
   guess, or ask."
 
+### Split with friends
+
+- Keep a **Friends** list (a name and an optional email). A friend who uses MoneyMoney gets an
+  invite and, once they accept, is linked.
+- Split a bill in chat ("me and Jaymin spent 1000 on pizza, split it", "Jaymin paid 1200 for
+  movie tickets, split it") or with Add transaction on the transactions page. Your share is
+  what counts in your spending, not the whole bill.
+- See who owes whom ("does Jaymin owe me?") and record a settlement ("Jaymin paid me 500").
+  A settlement is never income or spending.
+- A linked friend gets their share in their own records straight away and sees a "Shared with
+  you" card the next time they open the app. They see only that shared expense.
+
 ### Manage your records
 
 - Transactions page: search, filter, edit (safe against two tabs editing at once), delete
@@ -66,7 +78,7 @@ together, and [docs/phase-1-report.md](docs/phase-1-report.md) and
 | --- | --- | --- |
 | 1 | Chat entry with clarifications, transaction history, exact summaries, auth and isolation, Gemini + offline parser, tests, containers, CI | Done |
 | 2 | Merchant rules, accounts, transfers, account security, dark mode | Built; code review next |
-| 3 | Split expenses with friends, Splitwise-style: "me and Jaymin spent 1000 on pizza, split it"; who owes whom, settling up, and the friend sees it in their own chat or home page | Planned (next) |
+| 3 | Split expenses with friends, Splitwise-style: "me and Jaymin spent 1000 on pizza, split it"; who owes whom, settling up, and the friend sees it in their own records | Built; code review next |
 | 4 | Imports: CSV and Excel first, then receipts and PDF bank statements | Planned |
 | 5 | Charts and insights; a policy for totals across currencies | Planned |
 | 6 | MCP server over the same domain services (OAuth 2.1, confirmation before writes) | Planned |
@@ -83,8 +95,17 @@ Phase 2 in detail:
   two-factor sign-in, data export and account deletion.
 
 The Phase 2 plan, its spec and tickets live in [`.scratch/phase-2/`](.scratch/phase-2/).
-The Phase 3 brief (what was asked for and the questions to settle) is
-[`.scratch/phase-3/brief.md`](.scratch/phase-3/brief.md).
+
+Phase 3 in detail:
+
+- Built: a friends list with invites, shared expenses (equal or exact split, the user or a
+  friend as payer), balances per currency, settlements, "Shared with you" notices for linked
+  friends, and all of it in chat (prompt `understand_v4`).
+- Next: a code review of the whole branch, then merging it into `main`.
+- Deliberately later: groups, percentage splits, currency conversion, push or email notices.
+  See the [Phase 3 report](docs/phase-3-report.md) for the known limitations.
+
+The Phase 3 plan, its spec and tickets live in [`.scratch/phase-3/`](.scratch/phase-3/).
 
 ---
 
@@ -138,10 +159,10 @@ rules engine instead of failing, and the message metadata records `degraded: tru
 
 | Path | What lives there |
 | --- | --- |
-| `backend/src/finance_core/` | Domain services (auth, users, accounts, categories, merchants, transactions, reports, conversations, audit), database, Redis helpers, LLM layer, LangGraph workflow, agent runtime |
+| `backend/src/finance_core/` | Domain services (auth, users, accounts, categories, merchants, friends, transactions, reports, conversations, audit), database, Redis helpers, LLM layer, LangGraph workflow, agent runtime |
 | `backend/migrations/` | Alembic migrations (the only place schema changes happen) |
 | `apps/api/src/finance_api/` | FastAPI app: routes, dependencies, security, error envelope, middleware |
-| `apps/web/` | Next.js app: chat, transactions, settings |
+| `apps/web/` | Next.js app: chat, transactions, friends, settings |
 | `packages/contracts/` | `openapi.json` exported from the API and the TypeScript types generated from it |
 | `tests/` | `unit/`, `integration/` (real Postgres + Redis), `evals/` (LLM understanding cases) |
 | `infrastructure/local/` | Docker Compose init scripts |
@@ -229,6 +250,49 @@ All are under `/api/v1` and described in the OpenAPI document. Everything except
 | `POST /auth/password-reset` | Ask for a reset link (always 202) |
 | `POST /auth/password-reset/confirm` | Choose a new password with the link's token (204; 422 `reset_link_invalid`) |
 
+## API endpoints added in Phase 3
+
+All are under `/api/v1`, need a signed-in user, and another user's id is a 404.
+
+| Endpoint | Does |
+| --- | --- |
+| `GET /friends` | List friends with their balances per currency (zero balances left out) |
+| `POST /friends` | Add a friend (name, optional email); an email that belongs to a user sends an invite |
+| `GET /friends/{id}` | One friend with balances and every shared expense and settlement between you |
+| `PATCH /friends/{id}` | Rename or change the email (409 `friend_linked` for a linked friend's email) |
+| `DELETE /friends/{id}` | Remove a friend; one with shared history is archived instead |
+| `GET /friend-invites` | Invites waiting for your answer |
+| `POST /friend-invites/{id}/accept` | Accept: you and the sender are now linked friends |
+| `POST /friend-invites/{id}/decline` | Decline (204) |
+| `GET /shared-expenses` | List shared expenses you can see (as recorder or participant) |
+| `POST /shared-expenses` | Record one: total, currency, date, payer, split `equal` or `exact` and the friends |
+| `GET /shared-expenses/{id}` | The total, payer and every share |
+| `PUT /shared-expenses/{id}` | Replace the bill and split (recorder only) |
+| `DELETE /shared-expenses/{id}` | Delete it for everyone; it cannot be restored |
+| `GET /settlements` | List settlements (`friendId` filter) |
+| `POST /settlements` | Record a settlement; larger than the balance saves with `exceedsBalance: true` and a warning |
+| `DELETE /settlements/{id}` | Delete a settlement |
+| `GET /notices` | The "Shared with you" notices |
+| `POST /notices/read` | Mark notices as read |
+| `GET /transactions` | The list now carries `sharedExpenseId` on a share. A share's amount, date and type change only through the shared expense (409 `shared_expense_locked`) |
+
+### Trying sharing locally with two users
+
+1. Start the app (see [Quick start](#quick-start)) and register two users, for example
+   `riya@example.com` and `jaymin@example.com`, in two different browsers (or one normal and
+   one private window), because a session is per browser.
+2. As Riya, open **Friends** and add "Jaymin" with the email `jaymin@example.com`.
+3. As Jaymin, open **Friends**, find Riya's invite and press Accept. They are now linked.
+4. As Riya, in chat: "me and Jaymin spent 1000 on pizza, split it". Save it. Riya's
+   transactions show a share of 500, and Friends shows "Jaymin owes you 500".
+5. As Jaymin, open the app: the "Shared with you" card shows the pizza, and his transactions
+   hold his own 500 share.
+6. As Riya: "Jaymin paid me 500". The balance goes to zero and Jaymin gets a notice. Neither
+   side's income changes.
+
+To try it with one user, add a friend with no email: it works the same, without the invite and
+without the friend's side.
+
 ## Database migrations
 
 - Apply: `npm run db:migrate`. In deployed environments this runs as a separate job
@@ -261,14 +325,14 @@ docker compose up -d
 npm run test:api
 ```
 
-332 tests pass today (plus one skipped: the opt-in live eval).
+588 tests pass today (plus one skipped: the opt-in live eval).
 
 - **Unit:** money, dates and periods, reconciliation, workflow logic, category precedence,
   merchant keys, device labels, transfer and "paid from" phrasing, the console email sender,
   error mapping. These need no services.
 - **Integration:** run against a separate `moneymoney_test` database and Redis db 1. They
   cover auth, sessions and password changes, user isolation, idempotency, optimistic locking,
-  cache invalidation, merchant rules, accounts, transfers, password reset, a Redis outage, clarify/resume, a restart
+  cache invalidation, merchant rules, accounts, transfers, password reset, friends and invites, shared expenses, balances and settlements, notices, a Redis outage, clarify/resume, a restart
   mid-question, double-texting, a Gemini outage, crash recovery and SSE. Locally they skip if
   the services are down; in CI they fail. Point `TEST_DATABASE_URL` / `TEST_REDIS_URL`
   elsewhere to run two suites side by side.

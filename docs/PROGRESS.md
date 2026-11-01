@@ -93,26 +93,24 @@ becomes an account or category, the account question offers "Cash", a new accoun
 transfer takes the other end's currency and commits together with the transfer, and a blank
 model reading is filled from the offline parser. `uv run pytest`: 357 passed, 1 skipped.
 
-## Phase 3 (in progress, branch `phase-3/integration`)
+## Phase 3 (built, branch `phase-3/integration`)
 
 Split expenses with friends. Settled in a grilling session on 2026-11-01; spec
 `.scratch/phase-3/spec.md`, ADR `docs/adr/0001-shares-are-each-users-own-expense.md`, and 8
 tickets in `.scratch/phase-3/issues/` (each `Status:` line says whether it is merged).
 
-Checkpoint 2026-11-01: tickets 01 (friends and invites), 02 (shared expenses on the
-transactions page), 03 (balances and settlements) and 06 (shared expenses in chat, prompt
-`understand_v3`, live eval 100% over five runs of 38 cases, p50 about 1.25 s) are merged.
-`uv run pytest`: 495 passed, 1 skipped. In progress on their own branches: 04 (the friend's
-side, `phase-3/t04-friends-side`) and 07 (settlements and balances in chat,
-`phase-3/t07-settle-in-chat`). Left: 05 (notices, after 04), 08 (docs), then a code review of
-the whole branch and one fix-up ticket.
+Checkpoint 2026-11-01: tickets 01 to 07 merged (friends and invites, shared expenses, balances
+and settlements, the friend's side, "Shared with you" notices, shared expenses in chat with
+`understand_v3`, settlements and balances in chat with `understand_v4`), and ticket 08 (docs)
+written. `uv run pytest`: 588 passed, 1 skipped. Live eval: 100% over five runs of 38 cases
+(v3, p50 about 1.25 s) and 100% over five runs of 50 cases (v4, p50 about 1.37 s; about 0.13 s
+slower than v3 on the same cases). Report: [phase-3-report.md](phase-3-report.md).
 
 ## Next
 
-1. Finish 04 and 07 (worktrees under `.claude/worktrees/p3-t04-friends-side` and
-   `p3-t07-chat`), merge them, then 05, then 08.
-2. Code review of `phase-3/integration`, fix the findings, then merge into `main` with the
-   owner's OK.
+1. Code review of `phase-3/integration`, fix the findings in one ticket, then merge into
+   `main` with the owner's OK (Phase 2 is also waiting to merge).
+2. Pick which Phase 3 limitations to fix first (see the report), and choose an email provider.
 
 ## Resume
 

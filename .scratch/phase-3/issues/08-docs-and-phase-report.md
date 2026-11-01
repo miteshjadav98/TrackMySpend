@@ -9,10 +9,12 @@ Spec: `../spec.md` (all sections).
 
 **Status:** ready-for-agent
 
-- [ ] README: new endpoints and how to try sharing locally with two users.
-- [ ] `docs/architecture.md`: the data model (friends, invites, shared expenses, shares, settlements, notices), the cross-user visibility rule (ADR 0001), the chat additions, and the "deliberately not doing yet" table (groups, percentage splits, currency conversion, push/email notices).
-- [ ] `GLOSSARY.md` matches the names used in the final code and UI.
-- [ ] `docs/phase-3-report.md`: what was built against the spec, tests run, live eval numbers, known limitations, next steps.
-- [ ] `docs/PROGRESS.md` updated.
+- [x] README: new endpoints and how to try sharing locally with two users.
+- [x] `docs/architecture.md`: the data model (friends, invites, shared expenses, shares, settlements, notices), the cross-user visibility rule (ADR 0001), the chat additions, and the "deliberately not doing yet" table (groups, percentage splits, currency conversion, push/email notices).
+- [x] `GLOSSARY.md` matches the names used in the final code and UI.
+- [x] `docs/phase-3-report.md`: what was built against the spec, tests run, live eval numbers, known limitations, next steps.
+- [x] `docs/PROGRESS.md` updated.
 
 ## Comments
+
+- README has the Phase 3 endpoints table, a "Split with friends" feature section and a two-user walk-through; `docs/architecture.md` gains a "Friends, shared expenses and settlements" section (ADR 0001 visibility rule, balances, notices, chat additions), the data-model rows and six "not doing yet" rows. GLOSSARY.md already matched the code and UI; only Invite and Notice were added. The report lists the known limitations as the code behaves, including the ones in the briefing. No code bug found; `understand_v4` latency and the no-idempotency-key settlement are recorded as limitations. `npm run check:api` passes.
