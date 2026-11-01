@@ -250,3 +250,21 @@ async def test_show_my_shared_expenses_lists_only_the_shared_ones(
     assert card["title"] == "Recent shared expenses"
     [mine] = card["transactions"]
     assert (mine["amountMinor"], mine["sharedExpenseId"] is not None) == (50000, True)
+
+
+async def test_a_balance_reply_tells_two_friends_with_one_name_apart_by_email(
+    client: httpx.AsyncClient, chat: str
+) -> None:
+    first = await add_friend(client, "Jaymin")
+    second = await add_friend(client, "Jaymin")
+    await client.patch(f"/api/v1/friends/{first}", json={"email": "jay.one@example.com"})
+    await client.patch(f"/api/v1/friends/{second}", json={"email": "jay.two@example.com"})
+    await share(client, first, "1000")
+    await share(client, second, "400")
+
+    everyone = reply(await say(client, chat, "who owes me money?"))
+    asked = reply(await say(client, chat, "what does Jaymin owe me?"))
+
+    assert "Jaymin (jay.one@example.com) owes you ₹500.00." in everyone
+    assert "Jaymin (jay.two@example.com) owes you ₹200.00." in everyone
+    assert "Jaymin (jay.one@example.com) or Jaymin (jay.two@example.com)" in asked

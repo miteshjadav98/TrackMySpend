@@ -12,6 +12,7 @@ import type {
   NoticeList,
   UnreadCount,
   MeView,
+  SettlementView,
   SharedExpenseView,
   SpendingSummary,
   TransactionPage,
@@ -35,8 +36,10 @@ export const keys = {
   accounts: (includeArchived: boolean) => ["accounts", { includeArchived }] as const,
   transactions: (filters: TransactionFilters) => ["transactions", filters] as const,
   friends: ["friends"] as const,
+  archivedFriends: ["friends", "archived"] as const,
   // Under the friends key, so changing friends also refreshes every friend's page.
   friend: (id: string) => ["friends", id] as const,
+  friendSettlements: (id: string) => ["friends", id, "settlements"] as const,
   friendInvites: ["friend-invites"] as const,
   notices: ["notices"] as const,
   sharedExpense: (id: string) => ["shared-expense", id] as const,
@@ -180,6 +183,24 @@ export function useFriends() {
   return useQuery({
     queryKey: keys.friends,
     queryFn: () => unwrap<FriendView[]>(api.GET("/api/v1/friends")),
+  });
+}
+
+/** The settlements with one friend from the user's side, with the account each is tagged with. */
+export function useFriendSettlements(id: string) {
+  return useQuery({
+    queryKey: keys.friendSettlements(id),
+    queryFn: () =>
+      unwrap<SettlementView[]>(api.GET("/api/v1/settlements", { params: { query: { friendId: id } } })),
+  });
+}
+
+/** Friends the user removed, which can be brought back. */
+export function useArchivedFriends() {
+  return useQuery({
+    queryKey: keys.archivedFriends,
+    queryFn: () =>
+      unwrap<FriendView[]>(api.GET("/api/v1/friends", { params: { query: { archived: true } } })),
   });
 }
 

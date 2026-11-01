@@ -308,6 +308,23 @@ export interface paths {
         patch: operations["update_friend_api_v1_friends__friend_id__patch"];
         trace?: never;
     };
+    "/api/v1/friends/{friend_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive Friend */
+        post: operations["unarchive_friend_api_v1_friends__friend_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/friend-invites": {
         parameters: {
             query?: never;
@@ -319,6 +336,26 @@ export interface paths {
         get: operations["list_incoming_invites_api_v1_friend_invites_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-invites/{invite_id}/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Invite Code
+         * @description Email a one-time code to the invited address; accepting needs it.
+         */
+        post: operations["send_invite_code_api_v1_friend_invites__invite_id__code_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -391,7 +428,11 @@ export interface paths {
         delete: operations["delete_settlement_api_v1_settlements__settlement_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Tag Settlement Account
+         * @description A linked friend's own account on a settlement the other person recorded.
+         */
+        patch: operations["tag_settlement_account_api_v1_settlements__settlement_id__patch"];
         trace?: never;
     };
     "/api/v1/shared-expenses": {
@@ -1083,6 +1124,8 @@ export interface components {
             isLinked: boolean;
             /** Invitestatus */
             inviteStatus: ("pending" | "declined") | null;
+            /** Isarchived */
+            isArchived: boolean;
             /** Balances */
             balances: components["schemas"]["BalanceView"][];
             /**
@@ -1150,6 +1193,22 @@ export interface components {
             action: "submit" | "skip" | "cancel";
             /** Value */
             value?: string | string[] | null;
+        };
+        /**
+         * InviteAccept
+         * @description The 6-digit code from the email, which proves the user owns the invited address.
+         */
+        InviteAccept: {
+            /** Code */
+            code: string;
+        };
+        /**
+         * InviteCodeSent
+         * @description The address a one-time code was emailed to, so the screen can say where to look.
+         */
+        InviteCodeSent: {
+            /** Email */
+            email: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1513,6 +1572,14 @@ export interface components {
             isCurrent: boolean;
         };
         /**
+         * SettlementAccountTag
+         * @description Sets or clears the user's own account on a settlement, from the user's own side.
+         */
+        SettlementAccountTag: {
+            /** Accountid */
+            accountId: string | null;
+        };
+        /**
          * SettlementCreate
          * @description Money that changed hands between the user and one friend, in either direction.
          */
@@ -1571,6 +1638,8 @@ export interface components {
             /** Note */
             note: string | null;
             account: components["schemas"]["AccountRef"] | null;
+            /** Recordedbyyou */
+            recordedByYou: boolean;
             /**
              * Createdat
              * Format: date-time
@@ -1626,6 +1695,8 @@ export interface components {
             /** Note */
             note: string | null;
             account: components["schemas"]["AccountRef"] | null;
+            /** Recordedbyyou */
+            recordedByYou: boolean;
             /**
              * Createdat
              * Format: date-time
@@ -2580,7 +2651,9 @@ export interface operations {
     };
     list_friends_api_v1_friends_get: {
         parameters: {
-            query?: never;
+            query?: {
+                archived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2594,6 +2667,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FriendView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2726,6 +2808,37 @@ export interface operations {
             };
         };
     };
+    unarchive_friend_api_v1_friends__friend_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                friend_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_incoming_invites_api_v1_friend_invites_get: {
         parameters: {
             query?: never;
@@ -2746,7 +2859,7 @@ export interface operations {
             };
         };
     };
-    accept_invite_api_v1_friend_invites__invite_id__accept_post: {
+    send_invite_code_api_v1_friend_invites__invite_id__code_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2756,6 +2869,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteCodeSent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_invite_api_v1_friend_invites__invite_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteAccept"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -2841,7 +2989,10 @@ export interface operations {
     create_settlement_api_v1_settlements_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Client-generated key; repeating it returns the original settlement. */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -2851,6 +3002,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Idempotent replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementCreated"];
+                };
+            };
             /** @description Successful Response */
             201: {
                 headers: {
@@ -2888,6 +3048,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tag_settlement_account_api_v1_settlements__settlement_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                settlement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettlementAccountTag"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettlementView"];
+                };
             };
             /** @description Validation Error */
             422: {

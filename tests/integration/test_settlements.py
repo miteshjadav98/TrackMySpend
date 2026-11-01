@@ -266,11 +266,12 @@ async def test_a_friend_with_a_settlement_is_archived_not_deleted(
     await register(client)
     jaymin = await add_friend(client, "Jaymin")
     await settle(client, jaymin, "100")
+    await settle(client, jaymin, "100", direction="you_paid_friend")  # square again
 
     assert (await client.delete(f"{FRIENDS}/{jaymin}")).status_code == 204
 
     assert (await client.get(FRIENDS)).json() == []
-    assert len((await client.get(SETTLEMENTS)).json()) == 1
+    assert len((await client.get(SETTLEMENTS)).json()) == 2
 
 
 async def test_a_friends_history_lists_shared_expenses_and_settlements_by_date(
@@ -331,3 +332,85 @@ async def test_every_settlement_change_is_audited(app: Any, client: httpx.AsyncC
             )
         ).all()
     assert list(actions) == ["settlement.created", "settlement.deleted"]
+
+
+async def test_a_friend_who_still_owes_money_cannot_be_removed(client: httpx.AsyncClient) -> None:
+    await register(client)
+    jaymin = await add_friend(client, "Jaymin")
+    await share(client, jaymin, "1000")  # Jaymin owes 500
+
+    refused = await client.delete(f"{FRIENDS}/{jaymin}")
+
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "friend_has_balance"
+    assert "settle up first" in refused.json()["error"]["message"].lower()
+    assert await balances_of(client, jaymin) == {"INR": 50000}  # still listed, nothing archived
+    await settle(client, jaymin, "500")
+    assert (await client.delete(f"{FRIENDS}/{jaymin}")).status_code == 204
+
+
+async def test_a_removed_friend_can_be_brought_back_with_their_history(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    jaymin = await add_friend(client, "Jaymin")
+    await share(client, jaymin, "1000")
+    await settle(client, jaymin, "500")
+    await client.delete(f"{FRIENDS}/{jaymin}")
+    assert (await client.get(FRIENDS)).json() == []
+    [archived] = (await client.get(FRIENDS, params={"archived": "true"})).json()
+    assert archived["id"] == jaymin and archived["isArchived"] is True
+
+    restored = await client.post(f"{FRIENDS}/{jaymin}/unarchive")
+
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["isArchived"] is False
+    assert [f["id"] for f in (await client.get(FRIENDS)).json()] == [jaymin]
+    assert (await client.get(FRIENDS, params={"archived": "true"})).json() == []
+    assert (await client.post(f"{FRIENDS}/{jaymin}/unarchive")).status_code == 404
+
+
+async def test_another_users_archived_friend_cannot_be_brought_back(
+    client: httpx.AsyncClient, make_client: Any
+) -> None:
+    await register(client)
+    jaymin = await add_friend(client, "Jaymin")
+    await settle(client, jaymin, "100")
+    await settle(client, jaymin, "100", direction="you_paid_friend")
+    await client.delete(f"{FRIENDS}/{jaymin}")
+    stranger = make_client()
+    await register(stranger)
+
+    assert (await stranger.post(f"{FRIENDS}/{jaymin}/unarchive")).status_code == 404
+
+
+async def test_a_retried_settlement_request_is_saved_once(client: httpx.AsyncClient) -> None:
+    await register(client)
+    jaymin = await add_friend(client, "Jaymin")
+    headers = {"Idempotency-Key": "settle-retry-0001"}
+    body = {"friendId": jaymin, "direction": "friend_paid_you", "amount": "100"}
+
+    first = await client.post(SETTLEMENTS, json=body, headers=headers)
+    retry = await client.post(SETTLEMENTS, json=body, headers=headers)
+
+    assert first.status_code == 201, first.text
+    assert retry.status_code == 200, retry.text
+    assert retry.json()["id"] == first.json()["id"]
+    assert len((await client.get(SETTLEMENTS)).json()) == 1
+    assert await balances_of(client, jaymin) == {"INR": -10000}
+    other = await client.post(
+        SETTLEMENTS, json=body, headers={"Idempotency-Key": "settle-other-02"}
+    )
+    assert other.status_code == 201  # a different key is a different settlement
+
+
+async def test_a_settlement_without_a_key_is_never_treated_as_a_retry(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    jaymin = await add_friend(client, "Jaymin")
+
+    await settle(client, jaymin, "100")
+    await settle(client, jaymin, "100")
+
+    assert len((await client.get(SETTLEMENTS)).json()) == 2

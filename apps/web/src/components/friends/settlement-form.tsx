@@ -2,12 +2,12 @@
 
 import type { FriendView, SettlementCreated } from "@moneymoney/contracts";
 import { HandCoins } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
-import { api, ApiError, unwrap } from "@/lib/api";
+import { api, ApiError, newKey, unwrap } from "@/lib/api";
 import { accountOptionLabel, CURRENCIES, todayISO } from "@/lib/format";
 import { invalidateFriends, useAccounts, useMe, useQueryClient } from "@/lib/queries";
 
@@ -24,6 +24,9 @@ export function SettlementForm({ friend }: { friend: FriendView }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // One key per settlement: a double click or a retry sends the same key, so it is saved
+  // once. It changes only after a save, so the next settlement is a new one.
+  const idempotencyKey = useRef(newKey());
   const baseCurrency = me.data?.profile.baseCurrency ?? "INR";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -47,8 +50,10 @@ export function SettlementForm({ friend }: { friend: FriendView }) {
             accountId: accountId || null,
             note: note || null,
           },
+          params: { header: { "Idempotency-Key": idempotencyKey.current } },
         }),
       );
+      idempotencyKey.current = newKey();
       await invalidateFriends(queryClient);
       formElement.reset();
       if (saved.warning) setWarning(saved.warning);

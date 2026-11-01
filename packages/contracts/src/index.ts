@@ -33,6 +33,7 @@ export type FriendView = S["FriendView"];
 export type FriendCreate = S["FriendCreate"];
 export type FriendUpdate = S["FriendUpdate"];
 export type FriendInviteView = S["FriendInviteView"];
+export type InviteCodeSent = S["InviteCodeSent"];
 export type NoticeView = S["NoticeView"];
 export type NoticeList = S["NoticeList"];
 export type NoticesRead = S["NoticesRead"];

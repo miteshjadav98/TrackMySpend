@@ -25,7 +25,7 @@ from finance_core.categories.service import CategoryService
 from finance_core.conversations.service import HistoryItem
 from finance_core.dates import DateRange, PeriodError, resolve_period
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
-from finance_core.friends.names import matching_friends
+from finance_core.friends.names import matching_friends, names_telling_duplicates_apart
 from finance_core.friends.schemas import (
     BalanceView,
     FriendCreate,
@@ -50,7 +50,12 @@ from finance_core.llm.rules import RulesLLMClient
 from finance_core.llm.schemas import BalanceSpec, PeriodSpec, SearchSpec, SettlementSpec
 from finance_core.merchants.service import MerchantRuleService
 from finance_core.reports.service import ReportService
-from finance_core.transactions.schemas import TransactionCreate, TransactionQuery, TransactionView
+from finance_core.transactions.schemas import (
+    NewTransaction,
+    TransactionCreate,
+    TransactionQuery,
+    TransactionView,
+)
 from finance_core.transactions.service import TransactionService
 from finance_core.workflows.answers import AnswerApplier, AnswerOutcome, pending_field
 from finance_core.workflows.category_choice import CategoryOption, choose_category
@@ -740,34 +745,21 @@ class FinanceNodes:
                         )
                         return {"outcome": "save_failed", "drafts": []}
                     items.append((resolved, f"chat:{draft.id}"))
-                results = await transactions.create_resolved(
-                    ctx.user,
-                    items,
-                    source="chat",
-                    source_ref=source_ref,
-                    actor="assistant",
-                    request_id=ctx.request_id,
-                )
-                saved_by_draft = {
-                    key.removeprefix("chat:"): view
-                    for (_, key), (view, _) in zip(items, results, strict=True)
-                }
-                for draft in drafts:
-                    if not draft.is_shared():
-                        continue
-                    try:
-                        shared_view, added = await self._save_shared(
-                            ctx, session, categories, shared_service, draft, source_ref
-                        )
-                    except (ValidationFailedError, NotFoundError):
-                        logger.warning("shared draft failed at save", extra={"draftId": draft.id})
-                        return {"outcome": "save_failed", "drafts": []}
-                    shared_views.append(shared_view)
-                    added_friends += added
-                    assert shared_view.my_transaction_id is not None
-                    saved_by_draft[draft.id] = await transactions.get(
-                        ctx.user, shared_view.my_transaction_id
-                    )
+                # Friends and categories are settled first, because adding them commits; from
+                # here the whole message is one database transaction, saved together or not.
+                try:
+                    shared_requests = [
+                        (draft, *await self._shared_request(ctx, session, categories, draft))
+                        for draft in drafts
+                        if draft.is_shared()
+                    ]
+                except (ValidationFailedError, NotFoundError):
+                    logger.warning("shared draft failed at save")
+                    return {"outcome": "save_failed", "drafts": []}
+                saved = await self._save_together(ctx, session, items, shared_requests, source_ref)
+                if saved is None:
+                    return {"outcome": "save_failed", "drafts": []}
+                saved_by_draft, shared_views, added_friends = saved
                 views = [saved_by_draft[draft.id] for draft in drafts]  # in the order said
         return {
             "shared_saved": [v.model_dump(mode="json", by_alias=True) for v in shared_views],
@@ -779,17 +771,74 @@ class FinanceNodes:
             "outcome": "saved",
         }
 
-    async def _save_shared(
+    async def _save_together(
+        self,
+        ctx: TurnContext,
+        session: Any,
+        items: list[tuple[NewTransaction, str]],
+        shared_requests: list[tuple[TransactionDraft, SharedExpenseCreate, list[str]]],
+        source_ref: str,
+    ) -> tuple[dict[str, TransactionView], list[SharedExpenseView], list[str]] | None:
+        """Save a message's ordinary and shared expenses in one database transaction.
+
+        Returns each draft's saved transaction, the shared expenses and the friends added. If
+        a shared expense cannot be saved, nothing from the message is saved and this is None.
+        """
+        transactions = TransactionService(
+            session, clock=self._deps.clock, generation=self._deps.generation
+        )
+        shared_service = SharedExpenseService(
+            session, clock=self._deps.clock, generation=self._deps.generation
+        )
+        results = await transactions.create_resolved(
+            ctx.user,
+            items,
+            source="chat",
+            source_ref=source_ref,
+            actor="assistant",
+            request_id=ctx.request_id,
+            commit=False,
+        )
+        saved_by_draft = {
+            key.removeprefix("chat:"): view
+            for (_, key), (view, _) in zip(items, results, strict=True)
+        }
+        shared_views: list[SharedExpenseView] = []
+        added_friends: list[str] = []
+        try:
+            for draft, request, added in shared_requests:
+                shared_view = await shared_service.create(
+                    ctx.user,
+                    request,
+                    request_id=ctx.request_id,
+                    source="chat",
+                    source_ref=source_ref,
+                    commit=False,
+                )
+                shared_views.append(shared_view)
+                added_friends += added
+                assert shared_view.my_transaction_id is not None
+                saved_by_draft[draft.id] = await transactions.get(
+                    ctx.user, shared_view.my_transaction_id
+                )
+        except (ValidationFailedError, NotFoundError):
+            logger.warning("shared draft failed at save")
+            await session.rollback()  # the ordinary expenses of this message go too
+            return None
+        await session.commit()
+        await transactions.bump_pending_generations()
+        await shared_service.bump_pending_generations()
+        return saved_by_draft, shared_views, added_friends
+
+    async def _shared_request(
         self,
         ctx: TurnContext,
         session: Any,
         categories: CategoryService,
-        shared_service: SharedExpenseService,
         draft: TransactionDraft,
-        source_ref: str,
-    ) -> tuple[SharedExpenseView, list[str]]:
-        """Record a shared expense through the shared-expense service, adding the friends the
-        user agreed to add. Returns it with the names of the friends added."""
+    ) -> tuple[SharedExpenseCreate, list[str]]:
+        """The shared-expense request for a draft, adding the friends the user agreed to add.
+        Returns it with the names of the friends added."""
         assert draft.amount is not None and draft.date
         friend_ids, added = await self._friend_ids_for(
             ctx, FriendService(session, clock=self._deps.clock), draft
@@ -813,25 +862,19 @@ class FinanceNodes:
             (fid for fid, person in zip(friend_ids, draft.people, strict=True) if person.paid),
             None,
         )
-        view = await shared_service.create(
-            ctx.user,
-            SharedExpenseCreate(
-                total=Decimal(draft.amount),
-                currency=draft.currency,
-                occurred_on=date.fromisoformat(draft.date),
-                description=draft.description,
-                merchant=draft.merchant,
-                payer_friend_id=payer,
-                split=draft.split,
-                participants=participants,
-                category_id=own.category_id,
-                account_id=own.account_id,
-            ),
-            request_id=ctx.request_id,
-            source="chat",
-            source_ref=source_ref,
+        request = SharedExpenseCreate(
+            total=Decimal(draft.amount),
+            currency=draft.currency,
+            occurred_on=date.fromisoformat(draft.date),
+            description=draft.description,
+            merchant=draft.merchant,
+            payer_friend_id=payer,
+            split=draft.split,
+            participants=participants,
+            category_id=own.category_id,
+            account_id=own.account_id,
         )
-        return view, added
+        return request, added
 
     @staticmethod
     async def _friend_ids_for(
@@ -904,7 +947,7 @@ class FinanceNodes:
             accounts = await AccountService(session).list_accounts(ctx.user)
             account = resolve_account_name(spec.account, accounts) if spec.account else None
             try:
-                created = await SettlementService(session, clock=self._deps.clock).create(
+                created, _ = await SettlementService(session, clock=self._deps.clock).create(
                     ctx.user,
                     SettlementCreate(
                         friend_id=uuid.UUID(plan["friend_id"]),
@@ -925,7 +968,7 @@ class FinanceNodes:
             "outcome": "settlement_saved",
             "settlement_saved": {
                 "direction": created.direction,
-                "friend": created.friend.name,
+                "friend": names_telling_duplicates_apart(friends)[friend.id],
                 "amountFormatted": created.amount_formatted,
                 "currency": created.currency,
                 "balances": [b.model_dump(mode="json") for b in friend.balances],
@@ -942,21 +985,24 @@ class FinanceNodes:
         spec = BalanceSpec.model_validate(state.get("balance") or {})
         async with self._deps.session_factory() as session:
             friends = await FriendService(session, clock=self._deps.clock).list_friends(ctx.user)
+        names = names_telling_duplicates_apart(friends)
         if spec.friend:
             matches = matching_friends(spec.friend, friends)
             if len(matches) != 1:
                 reason = "ambiguous_friend" if matches else "unknown_friend"
-                options = [f.name for f in matches]
+                options = [names[f.id] for f in matches]
                 return {
                     "outcome": "balance_unclear",
                     "friend_question": {"reason": reason, "name": spec.friend, "options": options},
                 }
             friends = matches
+        # The reply names two friends who share a name by their emails as well.
+        named = [f.model_copy(update={"name": names[f.id]}) for f in friends]
         return {
             "outcome": "balances",
             "balance_answer": {
-                "askedAbout": friends[0].name if spec.friend else None,
-                "friends": [f.model_dump(mode="json", by_alias=True) for f in friends],
+                "askedAbout": named[0].name if spec.friend else None,
+                "friends": [f.model_dump(mode="json", by_alias=True) for f in named],
             },
         }
 

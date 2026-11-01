@@ -1,6 +1,6 @@
 "use client";
 
-import type { HistoryEntry } from "@moneymoney/contracts";
+import type { HistoryEntry, SettlementView } from "@moneymoney/contracts";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -10,7 +10,15 @@ import { SettlementForm } from "@/components/friends/settlement-form";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError, unwrap } from "@/lib/api";
 import { formatDay } from "@/lib/format";
-import { invalidateFriends, useFriendDetail, useQueryClient } from "@/lib/queries";
+import { Select } from "@/components/ui/field";
+import { accountOptionLabel } from "@/lib/format";
+import {
+  invalidateFriends,
+  useAccounts,
+  useFriendDetail,
+  useFriendSettlements,
+  useQueryClient,
+} from "@/lib/queries";
 
 function asApiError(caught: unknown): ApiError {
   return caught instanceof ApiError ? caught : new ApiError(0, undefined);
@@ -33,6 +41,7 @@ function entryTitle(entry: HistoryEntry, friendName: string): string {
 export function FriendDetailScreen({ friendId }: { friendId: string }) {
   const queryClient = useQueryClient();
   const detail = useFriendDetail(friendId);
+  const settlements = useFriendSettlements(friendId);
 
   useEffect(() => {
     void invalidateFriends(queryClient);
@@ -79,7 +88,12 @@ export function FriendDetailScreen({ friendId }: { friendId: string }) {
               ) : (
                 <ul className="mt-3 divide-y divide-line rounded-[var(--radius-card)] border border-line bg-surface px-5 shadow-[var(--shadow-card)]">
                   {detail.data.history.map((entry) => (
-                    <HistoryRow key={`${entry.kind}-${entry.id}`} entry={entry} friendName={detail.data.friend.name} />
+                    <HistoryRow
+                      key={`${entry.kind}-${entry.id}`}
+                      entry={entry}
+                      friendName={detail.data.friend.name}
+                      settlement={settlements.data?.find((s) => s.id === entry.id)}
+                    />
                   ))}
                 </ul>
               )}
@@ -92,7 +106,15 @@ export function FriendDetailScreen({ friendId }: { friendId: string }) {
 }
 
 /** One line of history; a settlement can be deleted, a shared expense is edited elsewhere. */
-function HistoryRow({ entry, friendName }: { entry: HistoryEntry; friendName: string }) {
+function HistoryRow({
+  entry,
+  friendName,
+  settlement,
+}: {
+  entry: HistoryEntry;
+  friendName: string;
+  settlement: SettlementView | undefined;
+}) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -113,6 +135,8 @@ function HistoryRow({ entry, friendName }: { entry: HistoryEntry; friendName: st
   }
 
   const friendOwesMore = entry.effectMinor > 0;
+  // Only a settlement the friend recorded can be tagged here; your own side was set when you recorded it.
+  const taggable = entry.kind === "settlement" && settlement !== undefined && !settlement.recordedByYou;
   return (
     <li className="flex items-center gap-3 py-3">
       <div className="min-w-0 flex-1">
@@ -120,6 +144,7 @@ function HistoryRow({ entry, friendName }: { entry: HistoryEntry; friendName: st
         <p className="text-xs text-ink-faint">
           {formatDay(entry.occurredOn)} · {entry.kind === "settlement" ? "Settlement" : "Shared expense"}
         </p>
+        {taggable ? <SettlementAccountPicker settlement={settlement} /> : null}
       </div>
       <span className={`figure text-sm font-semibold ${friendOwesMore ? "text-income" : "text-danger"}`}>
         {friendOwesMore ? "+" : "−"}
@@ -138,5 +163,47 @@ function HistoryRow({ entry, friendName }: { entry: HistoryEntry; friendName: st
         </button>
       ) : null}
     </li>
+  );
+}
+
+/** Lets a linked friend's settlement be tagged with the user's own account; only they see it. */
+function SettlementAccountPicker({ settlement }: { settlement: SettlementView }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const accounts = useAccounts();
+  const [busy, setBusy] = useState(false);
+
+  async function tag(accountId: string) {
+    setBusy(true);
+    try {
+      await unwrap<SettlementView>(
+        api.PATCH("/api/v1/settlements/{settlement_id}", {
+          params: { path: { settlement_id: settlement.id } },
+          body: { accountId: accountId || null },
+        }),
+      );
+      await invalidateFriends(queryClient);
+    } catch (caught) {
+      toast(asApiError(caught).message, { tone: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Select
+      aria-label="Your account for this settlement"
+      value={settlement.account?.id ?? ""}
+      disabled={busy}
+      onChange={(event) => void tag(event.target.value)}
+      className="mt-1.5 max-w-56 text-xs"
+    >
+      <option value="">No account</option>
+      {accounts.data?.map((account) => (
+        <option key={account.id} value={account.id}>
+          {accountOptionLabel(account)}
+        </option>
+      ))}
+    </Select>
   );
 }

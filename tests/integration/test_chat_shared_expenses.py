@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
 import pytest
 
+from finance_core.errors import NotFoundError
+from finance_core.friends.shared_expenses import SharedExpenseService
+from finance_core.llm.base import ReplyRequest, UnderstandRequest, UnderstandResult
+from finance_core.llm.schemas import ExtractedTransaction, TurnUnderstanding
 from tests.conftest import new_conversation, register, say
 
 FRIENDS = "/api/v1/friends"
@@ -233,4 +238,63 @@ async def test_an_expense_with_a_friend_but_no_split_stays_an_ordinary_expense(
     result = await say(client, chat, "coffee with Jaymin 200")
 
     assert saved_card(result)["shared"] == []
+    assert (await client.get(SHARED)).json() == []
+
+
+class _ReadsCoffeeAndAPizzaSplit:
+    """A model that reads one message as an ordinary coffee plus a pizza shared with Jaymin."""
+
+    name = "scripted"
+
+    async def understand(self, request: UnderstandRequest) -> UnderstandResult:
+        understanding = TurnUnderstanding(
+            intent="record_transactions",
+            transactions=[
+                ExtractedTransaction(
+                    type="expense", amount="200", category="food", description="Coffee"
+                ),
+                ExtractedTransaction(
+                    type="expense",
+                    amount="1000",
+                    category="food",
+                    description="Pizza",
+                    participants=["Jaymin"],
+                    split="equal",
+                ),
+            ],
+        )
+        return UnderstandResult(understanding=understanding, source="scripted", latency_ms=1)
+
+    async def stream_reply(self, request: ReplyRequest) -> AsyncIterator[str]:
+        yield ""
+
+
+async def test_a_mixed_message_saves_the_ordinary_and_the_shared_expense_together(
+    client: httpx.AsyncClient, chat: str, llm: Any
+) -> None:
+    await add_friend(client, "Jaymin")
+    llm.delegate = _ReadsCoffeeAndAPizzaSplit()
+
+    result = await say(client, chat, "coffee 200 and pizza 1000")
+
+    card = saved_card(result)
+    assert [t["description"] for t in card["transactions"]] == ["Coffee", "Pizza"]
+    assert len(card["shared"]) == 1
+    assert len((await client.get(TX)).json()["items"]) == 2
+
+
+async def test_a_failed_shared_expense_saves_nothing_from_that_message(
+    client: httpx.AsyncClient, chat: str, llm: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await add_friend(client, "Jaymin")
+    llm.delegate = _ReadsCoffeeAndAPizzaSplit()
+
+    async def fails_midway(*args: Any, **kwargs: Any) -> None:
+        raise NotFoundError("Friend not found")  # after the expense row was already written
+
+    monkeypatch.setattr(SharedExpenseService, "_create_share_transactions", fails_midway)
+
+    await say(client, chat, "coffee 200 and pizza 1000")
+
+    assert (await client.get(TX)).json()["items"] == []
     assert (await client.get(SHARED)).json() == []

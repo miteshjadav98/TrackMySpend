@@ -603,17 +603,39 @@
         ],
         "summary": "List Friends",
         "operationId": "list_friends_api_v1_friends_get",
+        "parameters": [
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Archived"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/FriendView"
                   },
-                  "type": "array",
                   "title": "Response List Friends Api V1 Friends Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -627,14 +649,14 @@
         "summary": "Add Friend",
         "operationId": "add_friend_api_v1_friends_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/FriendCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -788,6 +810,49 @@
         }
       }
     },
+    "/api/v1/friends/{friend_id}/unarchive": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Unarchive Friend",
+        "operationId": "unarchive_friend_api_v1_friends__friend_id__unarchive_post",
+        "parameters": [
+          {
+            "name": "friend_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Friend Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/friend-invites": {
       "get": {
         "tags": [
@@ -806,6 +871,50 @@
                   },
                   "type": "array",
                   "title": "Response List Incoming Invites Api V1 Friend Invites Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/friend-invites/{invite_id}/code": {
+      "post": {
+        "tags": [
+          "friends"
+        ],
+        "summary": "Send Invite Code",
+        "description": "Email a one-time code to the invited address; accepting needs it.",
+        "operationId": "send_invite_code_api_v1_friend_invites__invite_id__code_post",
+        "parameters": [
+          {
+            "name": "invite_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Invite Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteCodeSent"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -832,6 +941,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteAccept"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -963,6 +1082,27 @@
         ],
         "summary": "Create Settlement",
         "operationId": "create_settlement_api_v1_settlements_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._:-]{8,100}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Client-generated key; repeating it returns the original settlement.",
+              "title": "Idempotency-Key"
+            },
+            "description": "Client-generated key; repeating it returns the original settlement."
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -976,6 +1116,16 @@
         "responses": {
           "201": {
             "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementCreated"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Idempotent replay",
             "content": {
               "application/json": {
                 "schema": {
@@ -998,6 +1148,58 @@
       }
     },
     "/api/v1/settlements/{settlement_id}": {
+      "patch": {
+        "tags": [
+          "settlements"
+        ],
+        "summary": "Tag Settlement Account",
+        "description": "A linked friend's own account on a settlement the other person recorded.",
+        "operationId": "tag_settlement_account_api_v1_settlements__settlement_id__patch",
+        "parameters": [
+          {
+            "name": "settlement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Settlement Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettlementAccountTag"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettlementView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "settlements"
@@ -3763,6 +3965,10 @@
             ],
             "title": "Invitestatus"
           },
+          "isArchived": {
+            "type": "boolean",
+            "title": "Isarchived"
+          },
           "balances": {
             "items": {
               "$ref": "#/components/schemas/BalanceView"
@@ -3788,6 +3994,7 @@
           "email",
           "isLinked",
           "inviteStatus",
+          "isArchived",
           "balances",
           "createdAt",
           "updatedAt"
@@ -3916,6 +4123,36 @@
         ],
         "title": "InteractionResponse",
         "description": "The user's answer to a pending clarification or confirmation."
+      },
+      "InviteAccept": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "title": "Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "InviteAccept",
+        "description": "The 6-digit code from the email, which proves the user owns the invited address."
+      },
+      "InviteCodeSent": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "InviteCodeSent",
+        "description": "The address a one-time code was emailed to, so the screen can say where to look."
       },
       "LoginRequest": {
         "properties": {
@@ -4743,6 +4980,29 @@
         "title": "SessionView",
         "description": "One signed-in browser or device, as the user sees it in Settings → Security."
       },
+      "SettlementAccountTag": {
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "accountId"
+        ],
+        "title": "SettlementAccountTag",
+        "description": "Sets or clears the user's own account on a settlement, from the user's own side."
+      },
       "SettlementCreate": {
         "properties": {
           "friendId": {
@@ -4897,6 +5157,10 @@
               }
             ]
           },
+          "recordedByYou": {
+            "type": "boolean",
+            "title": "Recordedbyyou"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -4930,6 +5194,7 @@
           "occurredOn",
           "note",
           "account",
+          "recordedByYou",
           "createdAt",
           "exceedsBalance",
           "warning"
@@ -5024,6 +5289,10 @@
               }
             ]
           },
+          "recordedByYou": {
+            "type": "boolean",
+            "title": "Recordedbyyou"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -5042,6 +5311,7 @@
           "occurredOn",
           "note",
           "account",
+          "recordedByYou",
           "createdAt"
         ],
         "title": "SettlementView",

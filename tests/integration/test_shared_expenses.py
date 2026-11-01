@@ -200,12 +200,24 @@ async def test_a_friend_of_someone_else_or_an_unknown_friend_is_not_found(
         assert response.status_code == 404, response.text
 
 
+async def settle_up(client: httpx.AsyncClient, friend_id: str) -> None:
+    """Clear what the friend owes, so they can be removed (a balance blocks removal)."""
+    friends = (await client.get(FRIENDS)).json()
+    [balance] = next(f for f in friends if f["id"] == friend_id)["balances"]
+    paid = await client.post(
+        "/api/v1/settlements",
+        json={"friendId": friend_id, "direction": "friend_paid_you", "amount": balance["amount"]},
+    )
+    assert paid.status_code == 201, paid.text
+
+
 async def test_an_archived_friend_cannot_join_a_new_shared_expense(
     client: httpx.AsyncClient,
 ) -> None:
     await register(client)
     jaymin = await add_friend(client, "Jaymin")
     await record(client, participants=with_friends(jaymin))
+    await settle_up(client, jaymin)
     await client.delete(f"{FRIENDS}/{jaymin}")  # has history, so archived
 
     response = await record(client, participants=with_friends(jaymin))
@@ -221,6 +233,7 @@ async def test_removing_a_friend_in_a_shared_expense_archives_them_and_keeps_the
     jaymin = await add_friend(client, "Jaymin")
     loner = await add_friend(client, "Loner")
     shared = (await record(client, participants=with_friends(jaymin))).json()
+    await settle_up(client, jaymin)
 
     assert (await client.delete(f"{FRIENDS}/{jaymin}")).status_code == 204
     assert (await client.delete(f"{FRIENDS}/{loner}")).status_code == 204

@@ -1,7 +1,7 @@
 "use client";
 
-import type { FriendInviteView, FriendUpdate, FriendView } from "@moneymoney/contracts";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import type { FriendInviteView, FriendUpdate, FriendView, InviteCodeSent } from "@moneymoney/contracts";
+import { Check, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 
 import Link from "next/link";
@@ -12,7 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError, unwrap } from "@/lib/api";
-import { invalidateFriends, useFriendInvites, useFriends, useQueryClient } from "@/lib/queries";
+import {
+  invalidateFriends,
+  useArchivedFriends,
+  useFriendInvites,
+  useFriends,
+  useQueryClient,
+} from "@/lib/queries";
 
 function asApiError(caught: unknown): ApiError {
   return caught instanceof ApiError ? caught : new ApiError(0, undefined);
@@ -95,28 +101,118 @@ export function FriendsScreen() {
             </div>
           </div>
         </section>
+
+        <RemovedFriends />
       </div>
     </div>
   );
 }
 
-/** An incoming invite with accept and decline. */
+/** Friends the user removed but who have shared history, collapsed until opened. */
+function RemovedFriends() {
+  const removed = useArchivedFriends();
+  if (!removed.data?.length) return null;
+  return (
+    <details className="rounded-[var(--radius-card)] border border-line bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
+      <summary className="cursor-pointer font-medium">Removed friends ({removed.data.length})</summary>
+      <ul className="mt-2 divide-y divide-line">
+        {removed.data.map((friend) => (
+          <RemovedFriendRow key={friend.id} friend={friend} />
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/** A removed friend with a button to bring them back, history and all. */
+function RemovedFriendRow({ friend }: { friend: FriendView }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function restore() {
+    setBusy(true);
+    try {
+      await unwrap<FriendView>(
+        api.POST("/api/v1/friends/{friend_id}/unarchive", { params: { path: { friend_id: friend.id } } }),
+      );
+      await invalidateFriends(queryClient);
+      toast(`${friend.name} is back in your friends`);
+    } catch (caught) {
+      toast(asApiError(caught).message, { tone: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <li className="flex items-center gap-3 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{friend.name}</p>
+        <p className="truncate text-xs text-ink-faint">{friend.email ?? "No email"}</p>
+      </div>
+      <Button size="sm" variant="ghost" busy={busy} onClick={restore} icon={<RotateCcw className="size-4" aria-hidden />}>
+        Bring back
+      </Button>
+    </li>
+  );
+}
+
+/**
+ * An incoming invite. Accepting is two steps: we email a 6-digit code to the invited address,
+ * then the user types it in. Sign-up never checks an email, so the code is what proves it is
+ * theirs. Declining needs no code.
+ */
 function InviteRow({ invite }: { invite: FriendInviteView }) {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
+  const [busy, setBusy] = useState<"accept" | "code" | "decline" | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
-  async function answer(choice: "accept" | "decline") {
-    setBusy(choice);
+  async function sendCode() {
+    setBusy("code");
+    setError(null);
     try {
-      const params = { params: { path: { invite_id: invite.id } } };
-      if (choice === "accept") {
-        await unwrap<FriendView>(api.POST("/api/v1/friend-invites/{invite_id}/accept", params));
-        toast(`You and ${invite.fromName} are now friends`);
-      } else {
-        await unwrap<unknown>(api.POST("/api/v1/friend-invites/{invite_id}/decline", params));
-        toast("Invite declined");
-      }
+      const sent = await unwrap<InviteCodeSent>(
+        api.POST("/api/v1/friend-invites/{invite_id}/code", { params: { path: { invite_id: invite.id } } }),
+      );
+      setSentTo(sent.email);
+    } catch (caught) {
+      toast(asApiError(caught).message, { tone: "error" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const code = String(new FormData(event.currentTarget).get("code") ?? "").trim();
+    setBusy("accept");
+    setError(null);
+    try {
+      await unwrap<FriendView>(
+        api.POST("/api/v1/friend-invites/{invite_id}/accept", {
+          params: { path: { invite_id: invite.id } },
+          body: { code },
+        }),
+      );
+      toast(`You and ${invite.fromName} are now friends`);
+      await invalidateFriends(queryClient);
+    } catch (caught) {
+      setError(asApiError(caught));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function decline() {
+    setBusy("decline");
+    try {
+      await unwrap<unknown>(
+        api.POST("/api/v1/friend-invites/{invite_id}/decline", { params: { path: { invite_id: invite.id } } }),
+      );
+      toast("Invite declined");
       await invalidateFriends(queryClient);
     } catch (caught) {
       toast(asApiError(caught).message, { tone: "error" });
@@ -126,31 +222,66 @@ function InviteRow({ invite }: { invite: FriendInviteView }) {
   }
 
   return (
-    <li className="flex items-center gap-3 py-3">
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{invite.fromName}</p>
-        <p className="truncate text-xs text-ink-faint">{invite.fromEmail} wants to link up</p>
+    <li className="py-3">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{invite.fromName}</p>
+          <p className="truncate text-xs text-ink-faint">{invite.fromEmail} wants to link up</p>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          busy={busy === "decline"}
+          disabled={busy !== null}
+          onClick={decline}
+          icon={<X className="size-4" aria-hidden />}
+        >
+          Decline
+        </Button>
+        {sentTo === null ? (
+          <Button
+            size="sm"
+            variant="primary"
+            busy={busy === "code"}
+            disabled={busy !== null}
+            onClick={sendCode}
+            icon={<Check className="size-4" aria-hidden />}
+          >
+            Accept
+          </Button>
+        ) : null}
       </div>
-      <Button
-        size="sm"
-        variant="ghost"
-        busy={busy === "decline"}
-        disabled={busy !== null}
-        onClick={() => answer("decline")}
-        icon={<X className="size-4" aria-hidden />}
-      >
-        Decline
-      </Button>
-      <Button
-        size="sm"
-        variant="primary"
-        busy={busy === "accept"}
-        disabled={busy !== null}
-        onClick={() => answer("accept")}
-        icon={<Check className="size-4" aria-hidden />}
-      >
-        Accept
-      </Button>
+      {sentTo !== null ? (
+        <form onSubmit={confirm} className="mt-3 flex flex-col gap-2">
+          <label htmlFor={`code-${invite.id}`} className="text-sm text-ink-soft">
+            We sent a code to {sentTo}. It works for 15 minutes.
+          </label>
+          <div className="flex gap-2">
+            <Input
+              id={`code-${invite.id}`}
+              name="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              placeholder="6-digit code"
+              required
+              autoFocus
+            />
+            <Button type="submit" size="sm" variant="primary" busy={busy === "accept"} disabled={busy !== null}>
+              Confirm
+            </Button>
+            <Button size="sm" variant="ghost" busy={busy === "code"} disabled={busy !== null} onClick={sendCode}>
+              Resend
+            </Button>
+          </div>
+          {error ? (
+            <p role="alert" className="text-sm text-danger">
+              {error.message}
+            </p>
+          ) : null}
+        </form>
+      ) : null}
     </li>
   );
 }
