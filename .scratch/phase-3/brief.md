@@ -1,6 +1,6 @@
 # Phase 3 brief: split expenses with friends
 
-**Status:** needs-triage (idea captured 2026-10-28; next step is a grilling session, then `to-spec`)
+**Status:** done (settled 2026-11-01; see [spec.md](spec.md))
 
 This is the input for Phase 3's design, not the spec. It records what the owner asked for and
 the questions the design has to settle.
