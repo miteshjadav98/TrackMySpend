@@ -466,6 +466,40 @@ export interface paths {
         patch: operations["change_merchant_rule_api_v1_merchant_rules__rule_id__patch"];
         trace?: never;
     };
+    "/api/v1/notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notices */
+        get: operations["list_notices_api_v1_notices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notices/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Notices Read */
+        post: operations["mark_notices_read_api_v1_notices_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transactions": {
         parameters: {
             query?: never;
@@ -1231,6 +1265,50 @@ export interface components {
             /** Formatted */
             formatted: string;
         };
+        /**
+         * NoticeList
+         * @description The latest notices and the number still unread (which may exceed what is listed).
+         */
+        NoticeList: {
+            /** Unreadcount */
+            unreadCount: number;
+            /** Items */
+            items: components["schemas"]["NoticeView"][];
+        };
+        /**
+         * NoticeView
+         * @description One "Shared with you" notice, worded for the reader. `friend_id` is the reader's own
+         *     friend row for the person behind it, so clients can link to that friend; null when the
+         *     reader has no such row yet (a pending invite).
+         */
+        NoticeView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Message */
+            message: string;
+            /** Friendid */
+            friendId: string | null;
+            /** Isread */
+            isRead: boolean;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+        };
+        /**
+         * NoticesRead
+         * @description Which notices to mark read; leave `ids` out to mark every unread one.
+         */
+        NoticesRead: {
+            /** Ids */
+            ids?: string[] | null;
+        };
         /** Option */
         Option: {
             /** Label */
@@ -1918,6 +1996,14 @@ export interface components {
              * @default false
              */
             replayed: boolean;
+        };
+        /**
+         * UnreadCount
+         * @description How many notices are still unread.
+         */
+        UnreadCount: {
+            /** Unreadcount */
+            unreadCount: number;
         };
         /** UserView */
         UserView: {
@@ -3061,6 +3147,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MerchantRuleView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notices_api_v1_notices_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_notices_read_api_v1_notices_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticesRead"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCount"];
                 };
             };
             /** @description Validation Error */

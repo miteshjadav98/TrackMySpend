@@ -1471,6 +1471,92 @@
         }
       }
     },
+    "/api/v1/notices": {
+      "get": {
+        "tags": [
+          "notices"
+        ],
+        "summary": "List Notices",
+        "operationId": "list_notices_api_v1_notices_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notices/read": {
+      "post": {
+        "tags": [
+          "notices"
+        ],
+        "summary": "Mark Notices Read",
+        "operationId": "mark_notices_read_api_v1_notices_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticesRead"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCount"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/transactions": {
       "get": {
         "tags": [
@@ -4122,6 +4208,100 @@
         "title": "MoneyAmount",
         "description": "An exact amount. `amount` is a decimal string; never parse it as a float."
       },
+      "NoticeList": {
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "title": "Unreadcount"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NoticeView"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unreadCount",
+          "items"
+        ],
+        "title": "NoticeList",
+        "description": "The latest notices and the number still unread (which may exceed what is listed)."
+      },
+      "NoticeView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "friendId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendid"
+          },
+          "isRead": {
+            "type": "boolean",
+            "title": "Isread"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "message",
+          "friendId",
+          "isRead",
+          "createdAt"
+        ],
+        "title": "NoticeView",
+        "description": "One \"Shared with you\" notice, worded for the reader. `friend_id` is the reader's own\nfriend row for the person behind it, so clients can link to that friend; null when the\nreader has no such row yet (a pending invite)."
+      },
+      "NoticesRead": {
+        "properties": {
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NoticesRead",
+        "description": "Which notices to mark read; leave `ids` out to mark every unread one."
+      },
       "Option": {
         "properties": {
           "label": {
@@ -6108,6 +6288,20 @@
           "replayed"
         ],
         "title": "TurnResult"
+      },
+      "UnreadCount": {
+        "properties": {
+          "unreadCount": {
+            "type": "integer",
+            "title": "Unreadcount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unreadCount"
+        ],
+        "title": "UnreadCount",
+        "description": "How many notices are still unread."
       },
       "UserView": {
         "properties": {

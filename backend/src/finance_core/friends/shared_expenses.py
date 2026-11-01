@@ -31,6 +31,12 @@ from finance_core.cache.primitives import UserDataGeneration
 from finance_core.clock import Clock
 from finance_core.errors import NotFoundError, ValidationFailedError
 from finance_core.friends.models import Friend, SharedExpense, SharedExpenseShare
+from finance_core.friends.notices import (
+    SHARED_EXPENSE_ADDED,
+    SHARED_EXPENSE_CHANGED,
+    SHARED_EXPENSE_DELETED,
+    NoticeWriter,
+)
 from finance_core.friends.schemas import (
     ParticipantInput,
     PersonView,
@@ -80,6 +86,7 @@ class SharedExpenseService:
         self._session = session
         self._transactions = TransactionService(session, clock=clock, generation=generation)
         self._delivery = ShareDelivery(session, clock=clock)
+        self._notices = NoticeWriter(session)
 
     # -- writes ---------------------------------------------------------------------------
 
@@ -129,6 +136,12 @@ class SharedExpenseService:
             [ctx.user_id, *linked.values()], "shared_expense.created", expense.id,
             self._snapshot(expense, plan.shares), request_id,
         )  # fmt: skip
+        for friend_id, user_id in linked.items():
+            await self._notices.notify(
+                recipient_id=user_id, actor_id=ctx.user_id, kind=SHARED_EXPENSE_ADDED,
+                subject=_label(expense), amount_minor=plan.shares[friend_id],
+                currency=expense.currency,
+            )  # fmt: skip
         await self._session.commit()
         await self._bump_generations([ctx.user_id, *linked.values()])
         return await self.get(ctx, expense.id)
@@ -198,6 +211,7 @@ class SharedExpenseService:
         """Delete the shared expense, its shares and the recorder's share transaction."""
         expense = await self._owned(ctx, shared_expense_id)
         snapshot = self._snapshot(expense, await self._share_amounts(expense.id))
+        label = _label(expense)  # read before the delete is flushed
         rows = await self._share_rows(expense.id)
         for row in rows:  # the recorder's and every linked friend's
             await self._transactions.remove_share_row(row.user_id, row, request_id=request_id)
@@ -208,6 +222,11 @@ class SharedExpenseService:
         self._audit_all(
             users, "shared_expense.deleted", expense.id, {"before": snapshot}, request_id
         )
+        for user_id in users:
+            await self._notices.notify(
+                recipient_id=user_id, actor_id=ctx.user_id, kind=SHARED_EXPENSE_DELETED,
+                subject=label,
+            )  # fmt: skip
         await self._session.commit()
         await self._bump_generations(users)
 
@@ -291,13 +310,28 @@ class SharedExpenseService:
                     occurred_on=expense.occurred_on, description=expense.description,
                     merchant=expense.merchant, request_id=request_id,
                 )  # fmt: skip
+                await self._notices.notify(
+                    recipient_id=user_id, actor_id=ctx.user_id, kind=SHARED_EXPENSE_CHANGED,
+                    subject=_label(expense), amount_minor=amounts[user_id],
+                    currency=expense.currency,
+                )  # fmt: skip
             else:
                 await self._transactions.remove_share_row(user_id, row, request_id=request_id)
+                # Taken out of the split, so from their side the expense is gone.
+                await self._notices.notify(
+                    recipient_id=user_id, actor_id=ctx.user_id, kind=SHARED_EXPENSE_DELETED,
+                    subject=_label(expense),
+                )  # fmt: skip
         for friend_id, user_id in linked.items():
             if user_id not in had:
                 await self._delivery.deliver(
                     expense, user_id=user_id, amount_minor=plan.shares[friend_id],
                     request_id=request_id,
+                )  # fmt: skip
+                await self._notices.notify(
+                    recipient_id=user_id, actor_id=ctx.user_id, kind=SHARED_EXPENSE_ADDED,
+                    subject=_label(expense), amount_minor=plan.shares[friend_id],
+                    currency=expense.currency,
                 )  # fmt: skip
         return list({*had, *amounts})
 
@@ -674,6 +708,11 @@ class SharedExpenseService:
                 )
             )
         return views
+
+
+def _label(expense: SharedExpense) -> str | None:
+    """What a notice calls the expense: its description, else its merchant."""
+    return expense.description or expense.merchant
 
 
 def _users_of(ctx: UserContext, rows: Sequence[Transaction]) -> list[uuid.UUID]:

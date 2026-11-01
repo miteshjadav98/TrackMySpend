@@ -7,6 +7,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 
 import { balanceSentence, balanceTone } from "@/components/friends/balance-text";
+import { SharedWithYouCard } from "@/components/notices/shared-with-you-card";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
@@ -49,6 +50,8 @@ export function FriendsScreen() {
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex max-w-xl flex-col gap-8 px-4 py-6 md:px-8">
         <h1 className="display text-[1.9rem] leading-tight font-semibold">Friends</h1>
+
+        <SharedWithYouCard />
 
         {invites.data?.length ? (
           <section aria-labelledby="invites-heading">

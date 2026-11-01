@@ -205,3 +205,35 @@ class FriendDetail(ApiModel):
 
     friend: FriendView
     history: list[HistoryEntry]
+
+
+class NoticeView(ApiModel):
+    """One "Shared with you" notice, worded for the reader. `friend_id` is the reader's own
+    friend row for the person behind it, so clients can link to that friend; null when the
+    reader has no such row yet (a pending invite)."""
+
+    id: uuid.UUID
+    kind: str
+    message: str
+    friend_id: uuid.UUID | None
+    is_read: bool
+    created_at: datetime
+
+
+class NoticeList(ApiModel):
+    """The latest notices and the number still unread (which may exceed what is listed)."""
+
+    unread_count: int
+    items: list[NoticeView]
+
+
+class NoticesRead(ApiInput):
+    """Which notices to mark read; leave `ids` out to mark every unread one."""
+
+    ids: list[uuid.UUID] | None = None
+
+
+class UnreadCount(ApiModel):
+    """How many notices are still unread."""
+
+    unread_count: int

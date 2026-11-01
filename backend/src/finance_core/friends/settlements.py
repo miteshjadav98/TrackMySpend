@@ -10,7 +10,7 @@ The rules it enforces:
   view (direction flipped, named by their own friend row). Only whoever recorded it deletes
   it; anyone else gets a 404.
 - Each write and its audit event, for the recorder and a linked friend, are saved in one
-  database transaction.
+  database transaction, and so is the notice that tells a linked friend.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from finance_core.dates import EARLIEST_ALLOWED_DATE
 from finance_core.errors import NotFoundError, ValidationFailedError
 from finance_core.friends.balances import balance_in
 from finance_core.friends.models import Friend, Settlement
+from finance_core.friends.notices import SETTLEMENT_DELETED, SETTLEMENT_RECORDED, NoticeWriter
 from finance_core.friends.schemas import (
     SettlementCreate,
     SettlementCreated,
@@ -57,6 +58,7 @@ class SettlementService:
         self._session = session
         self._clock = clock
         self._accounts = AccountService(session)
+        self._notices = NoticeWriter(session)
 
     async def create(
         self, ctx: UserContext, data: SettlementCreate, *, request_id: str | None = None
@@ -109,6 +111,7 @@ class SettlementService:
         )
         self._session.add(settlement)
         self._audit(ctx.user_id, friend, "settlement.created", settlement, request_id)
+        await self._notify(ctx, friend, SETTLEMENT_RECORDED, settlement)
         await self._session.commit()
         await self._session.refresh(settlement)
 
@@ -172,6 +175,7 @@ class SettlementService:
         friend = await self._session.get(Friend, settlement.friend_id)
         assert friend is not None  # a settlement's friend is archived, never deleted
         self._audit(ctx.user_id, friend, "settlement.deleted", settlement, request_id)
+        await self._notify(ctx, friend, SETTLEMENT_DELETED, settlement)
         await self._session.delete(settlement)
         await self._session.commit()
 
@@ -189,6 +193,16 @@ class SettlementService:
         if friend is None:
             raise NotFoundError("Friend not found")
         return friend
+
+    async def _notify(
+        self, ctx: UserContext, friend: Friend, kind: str, settlement: Settlement
+    ) -> None:
+        """Tell the friend, when they are a user, saved with the settlement itself."""
+        if friend.linked_user_id is not None:
+            await self._notices.notify(
+                recipient_id=friend.linked_user_id, actor_id=ctx.user_id, kind=kind,
+                amount_minor=settlement.amount_minor, currency=settlement.currency,
+            )  # fmt: skip
 
     def _audit(
         self,
