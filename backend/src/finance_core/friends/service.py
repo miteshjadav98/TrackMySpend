@@ -9,6 +9,8 @@ The rules it enforces:
   address with no account yet simply waits until someone signs up with it.
 - Accepting an invite links both users: each ends up with a friend row pointing at the other.
   A linked friend's email is fixed (409 `friend_linked`).
+- Accepting also brings over every shared expense the two recorded with each other before they
+  linked (see `share_delivery`), once, in the same database transaction.
 - Every change is audited in the same database transaction as the change.
 """
 
@@ -22,6 +24,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_core.audit.service import record_audit
+from finance_core.cache.primitives import UserDataGeneration
+from finance_core.clock import Clock
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
 from finance_core.friends.balances import balances_by_friend, history_with
 from finance_core.friends.models import (
@@ -40,6 +44,7 @@ from finance_core.friends.schemas import (
     FriendUpdate,
     FriendView,
 )
+from finance_core.friends.share_delivery import ShareDelivery
 from finance_core.ids import uuid7
 from finance_core.users.context import UserContext
 from finance_core.users.models import User
@@ -61,8 +66,16 @@ def _violated_constraint(error: IntegrityError) -> str | None:
 class FriendService:
     """Lists, adds, changes and removes one user's friends, and answers their invites."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        clock: Clock,
+        generation: UserDataGeneration | None = None,
+    ) -> None:
         self._session = session
+        self._generation = generation
+        self._delivery = ShareDelivery(session, clock=clock)
 
     # -- friends --------------------------------------------------------------------------
 
@@ -232,7 +245,13 @@ class FriendService:
         # The inviter's row changed too, so it is recorded under the inviter.
         self._audit(inviter.id, "friend.linked", inviters_row.id,
                     {"linked_user_id": str(ctx.user_id)}, request_id=request_id)  # fmt: skip
+        # Flushed so the delivery below sees both rows as linked.
+        await self._session.flush()
+        await self._delivery.bring_over_between(inviter.id, ctx.user_id, request_id)
         await self._commit()
+        if self._generation is not None:
+            await self._generation.bump(ctx.user_id)
+            await self._generation.bump(inviter.id)
         await self._session.refresh(mine)
         return await self._view_of(ctx, mine)
 

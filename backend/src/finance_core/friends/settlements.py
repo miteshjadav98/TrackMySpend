@@ -6,8 +6,11 @@ The rules it enforces:
 - It is not a transaction: it moves the balance with that friend and nothing in summaries.
 - More than is owed is allowed; the reply flags it so the user can check, because the balance
   then points the other way.
-- Only whoever recorded a settlement sees or deletes it; anyone else gets a 404.
-- Each write and its audit event are saved in one database transaction.
+- A settlement shows on both sides: the linked friend lists it too, from their own point of
+  view (direction flipped, named by their own friend row). Only whoever recorded it deletes
+  it; anyone else gets a 404.
+- Each write and its audit event, for the recorder and a linked friend, are saved in one
+  database transaction.
 """
 
 from __future__ import annotations
@@ -16,8 +19,9 @@ import uuid
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from finance_core.accounts.schemas import AccountRef
 from finance_core.accounts.service import AccountService
@@ -104,11 +108,11 @@ class SettlementService:
             recorder_account_id=account_id,
         )
         self._session.add(settlement)
-        self._audit(ctx, "settlement.created", settlement, request_id)
+        self._audit(ctx.user_id, friend, "settlement.created", settlement, request_id)
         await self._session.commit()
         await self._session.refresh(settlement)
 
-        view = (await self._views(ctx, [settlement]))[0]
+        view = (await self._views(ctx, [(settlement, friend)]))[0]
         warning = None
         if exceeds:
             owed_text = format_money(owed_this_way, currency, ctx.locale)
@@ -122,18 +126,37 @@ class SettlementService:
     async def list_settlements(
         self, ctx: UserContext, *, friend_id: uuid.UUID | None = None, limit: int = 100
     ) -> list[SettlementView]:
-        """The user's settlements, newest first, optionally with one friend."""
-        query = select(Settlement).where(Settlement.recorder_id == ctx.user_id)
-        if friend_id is not None:
-            query = query.where(Settlement.friend_id == friend_id)
-        rows = (
-            await self._session.scalars(
-                query.order_by(Settlement.occurred_on.desc(), Settlement.id.desc()).limit(
-                    max(1, min(limit, MAX_LIST))
-                )
+        """Settlements with the user, newest first, optionally with one friend: the ones they
+        recorded and the ones a linked friend recorded with them."""
+        recorded = select(Settlement, Friend).join(Friend, Friend.id == Settlement.friend_id)
+        recorded = recorded.where(Settlement.recorder_id == ctx.user_id)
+        # `mine` is the user's own friend row for the recorder, so the friend is named by it.
+        recorder_friend = aliased(Friend)
+        mine = aliased(Friend)
+        recorded_by_friend = (
+            select(Settlement, mine)
+            .join(recorder_friend, recorder_friend.id == Settlement.friend_id)
+            .join(
+                mine,
+                and_(
+                    mine.user_id == ctx.user_id,
+                    mine.linked_user_id == Settlement.recorder_id,
+                    mine.is_archived.is_(False),
+                ),
             )
-        ).all()
-        return await self._views(ctx, rows)
+            .where(recorder_friend.linked_user_id == ctx.user_id)
+        )
+        if friend_id is not None:
+            recorded = recorded.where(Settlement.friend_id == friend_id)
+            recorded_by_friend = recorded_by_friend.where(mine.id == friend_id)
+        size = max(1, min(limit, MAX_LIST))
+        pairs = [
+            (settlement, friend)
+            for query in (recorded, recorded_by_friend)
+            for settlement, friend in (await self._session.execute(query)).all()
+        ]
+        pairs.sort(key=lambda pair: (pair[0].occurred_on, pair[0].id), reverse=True)
+        return await self._views(ctx, pairs[:size])
 
     async def delete(
         self, ctx: UserContext, settlement_id: uuid.UUID, *, request_id: str | None = None
@@ -146,7 +169,9 @@ class SettlementService:
         )
         if settlement is None:  # someone else's, or never existed
             raise NotFoundError("Settlement not found")
-        self._audit(ctx, "settlement.deleted", settlement, request_id)
+        friend = await self._session.get(Friend, settlement.friend_id)
+        assert friend is not None  # a settlement's friend is archived, never deleted
+        self._audit(ctx.user_id, friend, "settlement.deleted", settlement, request_id)
         await self._session.delete(settlement)
         await self._session.commit()
 
@@ -166,51 +191,63 @@ class SettlementService:
         return friend
 
     def _audit(
-        self, ctx: UserContext, action: str, settlement: Settlement, request_id: str | None
+        self,
+        ctx_user_id: uuid.UUID,
+        friend: Friend,
+        action: str,
+        settlement: Settlement,
+        request_id: str | None,
     ) -> None:
+        """Audit the change for the recorder and, when the friend is linked, for them too."""
         data: dict[str, Any] = {
-            "friendId": str(settlement.friend_id),
             "paidByRecorder": settlement.paid_by_recorder,
             "amountMinor": settlement.amount_minor,
             "currency": settlement.currency,
             "occurredOn": settlement.occurred_on.isoformat(),
         }
-        record_audit(
-            self._session, user_id=ctx.user_id, actor="user", action=action,
-            entity_type="settlement", entity_id=settlement.id, data=data, request_id=request_id,
-        )  # fmt: skip
+        records = [(ctx_user_id, {**data, "friendId": str(settlement.friend_id)})]
+        if friend.linked_user_id is not None:
+            # The friend's log never names the recorder's own friend row.
+            records.append((friend.linked_user_id, {**data, "recordedBy": str(ctx_user_id)}))
+        for user_id, event_data in records:
+            record_audit(
+                self._session, user_id=user_id, actor="user", action=action,
+                entity_type="settlement", entity_id=settlement.id, data=event_data,
+                request_id=request_id,
+            )  # fmt: skip
 
-    async def _views(self, ctx: UserContext, rows: Sequence[Settlement]) -> list[SettlementView]:
-        if not rows:
-            return []
-        names = {
-            friend.id: friend.name
-            for friend in (
-                await self._session.scalars(
-                    select(Friend).where(Friend.id.in_({row.friend_id for row in rows}))
-                )
-            ).all()
-        }
+    async def _views(
+        self, ctx: UserContext, pairs: Sequence[tuple[Settlement, Friend]]
+    ) -> list[SettlementView]:
+        """Each settlement from the user's side: `friend` is the user's own friend row for the
+        other person, so the direction and account are read from the user's side too."""
         accounts: dict[uuid.UUID, AccountRef] = {}
-        for account_id in {row.recorder_account_id for row in rows if row.recorder_account_id}:
-            account = await self._accounts.get(ctx, account_id, field="accountId")
-            accounts[account_id] = AccountRef(id=account.id, name=account.name, kind=account.kind)
-        return [
-            SettlementView(
-                id=row.id,
-                friend=SettlementFriend(id=row.friend_id, name=names[row.friend_id]),
-                direction="you_paid_friend" if row.paid_by_recorder else "friend_paid_you",
-                amount=from_minor(row.amount_minor, row.currency),
-                amount_minor=row.amount_minor,
-                currency=row.currency,
-                amount_formatted=format_money(row.amount_minor, row.currency, ctx.locale),
-                occurred_on=row.occurred_on,
-                note=row.note,
-                account=accounts.get(row.recorder_account_id) if row.recorder_account_id else None,
-                created_at=row.created_at,
+        views: list[SettlementView] = []
+        for row, friend in pairs:
+            mine = row.recorder_id == ctx.user_id
+            account_id = row.recorder_account_id if mine else row.friend_account_id
+            if account_id is not None and account_id not in accounts:
+                account = await self._accounts.get(ctx, account_id, field="accountId")
+                accounts[account_id] = AccountRef(
+                    id=account.id, name=account.name, kind=account.kind
+                )
+            paid_by_you = row.paid_by_recorder == mine
+            views.append(
+                SettlementView(
+                    id=row.id,
+                    friend=SettlementFriend(id=friend.id, name=friend.name),
+                    direction="you_paid_friend" if paid_by_you else "friend_paid_you",
+                    amount=from_minor(row.amount_minor, row.currency),
+                    amount_minor=row.amount_minor,
+                    currency=row.currency,
+                    amount_formatted=format_money(row.amount_minor, row.currency, ctx.locale),
+                    occurred_on=row.occurred_on,
+                    note=row.note,
+                    account=accounts.get(account_id) if account_id else None,
+                    created_at=row.created_at,
+                )
             )
-            for row in rows
-        ]
+        return views
 
 
 __all__ = ["SettlementService"]

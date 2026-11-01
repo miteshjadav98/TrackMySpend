@@ -9,8 +9,11 @@ The rules it enforces:
 - Shares are whole minor units that add up to the total: an equal split gives everyone the
   floor and the payer the leftover; exact amounts must sum to the total.
 - The recorder's share is saved as an ordinary expense transaction, so summaries count the
-  share. The shared expense, its shares, that transaction and their audit events are written
-  in one database transaction.
+  share. So is each linked friend's (see `share_delivery`). The shared expense, its shares,
+  every share transaction and the audit event for each affected user are written in one
+  database transaction.
+- A participant who is a linked user can read the shared expense (named the way they know
+  people, with nothing of the recorder's private fields) but never change it.
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ from collections.abc import Sequence
 from datetime import date
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_core.audit.service import record_audit
@@ -37,6 +40,7 @@ from finance_core.friends.schemas import (
     SharedExpenseWrite,
     ShareView,
 )
+from finance_core.friends.share_delivery import ShareDelivery
 from finance_core.friends.splits import equal_split, exact_split
 from finance_core.ids import uuid7
 from finance_core.money import (
@@ -50,6 +54,7 @@ from finance_core.transactions.models import Transaction
 from finance_core.transactions.schemas import NewTransaction, TransactionCreate
 from finance_core.transactions.service import TransactionService
 from finance_core.users.context import UserContext
+from finance_core.users.models import User
 
 # Keys of a split: the recorder is None, a friend is their id.
 type PersonKey = uuid.UUID | None
@@ -74,6 +79,7 @@ class SharedExpenseService:
     ) -> None:
         self._session = session
         self._transactions = TransactionService(session, clock=clock, generation=generation)
+        self._delivery = ShareDelivery(session, clock=clock)
 
     # -- writes ---------------------------------------------------------------------------
 
@@ -115,13 +121,16 @@ class SharedExpenseService:
         self._session.add(expense)
         await self._session.flush()  # the expense row must exist before shares point at it
         self._add_shares(expense.id, plan.shares)
+        linked = await self._linked_users(plan.shares)
         await self._create_share_transactions(
-            ctx, expense, my_share, request_id, source, source_ref
+            ctx, expense, my_share, plan.shares, linked, request_id, source, source_ref
         )
-        self._audit(ctx, "shared_expense.created", expense.id, self._snapshot(expense, plan.shares),
-                    request_id)  # fmt: skip
+        self._audit_all(
+            [ctx.user_id, *linked.values()], "shared_expense.created", expense.id,
+            self._snapshot(expense, plan.shares), request_id,
+        )  # fmt: skip
         await self._session.commit()
-        await self._transactions.bump_generation(ctx.user_id)
+        await self._bump_generations([ctx.user_id, *linked.values()])
         return await self.get(ctx, expense.id)
 
     async def update(
@@ -135,7 +144,7 @@ class SharedExpenseService:
         """Replace the bill and split, and move the recorder's share transaction with it."""
         expense = await self._owned(ctx, shared_expense_id)
         before = self._snapshot(expense, await self._share_amounts(expense.id))
-        share_row = await self._transactions.share_row(ctx, expense.id)
+        share_row = await self._transactions.share_row(ctx.user_id, expense.id)
         plan = await self._plan(ctx, data, existing=expense.id)
         # The share keeps its own category and account; resolve checks the new date and amount.
         my_share = await self._transactions.resolve(
@@ -165,7 +174,7 @@ class SharedExpenseService:
         )
         self._add_shares(expense.id, plan.shares)
         self._transactions.change_share_row(
-            ctx,
+            ctx.user_id,
             share_row,
             amount_minor=my_share.amount_minor,
             currency=my_share.currency,
@@ -174,12 +183,13 @@ class SharedExpenseService:
             merchant=my_share.merchant,
             request_id=request_id,
         )
-        self._audit(
-            ctx, "shared_expense.updated", expense.id,
+        affected = await self._sync_friend_shares(ctx, expense, plan, request_id)
+        self._audit_all(
+            [ctx.user_id, *affected], "shared_expense.updated", expense.id,
             {"before": before, "after": self._snapshot(expense, plan.shares)}, request_id,
         )  # fmt: skip
         await self._session.commit()
-        await self._transactions.bump_generation(ctx.user_id)
+        await self._bump_generations([ctx.user_id, *affected])
         return await self.get(ctx, expense.id)
 
     async def delete(
@@ -188,19 +198,30 @@ class SharedExpenseService:
         """Delete the shared expense, its shares and the recorder's share transaction."""
         expense = await self._owned(ctx, shared_expense_id)
         snapshot = self._snapshot(expense, await self._share_amounts(expense.id))
-        share_row = await self._transactions.share_row(ctx, expense.id)
-        await self._transactions.remove_share_row(ctx, share_row, request_id=request_id)
-        # Flushed first: the transaction points at the expense, and the expense must go last.
+        rows = await self._share_rows(expense.id)
+        for row in rows:  # the recorder's and every linked friend's
+            await self._transactions.remove_share_row(row.user_id, row, request_id=request_id)
+        # Flushed first: the transactions point at the expense, and the expense must go last.
         await self._session.flush()
         await self._session.delete(expense)  # its shares go with it (ON DELETE CASCADE)
-        self._audit(ctx, "shared_expense.deleted", expense.id, {"before": snapshot}, request_id)
+        users = _users_of(ctx, rows)
+        self._audit_all(
+            users, "shared_expense.deleted", expense.id, {"before": snapshot}, request_id
+        )
         await self._session.commit()
-        await self._transactions.bump_generation(ctx.user_id)
+        await self._bump_generations(users)
 
     # -- reads ----------------------------------------------------------------------------
 
     async def get(self, ctx: UserContext, shared_expense_id: uuid.UUID) -> SharedExpenseView:
-        expense = await self._owned(ctx, shared_expense_id)
+        """A shared expense the user recorded or takes part in; anyone else gets a 404."""
+        expense = await self._session.scalar(
+            select(SharedExpense).where(
+                SharedExpense.id == shared_expense_id, self._can_see(ctx.user_id)
+            )
+        )
+        if expense is None:
+            raise NotFoundError("Shared expense not found")
         return (await self._views(ctx, [expense]))[0]
 
     async def list_shared(
@@ -211,8 +232,8 @@ class SharedExpenseService:
         date_to: date | None = None,
         limit: int = 50,
     ) -> list[SharedExpenseView]:
-        """The user's shared expenses, newest first."""
-        query = select(SharedExpense).where(SharedExpense.recorder_id == ctx.user_id)
+        """The shared expenses the user recorded or takes part in, newest first."""
+        query = select(SharedExpense).where(self._can_see(ctx.user_id))
         if date_from:
             query = query.where(SharedExpense.occurred_on >= date_from)
         if date_to:
@@ -226,26 +247,86 @@ class SharedExpenseService:
         ).all()
         return await self._views(ctx, rows)
 
-    # -- the seam for linked friends -------------------------------------------------------
+    # -- linked friends' shares --------------------------------------------------------------
 
     async def _create_share_transactions(
         self,
         ctx: UserContext,
         expense: SharedExpense,
         my_share: NewTransaction,
+        shares: dict[PersonKey, int],
+        linked: dict[uuid.UUID, uuid.UUID],
         request_id: str | None,
         source: str,
         source_ref: str | None,
     ) -> None:
-        """Give every participant who is a user their share as an expense transaction.
-
-        Today only the recorder is a user here. Linked friends get theirs from the friends'
-        side of the feature, which will add its own loop over the linked participants here.
-        """
+        """Give the recorder and every participant who is a linked user their share."""
         await self._transactions.add_share_row(
-            ctx, my_share, shared_expense_id=expense.id, request_id=request_id,
+            ctx.user_id, my_share, shared_expense_id=expense.id, request_id=request_id,
             source=source, source_ref=source_ref,
         )  # fmt: skip
+        # Flushed so the friends' delivery can read the category the recorder chose.
+        await self._session.flush()
+        for friend_id, user_id in linked.items():
+            await self._delivery.deliver(
+                expense, user_id=user_id, amount_minor=shares[friend_id], request_id=request_id
+            )
+
+    async def _sync_friend_shares(
+        self, ctx: UserContext, expense: SharedExpense, plan: _Plan, request_id: str | None
+    ) -> list[uuid.UUID]:
+        """After an edit, bring the linked friends' share transactions in line with the new
+        split: move those still in it, add those just added, remove those taken out.
+
+        Returns every friend user the edit touched, for their audit events.
+        """
+        linked = await self._linked_users(plan.shares)
+        amounts = {user_id: plan.shares[friend_id] for friend_id, user_id in linked.items()}
+        had = {row.user_id: row for row in await self._share_rows(expense.id)}
+        had.pop(ctx.user_id, None)  # the recorder's own share was moved by the caller
+        for user_id, row in had.items():
+            if user_id in amounts:
+                self._transactions.change_share_row(
+                    user_id, row, amount_minor=amounts[user_id], currency=expense.currency,
+                    occurred_on=expense.occurred_on, description=expense.description,
+                    merchant=expense.merchant, request_id=request_id,
+                )  # fmt: skip
+            else:
+                await self._transactions.remove_share_row(user_id, row, request_id=request_id)
+        for friend_id, user_id in linked.items():
+            if user_id not in had:
+                await self._delivery.deliver(
+                    expense, user_id=user_id, amount_minor=plan.shares[friend_id],
+                    request_id=request_id,
+                )  # fmt: skip
+        return list({*had, *amounts})
+
+    async def _linked_users(self, shares: dict[PersonKey, int]) -> dict[uuid.UUID, uuid.UUID]:
+        """Friend id to user id, for the participants who are linked to a MoneyMoney user."""
+        friend_ids = [friend_id for friend_id in shares if friend_id is not None]
+        rows = await self._session.execute(
+            select(Friend.id, Friend.linked_user_id).where(
+                Friend.id.in_(friend_ids), Friend.linked_user_id.is_not(None)
+            )
+        )
+        return {friend_id: user_id for friend_id, user_id in rows.all() if user_id is not None}
+
+    async def _share_rows(self, shared_expense_id: uuid.UUID) -> list[Transaction]:
+        """Every participant's share transaction of this shared expense."""
+        rows = await self._session.scalars(
+            select(Transaction).where(Transaction.shared_expense_id == shared_expense_id)
+        )
+        return list(rows.all())
+
+    @staticmethod
+    def _can_see(user_id: uuid.UUID) -> Any:
+        """The recorder, or a participant whose friend row for them is linked to this user."""
+        taking_part = (
+            select(SharedExpenseShare.shared_expense_id)
+            .join(Friend, Friend.id == SharedExpenseShare.friend_id)
+            .where(Friend.linked_user_id == user_id)
+        )
+        return or_(SharedExpense.recorder_id == user_id, SharedExpense.id.in_(taking_part))
 
     # -- planning: who takes part and what each owes ---------------------------------------
 
@@ -315,6 +396,10 @@ class SharedExpenseService:
         }
         if wanted - friends.keys():  # unknown, or another user's: indistinguishable on purpose
             raise NotFoundError("Friend not found")
+        # Two friend rows for one linked user would give that user two shares of one bill.
+        linked_users = [f.linked_user_id for f in friends.values() if f.linked_user_id]
+        if len(set(linked_users)) != len(linked_users):
+            raise _participants_error("Each person can take part only once.")
         already_in = await self._friends_already_in(existing) if existing else set()
         for friend in friends.values():
             if friend.is_archived and friend.id not in already_in:
@@ -380,20 +465,135 @@ class SharedExpenseService:
                        for friend_id, amount in shares.items()},
         }  # fmt: skip
 
-    def _audit(
+    def _audit_all(
         self,
-        ctx: UserContext,
+        user_ids: Sequence[uuid.UUID],
         action: str,
         entity_id: uuid.UUID,
         data: dict[str, Any],
         request_id: str | None,
     ) -> None:
-        record_audit(
-            self._session, user_id=ctx.user_id, actor="user", action=action,
-            entity_type="shared_expense", entity_id=entity_id, data=data, request_id=request_id,
-        )  # fmt: skip
+        """One audit event per affected user, saved with the change itself."""
+        for user_id in dict.fromkeys(user_ids):
+            record_audit(
+                self._session, user_id=user_id, actor="user", action=action,
+                entity_type="shared_expense", entity_id=entity_id, data=data,
+                request_id=request_id,
+            )  # fmt: skip
+
+    async def _bump_generations(self, user_ids: Sequence[uuid.UUID]) -> None:
+        for user_id in dict.fromkeys(user_ids):
+            await self._transactions.bump_generation(user_id)
 
     async def _views(
+        self, ctx: UserContext, expenses: Sequence[SharedExpense]
+    ) -> list[SharedExpenseView]:
+        mine = [e for e in expenses if e.recorder_id == ctx.user_id]
+        theirs = [e for e in expenses if e.recorder_id != ctx.user_id]
+        views = [*await self._recorder_views(ctx, mine), *await self._friend_views(ctx, theirs)]
+        by_id = {view.id: view for view in views}
+        return [by_id[expense.id] for expense in expenses]
+
+    async def _friend_views(
+        self, ctx: UserContext, expenses: Sequence[SharedExpense]
+    ) -> list[SharedExpenseView]:
+        """The shared expenses as a linked friend sees them.
+
+        People are named the way this user knows them (their own friend row for someone
+        linked), else the way the recorder named them. Only fields of the shared expense
+        itself appear: never the recorder's category, account or notes, nor the recorder's
+        friend ids.
+        """
+        if not expenses:
+            return []
+        ids = [expense.id for expense in expenses]
+        share_rows = (
+            await self._session.execute(
+                select(SharedExpenseShare, Friend)
+                .outerjoin(Friend, Friend.id == SharedExpenseShare.friend_id)
+                .where(SharedExpenseShare.shared_expense_id.in_(ids))
+            )
+        ).all()
+        friends_by_id = {friend.id: friend for _, friend in share_rows if friend is not None}
+        recorder_ids = {expense.recorder_id for expense in expenses}
+        recorder_names = dict(
+            (
+                await self._session.execute(
+                    select(User.id, User.display_name).where(User.id.in_(recorder_ids))
+                )
+            ).all()
+        )
+        linked_ids = {f.linked_user_id for f in friends_by_id.values() if f.linked_user_id}
+        my_rows = {
+            row.linked_user_id: row
+            for row in (
+                await self._session.scalars(
+                    select(Friend).where(
+                        Friend.user_id == ctx.user_id,
+                        Friend.is_archived.is_(False),
+                        Friend.linked_user_id.in_(recorder_ids | linked_ids),
+                    )
+                )
+            ).all()
+        }
+        my_transactions = {
+            expense_id: transaction_id
+            for expense_id, transaction_id in (
+                await self._session.execute(
+                    select(Transaction.shared_expense_id, Transaction.id).where(
+                        Transaction.user_id == ctx.user_id,
+                        Transaction.shared_expense_id.in_(ids),
+                    )
+                )
+            ).all()
+        }
+
+        def person(expense: SharedExpense, friend_id: uuid.UUID | None) -> PersonView:
+            friend = friends_by_id.get(friend_id) if friend_id else None
+            user_id = friend.linked_user_id if friend else expense.recorder_id
+            if user_id == ctx.user_id:
+                return PersonView(friend_id=None, name=YOU, is_you=True)
+            known = my_rows.get(user_id) if user_id else None
+            if known is not None:
+                return PersonView(friend_id=known.id, name=known.name, is_you=False)
+            name = friend.name if friend else recorder_names[expense.recorder_id]
+            return PersonView(friend_id=None, name=name, is_you=False)
+
+        views: list[SharedExpenseView] = []
+        for expense in expenses:
+            shares = [
+                ShareView(
+                    **person(expense, share.friend_id).model_dump(),
+                    amount=from_minor(share.amount_minor, expense.currency),
+                    amount_minor=share.amount_minor,
+                    amount_formatted=format_money(share.amount_minor, expense.currency, ctx.locale),
+                )
+                for share, _ in share_rows
+                if share.shared_expense_id == expense.id
+            ]
+            shares.sort(key=lambda s: (not s.is_you, s.name.lower()))
+            payer = person(expense, expense.payer_friend_id)
+            views.append(
+                SharedExpenseView(
+                    id=expense.id,
+                    total=from_minor(expense.total_minor, expense.currency),
+                    total_minor=expense.total_minor,
+                    currency=expense.currency,
+                    total_formatted=format_money(expense.total_minor, expense.currency, ctx.locale),
+                    occurred_on=expense.occurred_on,
+                    description=expense.description,
+                    merchant=expense.merchant,
+                    payer=payer,
+                    paid_by_you=payer.is_you,
+                    shares=shares,
+                    my_transaction_id=my_transactions.get(expense.id),
+                    created_at=expense.created_at,
+                    updated_at=expense.updated_at,
+                )
+            )
+        return views
+
+    async def _recorder_views(
         self, ctx: UserContext, expenses: Sequence[SharedExpense]
     ) -> list[SharedExpenseView]:
         if not expenses:
@@ -474,6 +674,11 @@ class SharedExpenseService:
                 )
             )
         return views
+
+
+def _users_of(ctx: UserContext, rows: Sequence[Transaction]) -> list[uuid.UUID]:
+    """The recorder first, then everyone else who holds a share transaction."""
+    return [ctx.user_id, *(row.user_id for row in rows if row.user_id != ctx.user_id)]
 
 
 class _Plan:
