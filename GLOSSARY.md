@@ -115,6 +115,14 @@ _Avoid_: debt, due, outstanding
 A record that one person paid another to reduce their balance, such as "Jaymin paid me 500". It is never spending or income.
 _Avoid_: repayment, settle-up, transfer (that moves money between the user's own accounts)
 
+**Invite**:
+An offer to link two users as friends, sent when a friend's email belongs to a MoneyMoney user. It is pending until the other user accepts or declines it, and the sender can cancel it by changing the friend's email.
+_Avoid_: request, friend request
+
+**Notice**:
+An in-app message that a linked friend changed something in a record you share, shown on the "Shared with you" card. It is never sent as a push or an email.
+_Avoid_: notification, alert
+
 ### People and access
 
 **User**:
