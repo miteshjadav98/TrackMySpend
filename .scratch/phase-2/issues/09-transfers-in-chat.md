@@ -40,4 +40,4 @@ Spec: `../spec.md` → Implementation Decisions → Transfers and accounts in ch
   Across all 138 calls: p50 1154 ms, p95 1486 ms, against the Phase 1 baseline of p50 1.26 s. One earlier script run hit a Gemini 504 (DEADLINE_EXCEEDED) on a single call; it was a provider timeout and the rerun is the one above.
 - The ticket `Status:` line is left for the merge, as `docs/agents/issue-tracker.md` says.
 - The parser also reads "sent X from A to B" as a transfer, but only when both ends are named ("sent 500 to Ramesh" stays an expense).
-- Merged to `phase-2/integration` in commit e4706d3 ("Merge ticket 09: transfers in chat").
+- Merged to `phase-2/integration` in commit 2e06f65 ("Merge ticket 09: transfers in chat").
