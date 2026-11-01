@@ -328,7 +328,7 @@ class FinanceNodes:
         async with self._deps.session_factory() as session:
             categories = await CategoryService(session).list_visible(ctx.user_id)
             accounts = await AccountService(session).list_accounts(ctx.user)
-            friends = await FriendService(session).list_friends(ctx.user)
+            friends = await FriendService(session, clock=self._deps.clock).list_friends(ctx.user)
         request = UnderstandRequest(
             text=text,
             today=ctx.today,
@@ -458,7 +458,7 @@ class FinanceNodes:
                 today=ctx.today,
                 locale=ctx.locale,
                 accounts=await AccountService(session).list_accounts(ctx.user),
-                friends=await FriendService(session).list_friends(ctx.user),
+                friends=await FriendService(session, clock=self._deps.clock).list_friends(ctx.user),
             )
             return await applier.apply_value(
                 field, value, draft, allow_custom=bool(followup.get("allowCustom"))
@@ -481,7 +481,7 @@ class FinanceNodes:
             merchant_rules = MerchantRuleService(session, clock=self._deps.clock)
             account_service = AccountService(session)
             active_accounts = await account_service.list_accounts(ctx.user)
-            friends = await FriendService(session).list_friends(ctx.user)
+            friends = await FriendService(session, clock=self._deps.clock).list_friends(ctx.user)
             for index, draft in enumerate(drafts):
                 drafts[index] = await _file_under_category(
                     _with_friends_resolved(
@@ -562,7 +562,7 @@ class FinanceNodes:
                 today=ctx.today,
                 locale=ctx.locale,
                 accounts=await AccountService(session).list_accounts(ctx.user),
-                friends=await FriendService(session).list_friends(ctx.user),
+                friends=await FriendService(session, clock=self._deps.clock).list_friends(ctx.user),
             )
             if payload.get("kind") == "text":
                 outcome = await applier.from_text(
@@ -732,7 +732,9 @@ class FinanceNodes:
         """Record a shared expense through the shared-expense service, adding the friends the
         user agreed to add. Returns it with the names of the friends added."""
         assert draft.amount is not None and draft.date
-        friend_ids, added = await self._friend_ids_for(ctx, FriendService(session), draft)
+        friend_ids, added = await self._friend_ids_for(
+            ctx, FriendService(session, clock=self._deps.clock), draft
+        )
         own = await self._expense_or_income(ctx, categories, draft)
         exact = draft.split == "exact"
         participants = [
