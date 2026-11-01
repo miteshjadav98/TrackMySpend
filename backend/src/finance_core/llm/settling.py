@@ -118,7 +118,7 @@ def _friend_said(name: str, friend_names: Sequence[str]) -> str | None:
     full = _usable_name(name)
     if full is None or _is_known(full, friend_names):
         return full
-    return _usable_name(name.split()[0])
+    return _usable_name(name.split(maxsplit=1)[0])
 
 
 def read_balance_question(text: str, friend_names: Sequence[str] = ()) -> BalanceSpec | None:

@@ -919,7 +919,7 @@ class FinanceNodes:
             except (ValidationFailedError, NotFoundError):
                 logger.warning("settlement failed at save")
                 return {"outcome": "save_failed", "settlement": None}
-            friends = await FriendService(session).list_friends(ctx.user)
+            friends = await FriendService(session, clock=self._deps.clock).list_friends(ctx.user)
             friend = next(f for f in friends if str(f.id) == plan["friend_id"])
         return {
             "outcome": "settlement_saved",
@@ -941,7 +941,7 @@ class FinanceNodes:
         runtime.stream_writer(status_event("summarizing", "Checking your balances…"))
         spec = BalanceSpec.model_validate(state.get("balance") or {})
         async with self._deps.session_factory() as session:
-            friends = await FriendService(session).list_friends(ctx.user)
+            friends = await FriendService(session, clock=self._deps.clock).list_friends(ctx.user)
         if spec.friend:
             matches = matching_friends(spec.friend, friends)
             if len(matches) != 1:
