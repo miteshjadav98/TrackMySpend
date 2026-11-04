@@ -10,13 +10,13 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "next": "16.4.3",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
     "@moneymoney/contracts": "*",
-    "@tanstack/react-query": "^5.104.5",
+    "@tanstack/react-query": "^5.105.0",
+    "lucide-react": "^1.66.0",
+    "next": "16.4.3",
     "openapi-fetch": "^0.17.0",
-    "lucide-react": "*"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
