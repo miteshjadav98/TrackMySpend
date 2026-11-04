@@ -9,11 +9,11 @@ members = ["backend", "apps/api"]
 
 [dependency-groups]
 dev = [
-  "pytest>=8.4",
-  "pytest-asyncio>=1.2",
+  "pytest>=9.2.0",
+  "pytest-asyncio>=1.4.1",
   "httpx>=0.28",
-  "ruff>=0.14",
-  "mypy>=1.18",
+  "ruff>=0.17.3",
+  "mypy>=2.4.1",
   "import-linter>=2.5",
 ]
 
