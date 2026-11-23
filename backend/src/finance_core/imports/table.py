@@ -1,6 +1,6 @@
 """Finding the table inside the rows a reader returned, and enforcing the size limits.
 
-Any reader (CSV today, Excel later) hands over rows of cells; this is the one place that
+Any reader hands over rows of cells; this is the one place that
 decides where the table starts and whether the file is usable at all.
 """
 

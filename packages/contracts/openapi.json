@@ -1724,6 +1724,59 @@
         }
       }
     },
+    "/api/v1/imports/{import_id}/sheet": {
+      "put": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Select Sheet",
+        "operationId": "select_sheet_api_v1_imports__import_id__sheet_put",
+        "parameters": [
+          {
+            "name": "import_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Import Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_select_sheet_api_v1_imports__import_id__sheet_put"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/imports/{import_id}/rows": {
       "patch": {
         "tags": [
@@ -3405,6 +3458,27 @@
         "title": "BalanceView",
         "description": "What is owed between the user and a friend in one currency. Positive means the friend\nowes the user; negative means the user owes the friend. `formatted` is the size of the\nbalance without a sign. Settled-up currencies are left out."
       },
+      "Body_select_sheet_api_v1_imports__import_id__sheet_put": {
+        "properties": {
+          "sheetName": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Sheetname"
+          },
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sheetName",
+          "file"
+        ],
+        "title": "Body_select_sheet_api_v1_imports__import_id__sheet_put"
+      },
       "Body_upload_statement_api_v1_imports_post": {
         "properties": {
           "accountId": {
@@ -4756,6 +4830,24 @@
           "layout": {
             "$ref": "#/components/schemas/ColumnMap"
           },
+          "sheetName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheetname"
+          },
+          "sheetNames": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sheetnames"
+          },
           "layoutConfirmed": {
             "type": "boolean",
             "title": "Layoutconfirmed"
@@ -4792,6 +4884,8 @@
           "headers",
           "sampleRows",
           "layout",
+          "sheetName",
+          "sheetNames",
           "layoutConfirmed",
           "counts",
           "rows",

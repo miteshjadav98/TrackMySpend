@@ -1,4 +1,4 @@
-"""Importing a CSV statement end to end, through the HTTP API with real sample files."""
+"""Importing CSV and Excel statements through the HTTP API with sample files."""
 
 from __future__ import annotations
 
@@ -20,6 +20,8 @@ IMPORTS = "/api/v1/imports"
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "statements"
 HDFC = "hdfc_savings.csv"
 SBI = "sbi_savings.csv"
+AXIS = "axis_savings.csv"
+ICICI = "icici_savings.xlsx"
 
 
 async def make_account(client: httpx.AsyncClient, name: str = "HDFC Savings") -> str:
@@ -139,6 +141,76 @@ async def test_a_statement_with_account_details_above_the_table_is_read(
     assert detail["rows"][0]["occurredOn"] == "2026-10-01"
     assert detail["rows"][0]["merchant"] == "ZOMATO"
     assert detail["rows"][3]["amountMinor"] == 1234567
+
+
+async def test_a_semicolon_csv_with_a_ragged_preamble_is_read(client: httpx.AsyncClient) -> None:
+    await register(client)
+    detail = await upload(client, await make_account(client, "Axis Savings"), AXIS)
+    assert detail["headers"][0] == "Tran Date"
+    assert detail["sheetNames"] == []
+    assert [(row["direction"], row["amountMinor"]) for row in detail["rows"]] == [
+        ("out", 32550),
+        ("in", 3500000),
+    ]
+
+
+async def test_excel_skips_the_cover_sheet_and_remembers_the_worksheet_the_user_chose(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    account_id = await make_account(client, "ICICI Savings")
+    first = await upload(client, account_id, ICICI)
+    assert first["sheetNames"] == ["Read me", "Savings", "Alternate"]
+    assert first["sheetName"] == "Savings"
+    date, amount = first["rows"][0]["occurredOn"], first["rows"][0]["amountMinor"]
+    assert (date, amount) == ("2026-10-02", 45025)
+
+    url = f"{IMPORTS}/{first['id']}/sheet"
+    data = {"sheetName": "Alternate"}
+    rejected = await client.put(url, data=data, files={"file": (ICICI, b"Different file")})
+    assert rejected.status_code == 422
+    assert rejected.json()["error"]["code"] == "wrong_workbook"
+    assert (await client.get(f"{IMPORTS}/{first['id']}")).json()["sheetName"] == "Savings"
+
+    files = {"file": (ICICI, (FIXTURES / ICICI).read_bytes())}
+    response = await client.put(url, data=data, files=files)
+    assert response.status_code == 200, response.text
+    switched = response.json()
+    assert switched["id"] == first["id"]
+    assert switched["sheetName"] == "Alternate"
+    assert switched["layoutConfirmed"] is False  # The alternate sheet has the same headers.
+    assert [row["amountMinor"] for row in switched["rows"]] == [12575]
+
+    confirmed = await confirm_layout(client, switched)
+    assert confirmed["layoutConfirmed"] is True
+    done = await confirm(client, confirmed["id"])
+    assert done["importedCount"] == 1
+    assert done["sheetName"] == "Alternate"
+    assert done["sheetNames"] == []
+    assert (await client.put(url, data={"sheetName": "Savings"}, files=files)).status_code == 409
+
+    uploaded_again = await upload(client, account_id, ICICI)
+    assert uploaded_again["sheetName"] == "Alternate"
+    assert uploaded_again["layoutConfirmed"] is True
+    assert uploaded_again["rows"][0]["status"] == "skipped"
+
+
+@pytest.mark.parametrize(
+    ("file_name", "data", "code"),
+    [
+        ("statement.xls", b"old binary file", "unsupported_workbook"),
+        ("statement.xlsx", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", "protected_workbook"),
+        ("statement.xlsx", b"PK\x03\x04corrupt workbook", "not_a_statement"),
+    ],
+)
+async def test_excel_errors_explain_what_to_upload(
+    client: httpx.AsyncClient, file_name: str, data: bytes, code: str
+) -> None:
+    await register(client)
+    account_id = await make_account(client)
+    response = await upload(client, account_id, data, file_name=file_name, expect=422)
+    assert response["error"]["code"] == code
+    assert ".xlsx" in response["error"]["message"]
 
 
 async def test_a_merchant_rule_files_a_row_instead_of_other(client: httpx.AsyncClient) -> None:

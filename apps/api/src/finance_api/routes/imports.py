@@ -81,6 +81,20 @@ async def save_layout(
     return await service.save_layout(ctx, import_id, body, request_id=request_id)
 
 
+@router.put("/{import_id}/sheet")
+async def select_sheet(
+    import_id: uuid.UUID,
+    ctx: UserContextDep,
+    service: ServiceDep,
+    request_id: RequestIdDep,
+    sheet_name: Annotated[str, Form(alias="sheetName", min_length=1, max_length=100)],
+    file: Annotated[UploadFile, File()],
+) -> ImportDetail:
+    return await service.select_sheet(
+        ctx, import_id, sheet_name, await file.read(MAX_FILE_BYTES + 1), request_id=request_id
+    )
+
+
 @router.patch("/{import_id}/rows")
 async def update_rows(
     import_id: uuid.UUID,

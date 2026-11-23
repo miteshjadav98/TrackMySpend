@@ -1,17 +1,18 @@
 """File readers: turn an uploaded file into rows of cells.
 
-Every reader returns the same shape, `list[list[Cell]]`, so the parser does not care whether a
-statement came from a CSV or (later) an Excel sheet. The reader only reads; finding the table
-and the columns is the parser's job.
+CSV cells are text. The column guess helps distinguish delimiters even when a bank's
+preamble does not use the delimiter consistently.
 """
 
 from __future__ import annotations
 
 import csv
 import io
+from itertools import islice
 
 from finance_core.errors import ValidationFailedError
 from finance_core.imports.cells import Cell
+from finance_core.imports.columns import HEADER_SEARCH_ROWS, find_header_row
 
 NOT_A_STATEMENT = "not_a_statement"
 _DELIMITERS = ",;\t|"
@@ -28,7 +29,16 @@ def _decode(data: bytes) -> str:
 
 
 def _delimiter(text: str) -> str:
-    """The delimiter that splits the first lines into the most cells."""
+    """Prefer a delimiter that gives us a recognizable statement header."""
+    for delimiter in _DELIMITERS:
+        try:
+            rows = list(
+                islice(csv.reader(io.StringIO(text), delimiter=delimiter), HEADER_SEARCH_ROWS)
+            )
+        except csv.Error:
+            continue
+        if find_header_row(rows) is not None:
+            return delimiter
     sample = "\n".join(text.splitlines()[:30])
     try:
         return csv.Sniffer().sniff(sample, delimiters=_DELIMITERS).delimiter
@@ -38,12 +48,16 @@ def _delimiter(text: str) -> str:
 
 def read_csv(data: bytes) -> list[list[Cell]]:
     """All rows of a CSV file, cells as text."""
-    if b"\x00" in data[:4096] or data.startswith(b"PK"):
-        # NUL bytes mean a binary file; "PK" is a zip, which is what .xlsx is.
+    if b"\x00" in data:
         raise ValidationFailedError(
-            "This does not look like a CSV statement. Excel files are not supported yet.",
+            "This does not look like a CSV statement.",
             code=NOT_A_STATEMENT,
         )
     text = _decode(data)
     reader = csv.reader(io.StringIO(text), delimiter=_delimiter(text))
-    return [list(row) for row in reader]
+    try:
+        return [list(row) for row in reader]
+    except csv.Error:
+        raise ValidationFailedError(
+            "This CSV could not be read. Export it again from your bank.", code=NOT_A_STATEMENT
+        ) from None

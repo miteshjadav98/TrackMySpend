@@ -525,6 +525,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/imports/{import_id}/sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Select Sheet */
+        put: operations["select_sheet_api_v1_imports__import_id__sheet_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/imports/{import_id}/rows": {
         parameters: {
             query?: never;
@@ -896,6 +913,13 @@ export interface components {
             amount: number | string;
             /** Formatted */
             formatted: string;
+        };
+        /** Body_select_sheet_api_v1_imports__import_id__sheet_put */
+        Body_select_sheet_api_v1_imports__import_id__sheet_put: {
+            /** Sheetname */
+            sheetName: string;
+            /** File */
+            file: string;
         };
         /** Body_upload_statement_api_v1_imports_post */
         Body_upload_statement_api_v1_imports_post: {
@@ -1379,6 +1403,10 @@ export interface components {
             /** Samplerows */
             sampleRows: string[][];
             layout: components["schemas"]["ColumnMap"];
+            /** Sheetname */
+            sheetName: string | null;
+            /** Sheetnames */
+            sheetNames: string[];
             /** Layoutconfirmed */
             layoutConfirmed: boolean;
             counts: components["schemas"]["PreviewCounts"];
@@ -3709,6 +3737,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ColumnMapInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    select_sheet_api_v1_imports__import_id__sheet_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                import_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_select_sheet_api_v1_imports__import_id__sheet_put"];
             };
         };
         responses: {

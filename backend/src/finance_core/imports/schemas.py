@@ -106,6 +106,8 @@ class ImportDetail(ImportSummary):
     headers: list[str]
     sample_rows: list[list[str]]
     layout: ColumnMap
+    sheet_name: str | None
+    sheet_names: list[str]
     # False until the user confirms a layout the first time for this account's statement shape.
     layout_confirmed: bool
     counts: PreviewCounts
