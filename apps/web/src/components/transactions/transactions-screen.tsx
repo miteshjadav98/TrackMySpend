@@ -2,7 +2,8 @@
 
 import type { TransactionType, TransactionView } from "@moneymoney/contracts";
 import { FileUp, History, Plus, Search } from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { ImportStatementDialog } from "@/components/imports/import-dialog";
 import { ImportsDialog } from "@/components/imports/imports-dialog";
@@ -11,7 +12,7 @@ import { TransactionDialog } from "@/components/transactions/transaction-dialog"
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { NamedIcon } from "@/components/ui/icons";
-import { accountOptionLabel, formatDay, paymentLabel, transferRoute } from "@/lib/format";
+import { accountOptionLabel, CURRENCIES, formatDay, paymentLabel, transferRoute } from "@/lib/format";
 import { type TransactionFilters, useAccounts, useCategories, useTransactions } from "@/lib/queries";
 
 /** Where the money went from or came into: the account, then the payment method. */
@@ -27,12 +28,38 @@ function amountTone(type: TransactionView["type"]): string {
 }
 
 export function TransactionsScreen() {
-  const [query, setQuery] = useState("");
-  const [type, setType] = useState<"" | TransactionType>("");
-  const [categoryId, setCategoryId] = useState("");
-  const [accountId, setAccountId] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const params = useSearchParams();
+  const query = params.get("q") ?? "";
+  const type = (params.get("type") ?? "") as "" | TransactionType;
+  const categoryId = params.get("categoryId") ?? "";
+  const accountId = params.get("accountId") ?? "";
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
+  const currency = params.get("currency") ?? "";
+  const merchantKey = params.get("merchantKey") ?? undefined;
+  const otherMerchants = params.get("otherMerchants") === "true";
+  const uncategorized = params.get("uncategorized") === "true";
+  const searchInput = useRef<HTMLInputElement>(null);
+
+  // Let the native input keep every keystroke while Next transitions its URL snapshot.
+  // Reload/back/clear still restore the URL's value; an older render cannot overwrite typing.
+  useEffect(() => {
+    const latestQuery = new URLSearchParams(window.location.search).get("q") ?? "";
+    if (searchInput.current && query === latestQuery) searchInput.current.value = query;
+  }, [query]);
+
+  // Next integrates native history with useSearchParams: filters survive reload/back without
+  // remounting the page or interrupting text input while a server navigation is pending.
+  function changeFilters(updates: Record<string, string | null>, replace = false) {
+    const next = new URLSearchParams(window.location.search);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    const href = `/transactions${next.size ? `?${next}` : ""}`;
+    if (replace) window.history.replaceState(null, "", href);
+    else window.history.pushState(null, "", href);
+  }
   const [dialog, setDialog] = useState<{ open: boolean; transaction: TransactionView | null }>({
     open: false,
     transaction: null,
@@ -56,13 +83,17 @@ export function TransactionsScreen() {
       accountId: accountId || undefined,
       from: from || undefined,
       to: to || undefined,
+      currency: currency || undefined,
+      merchantKey,
+      otherMerchants: otherMerchants || undefined,
+      uncategorized: uncategorized || undefined,
     }),
-    [deferredQuery, type, categoryId, accountId, from, to],
+    [deferredQuery, type, categoryId, accountId, from, to, currency, merchantKey, otherMerchants, uncategorized],
   );
   const transactions = useTransactions(filters);
   const rows = transactions.data?.pages.flatMap((page) => page.items) ?? [];
   const filtered = Boolean(
-    filters.q || filters.type || filters.categoryId || filters.accountId || filters.from || filters.to,
+    filters.q || filters.type || filters.categoryId || filters.accountId || filters.from || filters.to || filters.currency || filters.merchantKey || filters.otherMerchants || filters.uncategorized,
   );
   const categoryOptions = (categories.data ?? []).filter((c) => !type || c.kind === type);
 
@@ -87,7 +118,7 @@ export function TransactionsScreen() {
           </div>
         </header>
 
-        <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,2fr)_repeat(5,minmax(0,1fr))]">
+        <div className="mt-6 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-[minmax(0,2fr)_repeat(6,minmax(0,1fr))]">
           <div className="relative col-span-2 md:col-span-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" aria-hidden />
             <label htmlFor="tx-search" className="sr-only">
@@ -96,8 +127,9 @@ export function TransactionsScreen() {
             <Input
               id="tx-search"
               type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              ref={searchInput}
+              defaultValue={query}
+              onChange={(event) => changeFilters({ q: event.target.value }, true)}
               placeholder="Search description, merchant, notes"
               className="pl-9"
               maxLength={100}
@@ -110,8 +142,8 @@ export function TransactionsScreen() {
             id="tx-type"
             value={type}
             onChange={(event) => {
-              setType(event.target.value as "" | TransactionType);
-              setCategoryId("");
+              changeFilters({ type: event.target.value, categoryId: null, uncategorized: null,
+                ...(event.target.value !== "expense" ? { otherMerchants: null } : {}) });
             }}
           >
             <option value="">All types</option>
@@ -124,11 +156,16 @@ export function TransactionsScreen() {
           </label>
           <Select
             id="tx-category"
-            value={categoryId}
+            value={uncategorized ? "uncategorized" : categoryId}
             disabled={type === "transfer"}
-            onChange={(event) => setCategoryId(event.target.value)}
+            onChange={(event) => changeFilters({
+              categoryId: event.target.value === "uncategorized" ? null : event.target.value,
+              uncategorized: event.target.value === "uncategorized" ? "true" : null,
+            })}
           >
             <option value="">All categories</option>
+            <option value="uncategorized">Uncategorized</option>
+            {categoryId && !categoryOptions.some((category) => category.id === categoryId) ? <option value={categoryId}>Selected category</option> : null}
             {categoryOptions.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
@@ -138,7 +175,7 @@ export function TransactionsScreen() {
           <label className="sr-only" htmlFor="tx-account">
             Account
           </label>
-          <Select id="tx-account" value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+          <Select id="tx-account" value={accountId} onChange={(event) => changeFilters({ accountId: event.target.value })}>
             <option value="">All accounts</option>
             {(accounts.data ?? []).map((account) => (
               <option key={account.id} value={account.id}>
@@ -149,12 +186,27 @@ export function TransactionsScreen() {
           <label className="sr-only" htmlFor="tx-from">
             From date
           </label>
-          <Input id="tx-from" type="date" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} />
+          <Input id="tx-from" type="date" value={from} max={to || undefined} onChange={(event) => changeFilters({ from: event.target.value }, true)} />
           <label className="sr-only" htmlFor="tx-to">
             To date
           </label>
-          <Input id="tx-to" type="date" value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} />
+          <Input id="tx-to" type="date" value={to} min={from || undefined} onChange={(event) => changeFilters({ to: event.target.value }, true)} />
+          <label htmlFor="tx-currency" className="sr-only">Currency</label>
+          <Select id="tx-currency" value={currency} onChange={(event) => changeFilters({ currency: event.target.value, otherMerchants: null })}>
+            <option value="">All currencies</option>
+            {CURRENCIES.map(([code, name]) => <option key={code} value={code}>{code} · {name}</option>)}
+            {currency && !CURRENCIES.some(([code]) => code === currency) ? <option value={currency}>{currency}</option> : null}
+          </Select>
         </div>
+
+        {filtered ? <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          {merchantKey || otherMerchants ? <span className="min-w-0 rounded-lg bg-sky-wash px-3 py-2 text-sky-ink [overflow-wrap:anywhere]">
+            {otherMerchants ? "Other merchants · ranked for these dates and currency" : `Exact merchant: ${merchantKey}`}
+            <button type="button" className="ml-3 font-medium underline" aria-label="Remove merchant filter"
+              onClick={() => changeFilters({ merchantKey: null, otherMerchants: null })}>Remove</button>
+          </span> : null}
+          <Button size="sm" variant="ghost" onClick={() => window.history.pushState(null, "", "/transactions")}>Clear filters</Button>
+        </div> : null}
 
         <section className="mt-5 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-card)]">
           {transactions.isPending ? (

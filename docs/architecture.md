@@ -595,6 +595,28 @@ A circuit breaker stops the app from waiting on a dead Redis, and socket timeout
 - The chat view consumes the SSE stream and renders typed interaction cards. A running
   "tally" strip shows this month's totals and refreshes after each save.
 
+## Reports and transaction drill-down
+
+The authenticated Reports page consumes `GET /api/v1/reports/overview`. Its period and currency
+selection live in the URL. The server owns monetary totals, comparisons, category shares,
+merchant grouping and display formatting; the browser only scales those values into SVG/CSS
+geometry. Income and expense trends use different shapes and line patterns, and every chart
+has an expandable table with exact values. Charts and tables link to the same transaction filters.
+
+Transaction URLs restore dates, type, category, account, currency and search. Report drill-down
+also supports `uncategorized=true`, `merchantKey` and `otherMerchants=true`. These exact merchant
+filters do not use the broad text search. `merchants/report_groups.py` shares Unicode case-folding,
+top-ten ranking and remainder rules between reports and transaction search, preserving original
+stored spellings for SQL matching. A named merchant called "Other" remains distinct from the
+aggregate Other merchants bucket.
+
+Merchant filtering first aggregates user-scoped live rows within the requested currency and
+dates, then applies exact alias matching before keyset pagination. The remainder requires an
+expense type, currency and explicit range of at most 1,830 inclusive days; optional category,
+account and text refinements do not change which merchants constitute that report's remainder.
+This adds one grouped read to a merchant-filtered transaction query, with no schema change or
+external service. Measure this read at the phase's 100,000-transaction boundary before release.
+
 ## Failure behaviour
 
 | What fails | What the user sees | Mechanism |

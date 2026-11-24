@@ -156,6 +156,10 @@ export interface TransactionFilters {
   from?: string;
   to?: string;
   q?: string;
+  currency?: string;
+  merchantKey?: string;
+  otherMerchants?: boolean;
+  uncategorized?: boolean;
 }
 
 export function useTransactions(filters: TransactionFilters) {
@@ -173,6 +177,10 @@ export function useTransactions(filters: TransactionFilters) {
               from: filters.from,
               to: filters.to,
               q: filters.q || undefined,
+              currency: filters.currency,
+              merchantKey: filters.merchantKey,
+              otherMerchants: filters.otherMerchants,
+              uncategorized: filters.uncategorized,
               limit: 50,
               cursor: pageParam,
             },
