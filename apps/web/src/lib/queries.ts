@@ -6,6 +6,9 @@ import type {
   FriendDetail,
   FriendInviteView,
   FriendView,
+  ImportDetail,
+  ImportSummary,
+  RowStatus,
   ConversationDetail,
   ConversationPage,
   MerchantRulePage,
@@ -44,6 +47,9 @@ export const keys = {
   notices: ["notices"] as const,
   sharedExpense: (id: string) => ["shared-expense", id] as const,
   merchantRules: (search: string) => ["merchant-rules", search] as const,
+  imports: ["imports"] as const,
+  // Under the imports key, so refreshing the imports list also refreshes an open preview.
+  import: (id: string, status: string, offset: number, limit: number) => ["imports", id, status, offset, limit] as const,
 };
 
 /** Anything that changes money: refresh every view that shows totals or rows. */
@@ -55,6 +61,8 @@ export function invalidateLedger(client: QueryClient): Promise<unknown> {
     client.invalidateQueries({ queryKey: keys.categories }),
     // Every save can teach or use a merchant rule.
     client.invalidateQueries({ queryKey: ["merchant-rules"] }),
+    // Importing or undoing a statement changes what the imports list and previews show.
+    client.invalidateQueries({ queryKey: keys.imports }),
   ]);
 }
 
@@ -172,6 +180,32 @@ export function useMerchantRules(search: string) {
         }),
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}
+
+/** The user's statement imports, newest first (previews waiting to be saved, saved, undone). */
+export function useImports(enabled = true) {
+  return useQuery({
+    queryKey: keys.imports,
+    enabled,
+    queryFn: () => unwrap<ImportSummary[]>(api.GET("/api/v1/imports")),
+  });
+}
+
+/** One import with its layout and a page of preview rows, optionally filtered by status. */
+export function useImport(id: string | null, status: RowStatus | "", offset: number, limit: number) {
+  return useQuery({
+    queryKey: keys.import(id ?? "", status, offset, limit),
+    enabled: id !== null,
+    queryFn: () =>
+      unwrap<ImportDetail>(
+        api.GET("/api/v1/imports/{import_id}", {
+          params: {
+            path: { import_id: id ?? "" },
+            query: { status: status || undefined, offset, limit },
+          },
+        }),
+      ),
   });
 }
 

@@ -344,7 +344,7 @@ function FriendRow({ friend }: { friend: FriendView }) {
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash hover:text-ink"
+            className="rounded-lg p-1.5 text-ink-faint hover:bg-sky-wash hover:text-ink"
             aria-label={`Edit ${friend.name}`}
             title="Rename or change email"
           >
@@ -353,7 +353,7 @@ function FriendRow({ friend }: { friend: FriendView }) {
           <button
             type="button"
             onClick={() => setConfirmingRemove(true)}
-            className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash hover:text-danger"
+            className="rounded-lg p-1.5 text-ink-faint hover:bg-sky-wash hover:text-danger"
             aria-label={`Remove ${friend.name}`}
             title="Remove"
           >

@@ -5,12 +5,12 @@ type Variant = "primary" | "secondary" | "ghost" | "danger" | "chip";
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    "bg-lavender-fill text-white hover:bg-lavender-press disabled:bg-lavender-fill/50 shadow-sm",
+    "bg-sky-fill text-white hover:bg-sky-press disabled:bg-sky-fill/50 shadow-sm",
   secondary:
-    "bg-surface text-ink border border-line-strong hover:border-lavender hover:bg-lavender-wash/50 disabled:opacity-50",
-  ghost: "text-ink-soft hover:bg-lavender-wash/70 hover:text-ink disabled:opacity-50",
+    "bg-surface text-ink border border-line-strong hover:border-sky hover:bg-sky-wash/50 disabled:opacity-50",
+  ghost: "text-ink-soft hover:bg-sky-wash/70 hover:text-ink disabled:opacity-50",
   danger: "bg-danger text-white hover:bg-danger/90 disabled:opacity-50",
-  chip: "bg-surface text-ink border border-line-strong hover:border-lavender-deep hover:bg-lavender-wash rounded-full disabled:opacity-50",
+  chip: "bg-surface text-ink border border-line-strong hover:border-sky-deep hover:bg-sky-wash rounded-full disabled:opacity-50",
 };
 
 const SIZES = {

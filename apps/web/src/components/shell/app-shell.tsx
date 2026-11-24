@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className="rounded-lg p-2 text-ink-soft hover:bg-lavender-wash"
+            className="rounded-lg p-2 text-ink-soft hover:bg-sky-wash"
             aria-label="Open navigation"
           >
             <Menu className="size-5" aria-hidden />

@@ -19,7 +19,7 @@ saves must be idempotent, every change needs an audit trail, and one user must n
 another user's data. Those requirements shape most of the decisions below.
 
 The seams for growth are already in place. Domain services know nothing about HTTP or the
-LLM, so an MCP server (Phase 6) or a background worker can reuse them unchanged.
+LLM, so an MCP server (Phase 7) or a background worker can reuse them unchanged.
 
 ## Components
 
@@ -31,7 +31,7 @@ flowchart LR
     core --> pg[("PostgreSQL<br/>identity · ledger · chat · audit · agent")]
     core --> redis[("Redis<br/>cache · rate limits · locks")]
     core --> gemini["Gemini on Vertex AI"]
-    mcp["MCP server (Phase 6)"] -.-> core
+    mcp["MCP server (Phase 7)"] -.-> core
     jobs["Jobs: migrate, prune-checkpoints"] --> core
 ```
 
@@ -92,8 +92,8 @@ Conventions:
   injected clock, so tests can pin time.
 - **Transactions:** the type is `expense`, `income` or `transfer`. A row is soft-deleted
   (`deleted_at`) and can be restored. It carries an optimistic-lock `version`, a `source`
-  (chat, manual, import or api) and an optional `source_ref` pointing at the chat message
-  that created it.
+  (chat, manual, import or api) and an optional `source_ref` pointing at the originating
+  chat message or statement import.
 - **Accounts:** an `accounts` row has a name (1-60 characters), a kind (`bank`,
   `credit_card`, `wallet`, `cash`, `other`), a currency that is fixed after creation, and an
   archived flag. Names are unique per user, ignoring case, among active accounts only (a
@@ -122,6 +122,8 @@ Conventions:
 - **Idempotency:** `UNIQUE (user_id, idempotency_key)` with
   `INSERT … ON CONFLICT DO NOTHING`, then the existing row is returned. A retry returns
   200 with the original row instead of creating a duplicate.
+- **Statement imports:** the ledger stores `statement_imports`, `statement_import_rows` and
+  `statement_layouts`. See [Statement imports](#statement-imports) for their lifecycle.
 - **Hot-path index:** `(user_id, occurred_on DESC, id DESC) WHERE deleted_at IS NULL`. It
   serves listing, keyset pagination and the period sums behind every summary.
 
@@ -404,6 +406,45 @@ MoneyMoney remembers the category you use for each merchant (`merchants/`).
   income) for a tagged transaction. Chat search accepts transfers as a type, and chat
   summaries keep leaving them out.
 
+## Statement imports
+
+- The `imports` domain module reads bank and card statements into one account per import.
+  CSV and read-only Excel readers find the table beneath account details. The request limit
+  is 5 MB and 5,000 data rows. Files are processed in the request and the original bytes
+  are discarded. Switching worksheets requires resending the original workbook, which the
+  service checks against the digest saved with the preview.
+- `statement_layouts` remember the header signature, column positions, date order and
+  worksheet per account. A new layout or changed headers require confirmation. Including
+  blank header positions in the signature protects against columns shifting silently.
+- `statement_imports` record the account, status and preview revision. `statement_import_rows`
+  hold the parsed rows and the cells needed to apply a corrected layout. A preview expires
+  after 24 hours. The API sweeps expired previews at startup and every 15 minutes. The
+  `prune-import-previews` management command runs the same sweep for a scheduled job.
+  Confirming clears the raw cells and saves selected rows in one commit with audit events.
+  The transaction source is `import` and its source reference is the import id. Preview
+  changes advance the revision so a stale tab cannot confirm unseen rows.
+- A row fingerprint covers account, date, amount, direction, normalised description and its
+  occurrence among identical rows. The transaction idempotency key prevents an exact
+  reimport from adding rows a second time. Undo soft-deletes the transactions the import
+  created and frees their fingerprints for a later import.
+- SQL matches an eligible preview row to a live transaction in the same account on date,
+  amount and direction, excluding fingerprints already saved from the statement. Each
+  transaction is suggested once per statement. The preview shows its description and
+  source and leaves the likely duplicate unticked for review.
+- Pure rules extract a merchant from the narration. An active merchant rule supplies the
+  category first. Gemini labels the remaining rows in batches of 50 using short redacted
+  text and the row direction. The response supplies only row positions and category slugs.
+  Unknown labels become Other. Provider failures and timeouts use the offline parser's
+  keyword categories. The preview shows each category's source. Only a user's category
+  choice teaches a merchant rule on confirmation.
+- The preview suggests transfers from account names, card payments or self-transfer
+  wording. It matches a live transfer with the same currency, amount and ordered account
+  pair within three days. Each confirmed statement side can link to one canonical transfer
+  through `statement_transfer_sides`. Confirm and undo serialize per user and recheck
+  matches before saving. Undoing a linked statement releases its side. Undoing the statement
+  that created the transfer soft-deletes it and releases its links. Reports leave transfers
+  out of spending and income totals.
+
 ## Understanding messages (LLM layer)
 
 - `LLMClient` is a two-method protocol: `understand()` returns structured output, and
@@ -626,11 +667,14 @@ Where the system bends first, and what to do about it:
 | Not doing | Why | Trigger to revisit |
 | --- | --- | --- |
 | Microservices | One team, one deployable; distribution adds failure modes | Separate teams needing independent deploys, or one part needing very different scaling |
-| Message queue / event bus | No asynchronous work yet | Phase 4 imports (long-running parsing), scheduled summaries |
+| Message queue / event bus | Bounded statement imports run in the request | Larger statements or scheduled summaries |
+| PDF statements and receipts | The statement importer reads structured CSV and Excel tables | A separate document extraction and verification flow |
+| Old `.xls` workbooks | The Excel parser reads `.xlsx` | A bank without CSV or `.xlsx` export |
+| Bank connections and scheduled statement delivery | Users choose the file and destination account for each import | A bank connection or scheduled import project |
 | FX conversion | Totals per currency are exact; conversion needs a rate source and a policy | Users with multi-currency spending asking for a single total |
 | Read replicas | One primary handles the load | Primary CPU above about 60% sustained, or summary queries above about 30% of load |
 | Multi-region | 99.9% single-region is the target | Contractual availability above 99.95%, or users across continents |
-| Account balances | Most transactions carry no account yet, so a balance would be wrong. Opening balances come with it | Imports (Phase 4) and debt tracking (Phase 7) put an account on most transactions |
+| Account balances | Most transactions carry no account yet, so a balance would be wrong. Opening balances come with it | Imports (Phase 4) and debt tracking (Phase 6) put an account on most transactions |
 | Cross-currency transfers | They need an exchange rate and a rule for which rate. Both accounts and the amount must share one currency | A decision on the multi-currency policy (Phase 5) |
 | Groups | Phase 3 is between the user and individual friends. A group needs its own membership and balances across members | Users asking to split one trip across many people repeatedly |
 | Percentage and share-count splits | Equal and exact amounts cover the common cases | Users asking for "60/40" or "2 shares" splits |

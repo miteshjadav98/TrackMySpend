@@ -17,14 +17,6 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   output: "standalone",
   transpilePackages: ["@moneymoney/contracts"],
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${apiOrigin}/api/:path*` }];
   },

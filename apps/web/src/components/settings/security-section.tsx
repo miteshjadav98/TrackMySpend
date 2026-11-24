@@ -98,7 +98,7 @@ function SignedInDevices() {
               <p className="flex flex-wrap items-center gap-2 font-medium">
                 {session.device}
                 {session.isCurrent ? (
-                  <span className="rounded-full bg-lavender-wash px-2 py-0.5 text-xs font-medium text-lavender-ink">
+                  <span className="rounded-full bg-sky-wash px-2 py-0.5 text-xs font-medium text-sky-ink">
                     This device
                   </span>
                 ) : null}

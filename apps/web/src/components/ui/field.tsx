@@ -1,7 +1,7 @@
 import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, useId } from "react";
 
 const CONTROL =
-  "w-full rounded-[10px] border border-line-strong bg-surface px-3 text-[15px] text-ink placeholder:text-ink-faint/80 transition-colors hover:border-lavender focus:border-lavender-deep focus:outline-none focus:ring-2 focus:ring-lavender/30 disabled:bg-paper disabled:text-ink-faint aria-[invalid=true]:border-danger";
+  "w-full rounded-[10px] border border-line-strong bg-surface px-3 text-[15px] text-ink placeholder:text-ink-faint/80 transition-colors hover:border-sky focus:border-sky-deep focus:outline-none focus:ring-2 focus:ring-sky/30 disabled:bg-paper disabled:text-ink-faint aria-[invalid=true]:border-danger";
 
 export function Field({
   label,

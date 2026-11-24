@@ -114,10 +114,25 @@ retried settlement request is saved once; a linked friend can tag their own acco
 settlement; and replies tell two friends with the same name apart by email. `uv run pytest`:
 609 passed, 1 skipped.
 
+## Phase 4 (built on `phase-4/integration`)
+
+Import CSV and Excel bank and card statements. Settled in a grilling session on 2026-11-01;
+spec `.scratch/phase-4/spec.md`, 6 tickets in `.scratch/phase-4/issues/` (each `Status:` line
+says whether it is merged), subagent briefing `.scratch/phase-4/build-notes.md`.
+
+The integration branch includes CSV and Excel parsing, remembered layouts, full preview
+pagination, one-to-one likely duplicate matching, merchant extraction and category labels,
+and both sides of a transfer. Import confirmation and undo write audit events. Expired
+previews are swept without waiting for an import request from the owner.
+
+See the [Phase 4 report](phase-4-report.md) for the verification, Vertex evaluation and
+limitations. The [README](../README.md#trying-a-statement-import-locally) has synthetic
+statements for trying the flow locally.
+
 ## Next
 
-1. Phase 4: imports (CSV and Excel first). Start with a grilling session, then the spec and tickets.
-2. Pick which Phase 3 limitations to fix first (see the report), and choose an email provider.
+1. Confirm the Phase 4 integration changes with the owner before merging into `main`.
+2. Phase 5 covers charts, insights and a policy for totals across currencies.
 
 ## Resume
 

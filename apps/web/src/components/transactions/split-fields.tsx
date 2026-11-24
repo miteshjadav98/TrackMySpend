@@ -91,7 +91,7 @@ export function SplitFields({
         <legend className="text-sm font-medium text-ink-soft">Share with</legend>
         {choices.length === 0 ? (
           <p className="mt-2 text-sm text-ink-faint">
-            You have no friends yet. <Link href="/friends" className="text-lavender-ink underline">Add one</Link>.
+            You have no friends yet. <Link href="/friends" className="text-sky-ink underline">Add one</Link>.
           </p>
         ) : (
           <ul className="mt-2 flex flex-col gap-1.5">

@@ -15,6 +15,7 @@ dev = [
   "ruff>=0.14",
   "mypy>=1.18",
   "import-linter>=2.5",
+  "types-openpyxl>=3.1,<4",
 ]
 
 [tool.pytest.ini_options]
@@ -88,6 +89,7 @@ source_modules = [
   "finance_core.merchants",
   "finance_core.accounts",
   "finance_core.friends",
+  "finance_core.imports",
   "finance_core.users",
   "finance_core.auth",
   "finance_core.conversations",

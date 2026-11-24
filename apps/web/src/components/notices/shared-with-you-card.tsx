@@ -41,9 +41,9 @@ export function SharedWithYouCard() {
   return (
     <section
       aria-labelledby="shared-with-you-heading"
-      className="rounded-[var(--radius-card)] border border-line bg-lavender-wash px-5 py-4 shadow-[var(--shadow-card)]"
+      className="rounded-[var(--radius-card)] border border-line bg-sky-wash px-5 py-4 shadow-[var(--shadow-card)]"
     >
-      <h2 id="shared-with-you-heading" className="flex items-center gap-2 text-sm font-semibold text-lavender-ink">
+      <h2 id="shared-with-you-heading" className="flex items-center gap-2 text-sm font-semibold text-sky-ink">
         <Users className="size-4" aria-hidden />
         Shared with you
       </h2>
@@ -52,7 +52,7 @@ export function SharedWithYouCard() {
           <li key={notice.id} className="text-[15px]">
             <Link
               href={notice.friendId ? `/friends/${notice.friendId}` : "/friends"}
-              className="text-ink hover:text-lavender-deep hover:underline"
+              className="text-ink hover:text-sky-deep hover:underline"
             >
               {notice.message}
             </Link>

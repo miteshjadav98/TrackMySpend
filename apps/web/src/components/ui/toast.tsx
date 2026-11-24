@@ -51,7 +51,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   toast.action?.onClick();
                   setToasts((current) => current.filter((t) => t.id !== toast.id));
                 }}
-                className="font-semibold text-lavender-wash underline-offset-2 hover:underline"
+                className="font-semibold text-sky-wash underline-offset-2 hover:underline"
               >
                 {toast.action.label}
               </button>

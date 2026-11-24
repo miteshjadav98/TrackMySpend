@@ -92,3 +92,10 @@ export function accountPhrase(tx: { type: string; account?: { name: string } | n
 export function accountOptionLabel(account: { name: string; isArchived: boolean }): string {
   return account.isArchived ? `${account.name} (archived)` : account.name;
 }
+
+/** An amount in minor units (paise, cents) as money, using the currency's own decimals. */
+export function formatMinor(minor: number, currency: string, locale = "en-IN"): string {
+  const format = new Intl.NumberFormat(locale, { style: "currency", currency });
+  const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
+  return format.format(minor / 10 ** digits);
+}

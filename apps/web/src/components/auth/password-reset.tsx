@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { api, ApiError, unwrap } from "@/lib/api";
 
-const LINK_CLASS = "font-medium text-lavender-deep underline-offset-2 hover:underline";
+const LINK_CLASS = "font-medium text-sky-deep underline-offset-2 hover:underline";
 
 /** "Forgot password?": asks for a reset link, and always confirms in the same words. */
 export function ForgotPasswordForm() {
@@ -208,7 +208,7 @@ function InvalidResetLink() {
       </p>
       <Link
         href="/forgot-password"
-        className="mt-8 inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-lavender-fill px-4 text-[15px] font-medium text-white shadow-sm hover:bg-lavender-press"
+        className="mt-8 inline-flex h-10 w-full items-center justify-center rounded-[10px] bg-sky-fill px-4 text-[15px] font-medium text-white shadow-sm hover:bg-sky-press"
       >
         Request a new link
       </Link>

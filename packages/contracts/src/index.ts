@@ -99,3 +99,12 @@ export interface ApiErrorBody {
     details?: Record<string, unknown> | null;
   };
 }
+
+export type ImportDetail = S["ImportDetail"];
+export type ImportSummary = S["ImportSummary"];
+export type ImportStatus = ImportSummary["status"];
+export type ColumnMap = S["ColumnMap"];
+export type PreviewRow = S["PreviewRow"];
+export type PreviewCounts = S["PreviewCounts"];
+export type RowChange = S["RowChange"];
+export type RowStatus = PreviewRow["status"];

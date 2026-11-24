@@ -238,7 +238,7 @@ function TransactionForm({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {sharedExpenseId ? (
-        <div className="flex items-center justify-between gap-3 rounded-[10px] bg-lavender-wash px-3 py-2 text-sm text-lavender-ink">
+        <div className="flex items-center justify-between gap-3 rounded-[10px] bg-sky-wash px-3 py-2 text-sm text-sky-ink">
           <span>Your share of a shared expense. Its amount, date and type change with the split.</span>
           <Button size="sm" onClick={() => onOpenShared?.(sharedExpenseId)}>
             See the split
@@ -250,12 +250,12 @@ function TransactionForm({
         {(["expense", "income", "transfer"] as const).map((value) => (
           <label
             key={value}
-            className={`flex cursor-pointer items-center justify-center rounded-[10px] border px-3 py-2 text-[15px] font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-lavender-deep ${
+            className={`flex cursor-pointer items-center justify-center rounded-[10px] border px-3 py-2 text-[15px] font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-sky-deep ${
               type === value
                 ? value === "income"
                   ? "border-income bg-income-wash text-income"
-                  : "border-lavender-deep bg-lavender-wash text-lavender-ink"
-                : "border-line-strong text-ink-soft hover:border-lavender"
+                  : "border-sky-deep bg-sky-wash text-sky-ink"
+                : "border-line-strong text-ink-soft hover:border-sky"
             }`}
           >
             <input
@@ -449,7 +449,7 @@ function TransactionForm({
             maxLength={1000}
             rows={2}
             defaultValue={transaction?.notes ?? ""}
-            className="w-full rounded-[10px] border border-line-strong bg-surface px-3 py-2 text-[15px] focus:border-lavender-deep focus:ring-2 focus:ring-lavender/30 focus:outline-none"
+            className="w-full rounded-[10px] border border-line-strong bg-surface px-3 py-2 text-[15px] focus:border-sky-deep focus:ring-2 focus:ring-sky/30 focus:outline-none"
           />
         )}
       </Field>

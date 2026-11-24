@@ -38,6 +38,10 @@ class ConflictError(DomainError):
     code = "conflict"
 
 
+class PayloadTooLargeError(DomainError):
+    code = "payload_too_large"
+
+
 class AuthenticationError(DomainError):
     code = "unauthenticated"
 
