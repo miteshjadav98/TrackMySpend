@@ -26,13 +26,20 @@ from finance_core.accounts.schemas import AccountRef, AccountView
 from finance_core.accounts.service import AccountService
 from finance_core.audit.service import record_audit
 from finance_core.cache.primitives import UserDataGeneration
+from finance_core.categories.defaults import CategoryKind
 from finance_core.categories.models import Category
 from finance_core.categories.schemas import CategoryRef
 from finance_core.categories.service import CategoryService
 from finance_core.clock import Clock
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
 from finance_core.ids import uuid7
-from finance_core.imports.categorise import CategoryPicker
+from finance_core.imports.categorise import (
+    CategoryChoice,
+    StatementCategorizer,
+    StatementCategoryRow,
+    category_text,
+    pick_categories,
+)
 from finance_core.imports.cells import cell_text, guess_date_order
 from finance_core.imports.columns import guess_columns, header_signature
 from finance_core.imports.duplicates import (
@@ -82,6 +89,7 @@ DEFAULT_PAGE_SIZE = 200
 MAX_PAGE_SIZE = 500
 MAX_DESCRIPTION = 500
 SAVEABLE_STATUSES = ("to_import", "likely_duplicate", "transfer")
+_KINDS_BY_DIRECTION: dict[str, CategoryKind] = {"out": "expense", "in": "income"}
 
 
 def _not_previewing() -> ConflictError:
@@ -100,8 +108,8 @@ def _check_preview_revision(imp: StatementImport, expected: int | None) -> None:
         )
 
 
-def _type_of(direction: str | None) -> str | None:
-    return {"out": "expense", "in": "income"}.get(direction or "")
+def _type_of(direction: str | None) -> CategoryKind | None:
+    return _KINDS_BY_DIRECTION.get(direction or "")
 
 
 class ImportService:
@@ -111,6 +119,7 @@ class ImportService:
         *,
         clock: Clock,
         generation: UserDataGeneration | None = None,
+        categorizer: StatementCategorizer | None = None,
     ) -> None:
         self._session = session
         self._clock = clock
@@ -118,6 +127,7 @@ class ImportService:
         self._categories = CategoryService(session)
         self._transactions = TransactionService(session, clock=clock, generation=generation)
         self._rules = MerchantRuleService(session, clock=clock)
+        self._categorizer = categorizer
 
     # -- starting an import -----------------------------------------------------------------
 
@@ -660,19 +670,28 @@ class ImportService:
         )
         fingerprints = assign_fingerprints(imp.account_id, parsed)
         already_saved = await self._saved_keys(ctx.user_id, [f for f in fingerprints if f])
-        picker = await CategoryPicker.for_user(
-            ctx.user_id, categories=self._categories, rules=self._rules
-        )
-        # Merchants are read once per row, then every rule is fetched in one query.
         merchants = [extract_merchant(row.description) for row in parsed]
-        await picker.prepare(
-            [
-                (_type_of(row.direction) or "", merchant)
-                for row, merchant in zip(parsed, merchants, strict=True)
-            ]
+        wanted = [
+            (
+                StatementCategoryRow(row.position, kind, category_text(merchant, row.description)),
+                merchant,
+            )
+            for row, merchant, fingerprint in zip(parsed, merchants, fingerprints, strict=True)
+            if row.problem is None
+            and fingerprint not in already_saved
+            and (kind := _type_of(row.direction)) is not None
+        ]
+        choices = await pick_categories(
+            ctx.user_id,
+            categories=self._categories,
+            rules=self._rules,
+            wanted=wanted,
+            categorizer=self._categorizer,
         )
         built = [
-            self._preview_row(ctx, imp, picker, row, merchant, fingerprint, already_saved)
+            self._preview_row(
+                ctx, imp, choices.get(row.position), row, merchant, fingerprint, already_saved
+            )
             for row, merchant, fingerprint in zip(parsed, merchants, fingerprints, strict=True)
         ]
         await self._session.execute(delete(ImportRow).where(ImportRow.import_id == imp.id))
@@ -686,7 +705,7 @@ class ImportService:
         self,
         ctx: UserContext,
         imp: StatementImport,
-        picker: CategoryPicker,
+        choice: CategoryChoice | None,
         row: ParsedRow,
         merchant: str | None,
         fingerprint: str | None,
@@ -706,9 +725,7 @@ class ImportService:
             return values
         if fingerprint in already_saved:
             return {**values, "note": "Already imported"}
-        row_type = _type_of(row.direction)
-        assert row_type is not None
-        choice = picker.pick(row_type=row_type, merchant=merchant)
+        assert choice is not None
         return {
             **values, "merchant": merchant, "category_id": choice.category_id,
             "category_source": choice.source, "status": "to_import", "note": None,

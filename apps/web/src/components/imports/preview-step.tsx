@@ -16,8 +16,9 @@ const STATUS_FILTERS: { value: RowStatus | ""; label: string }[] = [
 
 const SOURCE_NOTES: Record<string, string> = {
   rule: "From your merchant rule",
-  ai: "Suggested",
-  keyword: "Guessed from the wording",
+  ai: "Suggested by AI",
+  keyword: "Matched a keyword",
+  default: "Filed under Other",
   user: "Your pick",
 };
 
@@ -202,8 +203,11 @@ function Row({
       <td className="px-3 py-2 whitespace-nowrap">{row.occurredOn ?? "—"}</td>
       <td className="max-w-[22rem] px-3 py-2">
         <span className="block truncate" title={row.description ?? undefined}>
-          {row.description ?? "—"}
+          {row.merchant ?? row.description ?? "—"}
         </span>
+        {row.merchant && row.description && row.merchant !== row.description ? (
+          <span className="block truncate text-xs text-ink-faint" title={row.description}>{row.description}</span>
+        ) : null}
         {row.note ? <span className="block text-xs">{row.note}</span> : null}
         {duplicateNoteId ? (
           <span id={duplicateNoteId} className="block text-xs text-ink-soft">
