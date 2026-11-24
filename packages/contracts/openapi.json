@@ -5622,6 +5622,9 @@
                   "$ref": "#/components/schemas/SummaryInteraction"
                 },
                 {
+                  "$ref": "#/components/schemas/ReportInteraction"
+                },
+                {
                   "$ref": "#/components/schemas/TransactionListInteraction"
                 },
                 {
@@ -5633,6 +5636,7 @@
                 "mapping": {
                   "clarification": "#/components/schemas/ClarificationInteraction",
                   "confirmation": "#/components/schemas/ConfirmationInteraction",
+                  "report": "#/components/schemas/ReportInteraction",
                   "suggestions": "#/components/schemas/SuggestionsInteraction",
                   "summary": "#/components/schemas/SummaryInteraction",
                   "transaction_list": "#/components/schemas/TransactionListInteraction",
@@ -6550,6 +6554,94 @@
         ],
         "title": "ReportInsight",
         "description": "A deterministic fact and the exact evidence needed to explain or drill into it."
+      },
+      "ReportInteraction": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "report",
+            "title": "Type",
+            "default": "report"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version",
+            "default": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "trend",
+              "breakdown",
+              "insights"
+            ],
+            "title": "Kind"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "comparisonPeriod": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "availableCurrencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Availablecurrencies"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transactionCount": {
+            "type": "integer",
+            "title": "Transactioncount"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generatedat"
+          },
+          "reportHref": {
+            "type": "string",
+            "pattern": "^/reports\\?",
+            "title": "Reporthref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "version",
+          "kind",
+          "period",
+          "comparisonPeriod",
+          "currency",
+          "availableCurrencies",
+          "preview",
+          "transactionCount",
+          "generatedAt",
+          "reportHref"
+        ],
+        "title": "ReportInteraction",
+        "description": "Versioned, bounded snapshot of one currency; the full report remains linked."
       },
       "ReportOverview": {
         "properties": {
@@ -8486,6 +8578,7 @@
               "mapping": {
                 "clarification": "#/components/schemas/ClarificationInteraction",
                 "confirmation": "#/components/schemas/ConfirmationInteraction",
+                "report": "#/components/schemas/ReportInteraction",
                 "suggestions": "#/components/schemas/SuggestionsInteraction",
                 "summary": "#/components/schemas/SummaryInteraction",
                 "transaction_list": "#/components/schemas/TransactionListInteraction",
@@ -8505,6 +8598,9 @@
               },
               {
                 "$ref": "#/components/schemas/SummaryInteraction"
+              },
+              {
+                "$ref": "#/components/schemas/ReportInteraction"
               },
               {
                 "$ref": "#/components/schemas/TransactionListInteraction"

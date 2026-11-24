@@ -60,6 +60,7 @@ class FinanceState(TypedDict, total=False):
     # insights / search
     period: dict[str, Any] | None
     search: dict[str, Any] | None
+    report_request: dict[str, Any] | None
     # results
     outcome: str | None
     saved: list[dict[str, Any]]
@@ -73,6 +74,7 @@ class FinanceState(TypedDict, total=False):
     balance_answer: dict[str, Any] | None  # the friends' balances that answer it
     friend_question: dict[str, Any] | None  # why a settlement or balance question needs more
     summary: dict[str, Any] | None
+    report_result: dict[str, Any] | None
     results: dict[str, Any] | None
     reply: dict[str, Any] | None  # {"text": str, "ui": [interaction, ...]}
 

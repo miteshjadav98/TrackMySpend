@@ -8,7 +8,8 @@ costs microseconds, so:
 - the model may not return more transactions with a given amount than the user wrote;
 - empty fields are filled from the parser's reading of the same amount.
 
-The model's non-empty values always win; the parser only fills gaps.
+Non-empty transaction fields normally win; exact transfer/report wording and settlement
+amounts remain grounded in the user's text.
 """
 
 from __future__ import annotations
@@ -22,7 +23,14 @@ from decimal import Decimal, InvalidOperation
 from finance_core.accounts.names import could_mean_an_account, same_account_name
 from finance_core.categories.defaults import FALLBACK_SLUG, system_category
 from finance_core.dates import day_first_for_locale, resolve_date_expression
-from finance_core.llm.rules import extract_search, extract_settlement, extract_transactions
+from finance_core.llm.reporting import read_report_spec
+from finance_core.llm.rules import (
+    classify,
+    extract_period,
+    extract_search,
+    extract_settlement,
+    extract_transactions,
+)
 from finance_core.llm.schemas import ExtractedTransaction, SettlementSpec, TurnUnderstanding
 from finance_core.money import find_amounts, parse_amount
 
@@ -226,6 +234,34 @@ def reconcile(
     account_names: Sequence[str] = (),
     friend_names: Sequence[str] = (),
 ) -> TurnUnderstanding:
+    # Explicit report phrases are read-only, even if a provider mistakes a period count
+    # for an amount to record. Reconcile only this high-precision supported language.
+    if classify(text) == "spending_report":
+        return understanding.model_copy(
+            update={
+                "intent": "spending_report",
+                "transactions": [],
+                "search": None,
+                "report": read_report_spec(text),
+                "period": extract_period(text, today),
+                "pending_answer": None,
+            }
+        )
+    if understanding.intent == "spending_report":
+        if classify(text) in ("spending_summary", "search_transactions"):
+            return understanding.model_copy(
+                update={
+                    "intent": classify(text),
+                    "report": None,
+                    "period": understanding.period or extract_period(text, today),
+                    "search": understanding.search or extract_search(text),
+                }
+            )
+        return understanding.model_copy(
+            update={
+                "report": understanding.report or read_report_spec(text),
+            }
+        )
     if understanding.intent == "record_transactions" and understanding.transactions:
         transactions = _drop_duplicates(_merge_fragments(list(understanding.transactions)), text)
         hints = extract_transactions(text, today, locale, account_names, friend_names)

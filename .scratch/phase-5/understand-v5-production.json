@@ -1,0 +1,997 @@
+{
+  "recordedAt": "2026-11-24T12:59:24.379958+00:00",
+  "pipeline": "production provider + rules fallback + reconciliation",
+  "promptVersion": "understand_v5",
+  "model": "gemini-3.5-flash-lite",
+  "thinking": "low",
+  "runs": [
+    {
+      "run": 1,
+      "cases": 60,
+      "correct": 60,
+      "rawCorrect": 46,
+      "fallbackCount": 0,
+      "reportCases": 8,
+      "reportCorrect": 8,
+      "p50Ms": 1299.5,
+      "p95Ms": 2246.4,
+      "failures": [],
+      "rawFailures": [
+        {
+          "text": "show my spending trend for six months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.start '2026-05-015:00:00Z' != '2026-05-01'",
+            "period.end None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 2219
+        },
+        {
+          "text": "USD income chart for the past 3 months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-24'",
+            "report.currency None != 'USD'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1830
+        },
+        {
+          "text": "compare my spending last month",
+          "reportCase": true,
+          "rawProblems": [
+            "report.kind 'trend' != 'insights'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1035
+        },
+        {
+          "text": "show my spending trend from 2026-09-01 to 2026-10-20",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-20'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1556
+        },
+        {
+          "text": "paid 1,200 for electricity bill on 12 oct by credit card",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 2841
+        },
+        {
+          "text": "received 2 lakh from a client for the freelance project",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'business'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1023
+        },
+        {
+          "text": "bought groceries from Blinkit for 845.50 via gpay",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'groceries'",
+            "tx0.payment_method None != 'upi'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1059
+        },
+        {
+          "text": "paid 15000 credit card bill from HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1380
+        },
+        {
+          "text": "salary 50000 into HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'salary'",
+            "tx0.account None != 'HDFC'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1024
+        },
+        {
+          "text": "paid 250 for a taxi from the office",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'transport'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1276
+        },
+        {
+          "text": "dinner 1000 with Jaymin, I had 400 and he had 600",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'food'",
+            "tx0.participants [] != ['Jaymin']",
+            "tx0.split None != 'exact'",
+            "tx0.shares [] != [('jaymin', Decimal('600')), ('me', Decimal('400'))]"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1077
+        },
+        {
+          "text": "split 1200 for movie tickets with Riya",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1722
+        },
+        {
+          "text": "paid Jaymin back 500",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'i_paid_friend'",
+            "settlement.amount None != '500'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1055
+        },
+        {
+          "text": "Jaymin paid me 500 to HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'friend_paid_me'",
+            "settlement.amount None != '500'",
+            "settlement.account None != 'HDFC'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 878
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "cases": 60,
+      "correct": 58,
+      "rawCorrect": 37,
+      "fallbackCount": 1,
+      "reportCases": 8,
+      "reportCorrect": 8,
+      "p50Ms": 1249,
+      "p95Ms": 4598.3,
+      "failures": [
+        {
+          "text": "Jaymin paid 1000 for pizza, split it",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [
+            "2 transactions != 1"
+          ],
+          "latencyMs": 1231
+        },
+        {
+          "text": "dinner 1000 with Jaymin, I had 400 and he had 600",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [
+            "2 transactions != 1"
+          ],
+          "latencyMs": 1302
+        }
+      ],
+      "rawFailures": [
+        {
+          "text": "show my spending trend for six months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1111
+        },
+        {
+          "text": "USD income chart for the past 3 months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-24'",
+            "report.currency None != 'USD'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1058
+        },
+        {
+          "text": "compare my spending last month",
+          "reportCase": true,
+          "rawProblems": [
+            "period.kind 'month' != 'last_month'",
+            "report.kind 'trend' != 'insights'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1419
+        },
+        {
+          "text": "show my spending trend from 2026-09-01 to 2026-10-20",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-20'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 4753
+        },
+        {
+          "text": "Got salary 50k today",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'salary'",
+            "tx0.date None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 2676
+        },
+        {
+          "text": "what was my biggest expense in september",
+          "reportCase": false,
+          "rawProblems": [
+            "search.sort 'recent' != 'largest'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1199
+        },
+        {
+          "text": "transferred 12,000 from SBI to my ICICI account yesterday",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1592
+        },
+        {
+          "text": "paid 15000 credit card bill from HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.account None != 'HDFC'",
+            "tx0.to_account None != 'Credit card'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1390
+        },
+        {
+          "text": "cash withdrawal of 1500 from ICICI ATM",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.account None != 'ICICI'",
+            "tx0.to_account None != 'Cash'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1101
+        },
+        {
+          "text": "what can you do?",
+          "reportCase": false,
+          "rawProblems": [
+            "Provider unavailable; rules fallback"
+          ],
+          "degraded": true,
+          "problems": [],
+          "latencyMs": null
+        },
+        {
+          "text": "salary 50000 into HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'salary'",
+            "tx0.account None != 'HDFC'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1210
+        },
+        {
+          "text": "received 2000 refund on ICICI account today",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.account None != 'ICICI'",
+            "tx0.date None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 8150
+        },
+        {
+          "text": "paid 250 for a taxi from the office",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'transport'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1124
+        },
+        {
+          "text": "me and Jaymin spent 1000 on pizza, split it",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'food'",
+            "tx0.participants [] != ['Jaymin']",
+            "tx0.split None != 'equal'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1329
+        },
+        {
+          "text": "Jaymin paid 1000 for pizza, split it",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [
+            "2 transactions != 1"
+          ],
+          "latencyMs": 1231
+        },
+        {
+          "text": "me, Jaymin and Riya spent 1500 on cab, split it",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'transport'",
+            "tx0.participants [] != ['Jaymin', 'Riya']",
+            "tx0.split None != 'equal'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1235
+        },
+        {
+          "text": "dinner 1000 with Jaymin, I had 400 and he had 600",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [
+            "2 transactions != 1"
+          ],
+          "latencyMs": 1302
+        },
+        {
+          "text": "split 1200 for movie tickets with Riya",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1190
+        },
+        {
+          "text": "I paid 2400 for the hotel, split equally with Jaymin and Riya yesterday",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1539
+        },
+        {
+          "text": "Riya paid 900 for groceries, split with me",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'groceries'",
+            "tx0.participants [] != ['Riya']",
+            "tx0.payer None != 'Riya'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 2088
+        },
+        {
+          "text": "Riya gave me back 1200",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'friend_paid_me'",
+            "settlement.amount None != '1200'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1596
+        },
+        {
+          "text": "paid Jaymin back 500",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'i_paid_friend'",
+            "settlement.amount None != '500'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1227
+        },
+        {
+          "text": "Jaymin paid me 500 to HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'friend_paid_me'",
+            "settlement.amount None != '500'",
+            "settlement.account None != 'HDFC'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 999
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "cases": 60,
+      "correct": 60,
+      "rawCorrect": 46,
+      "fallbackCount": 0,
+      "reportCases": 8,
+      "reportCorrect": 8,
+      "p50Ms": 1356.5,
+      "p95Ms": 2233.1,
+      "failures": [],
+      "rawFailures": [
+        {
+          "text": "show my spending trend for six months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1157
+        },
+        {
+          "text": "USD income chart for the past 3 months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-24'",
+            "report.currency None != 'USD'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1162
+        },
+        {
+          "text": "compare my spending last month",
+          "reportCase": true,
+          "rawProblems": [
+            "report.kind 'trend' != 'insights'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1091
+        },
+        {
+          "text": "show my spending trend from 2026-09-01 to 2026-10-20",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-20'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1520
+        },
+        {
+          "text": "Got salary 50k today",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'salary'",
+            "tx0.date None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1354
+        },
+        {
+          "text": "withdrew 2000 from SBI",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1333
+        },
+        {
+          "text": "paid 15000 credit card bill from HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.account None != 'HDFC'",
+            "tx0.to_account None != 'Credit card'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1932
+        },
+        {
+          "text": "sent 3000 from Paytm to HDFC on 20 oct",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1753
+        },
+        {
+          "text": "received 2000 refund on ICICI account today",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.account None != 'ICICI'",
+            "tx0.date None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 2539
+        },
+        {
+          "text": "paid 250 for a taxi from the office",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1167
+        },
+        {
+          "text": "dinner 1000 with Jaymin, I had 400 and he had 600",
+          "reportCase": false,
+          "rawProblems": [
+            "4 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1485
+        },
+        {
+          "text": "I paid 2400 for the hotel, split equally with Jaymin and Riya yesterday",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1170
+        },
+        {
+          "text": "Riya paid 900 for groceries, split with me",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1392
+        },
+        {
+          "text": "Riya sent me 750 yesterday",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'friend_paid_me'",
+            "settlement.amount None != '750'",
+            "settlement.date None != '2026-10-23'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 991
+        }
+      ]
+    },
+    {
+      "run": 4,
+      "cases": 60,
+      "correct": 60,
+      "rawCorrect": 43,
+      "fallbackCount": 3,
+      "reportCases": 8,
+      "reportCorrect": 8,
+      "p50Ms": 1327,
+      "p95Ms": 2155.6,
+      "failures": [],
+      "rawFailures": [
+        {
+          "text": "show my spending trend for six months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1305
+        },
+        {
+          "text": "USD income chart for the past 3 months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.start '2026-08-01-01' != '2026-08-01'",
+            "period.end None != '2026-10-24'",
+            "report.currency None != 'USD'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1233
+        },
+        {
+          "text": "compare my spending last month",
+          "reportCase": true,
+          "rawProblems": [
+            "report.kind 'trend' != 'insights'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1125
+        },
+        {
+          "text": "show my spending trend from 2026-09-01 to 2026-10-20",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-20'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 5650
+        },
+        {
+          "text": "received 2 lakh from a client for the freelance project",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1433
+        },
+        {
+          "text": "paid 15000 credit card bill from HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.account None != 'HDFC'",
+            "tx0.to_account None != 'Credit card'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1086
+        },
+        {
+          "text": "cash withdrawal of 1500 from ICICI ATM",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1459
+        },
+        {
+          "text": "what can you do?",
+          "reportCase": false,
+          "rawProblems": [
+            "Provider unavailable; rules fallback"
+          ],
+          "degraded": true,
+          "problems": [],
+          "latencyMs": null
+        },
+        {
+          "text": "received 2000 refund on ICICI account today",
+          "reportCase": false,
+          "rawProblems": [
+            "Provider unavailable; rules fallback"
+          ],
+          "degraded": true,
+          "problems": [],
+          "latencyMs": null
+        },
+        {
+          "text": "me, Jaymin and Riya spent 1500 on cab, split it",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1327
+        },
+        {
+          "text": "dinner 1000 with Jaymin, I had 400 and he had 600",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'food'",
+            "tx0.participants [] != ['Jaymin']",
+            "tx0.split None != 'exact'",
+            "tx0.shares [] != [('jaymin', Decimal('600')), ('me', Decimal('400'))]"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1317
+        },
+        {
+          "text": "Riya paid 900 for groceries, split with me",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 2250
+        },
+        {
+          "text": "coffee with Jaymin 200",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1266
+        },
+        {
+          "text": "paid Jaymin back 500",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'i_paid_friend'",
+            "settlement.amount None != '500'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1281
+        },
+        {
+          "text": "Jaymin paid me 500 to HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'friend_paid_me'",
+            "settlement.amount None != '500'",
+            "settlement.account None != 'HDFC'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1206
+        },
+        {
+          "text": "Riya sent me 750 yesterday",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'friend_paid_me'",
+            "settlement.amount None != '750'",
+            "settlement.date None != '2026-10-23'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1111
+        },
+        {
+          "text": "paid Riya 800 for the movie tickets",
+          "reportCase": false,
+          "rawProblems": [
+            "Provider unavailable; rules fallback"
+          ],
+          "degraded": true,
+          "problems": [],
+          "latencyMs": null
+        }
+      ]
+    },
+    {
+      "run": 5,
+      "cases": 60,
+      "correct": 60,
+      "rawCorrect": 45,
+      "fallbackCount": 2,
+      "reportCases": 8,
+      "reportCorrect": 8,
+      "p50Ms": 1254.5,
+      "p95Ms": 2228.7,
+      "failures": [],
+      "rawFailures": [
+        {
+          "text": "show my spending trend for six months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.start '2026-05-01t00:00:00z' != '2026-05-01'",
+            "period.end None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1129
+        },
+        {
+          "text": "USD income chart for the past 3 months",
+          "reportCase": true,
+          "rawProblems": [
+            "period.end None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1445
+        },
+        {
+          "text": "compare my spending last month",
+          "reportCase": true,
+          "rawProblems": [
+            "report.kind 'trend' != 'insights'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1006
+        },
+        {
+          "text": "show my spending trend from 2026-09-01 to 2026-10-20",
+          "reportCase": true,
+          "rawProblems": [
+            "Provider unavailable; rules fallback"
+          ],
+          "degraded": true,
+          "problems": [],
+          "latencyMs": null
+        },
+        {
+          "text": "Got salary 50k today",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'salary'",
+            "tx0.date None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1186
+        },
+        {
+          "text": "withdrew 2000 from SBI",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.amount None != '2000'",
+            "tx0.account None != 'SBI'",
+            "tx0.to_account None != 'Cash'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1369
+        },
+        {
+          "text": "paid 15000 credit card bill from HDFC",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.amount None != '15000'",
+            "tx0.account None != 'HDFC'",
+            "tx0.to_account None != 'Credit card'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1195
+        },
+        {
+          "text": "received 2000 refund on ICICI account today",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.account None != 'ICICI'",
+            "tx0.date None != '2026-10-24'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 7045
+        },
+        {
+          "text": "Jaymin paid 1000 for pizza, split it",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'food'",
+            "tx0.participants [] != ['Jaymin']",
+            "tx0.payer None != 'Jaymin'",
+            "tx0.split None != 'equal'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1109
+        },
+        {
+          "text": "I paid 2400 for the hotel, split equally with Jaymin and Riya yesterday",
+          "reportCase": false,
+          "rawProblems": [
+            "10 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1582
+        },
+        {
+          "text": "Riya paid 900 for groceries, split with me",
+          "reportCase": false,
+          "rawProblems": [
+            "tx0.category None != 'groceries'",
+            "tx0.participants [] != ['Riya']",
+            "tx0.payer None != 'Riya'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1270
+        },
+        {
+          "text": "coffee with Jaymin 200",
+          "reportCase": false,
+          "rawProblems": [
+            "2 transactions != 1"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1330
+        },
+        {
+          "text": "Jaymin paid me 500",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'friend_paid_me'",
+            "settlement.amount None != '500'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1254
+        },
+        {
+          "text": "Riya sent me 750 yesterday",
+          "reportCase": false,
+          "rawProblems": [
+            "settlement.direction None != 'friend_paid_me'",
+            "settlement.amount None != '750'",
+            "settlement.date None != '2026-10-23'"
+          ],
+          "degraded": false,
+          "problems": [],
+          "latencyMs": 1084
+        },
+        {
+          "text": "paid Riya 800 for the movie tickets",
+          "reportCase": false,
+          "rawProblems": [
+            "Provider unavailable; rules fallback"
+          ],
+          "degraded": true,
+          "problems": [],
+          "latencyMs": null
+        }
+      ]
+    }
+  ]
+}

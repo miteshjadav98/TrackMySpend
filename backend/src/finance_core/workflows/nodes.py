@@ -39,6 +39,7 @@ from finance_core.friends.service import FriendService
 from finance_core.friends.settlements import SettlementService
 from finance_core.friends.shared_expenses import SharedExpenseService
 from finance_core.ids import derived_id
+from finance_core.interactions import ReportInteraction
 from finance_core.llm.base import (
     CategoryHint,
     LLMUnavailableError,
@@ -47,7 +48,7 @@ from finance_core.llm.base import (
     UnderstandRequest,
 )
 from finance_core.llm.rules import RulesLLMClient
-from finance_core.llm.schemas import BalanceSpec, PeriodSpec, SearchSpec, SettlementSpec
+from finance_core.llm.schemas import BalanceSpec, PeriodSpec, ReportSpec, SearchSpec, SettlementSpec
 from finance_core.merchants.service import MerchantRuleService
 from finance_core.reports.service import ReportService
 from finance_core.transactions.schemas import (
@@ -81,6 +82,7 @@ from finance_core.workflows.replies import (
     reply_is_grounded,
     suggestions_for,
 )
+from finance_core.workflows.reporting import report_interaction
 from finance_core.workflows.settling import choose_settlement, expense_from_settlement
 from finance_core.workflows.state import (
     AgentDeps,
@@ -105,6 +107,8 @@ _TURN_RESET: dict[str, Any] = {
     "abandoned": False,
     "period": None,
     "search": None,
+    "report_request": None,
+    "report_result": None,
     "outcome": None,
     "saved": [],
     "filed_by_merchant_rule": [],
@@ -456,6 +460,10 @@ class FinanceNodes:
         if intent == "balance_question":
             update["balance"] = (understanding.balance or BalanceSpec()).model_dump()
             return Command(goto="balances", update=update)
+        if intent == "spending_report":
+            update["period"] = (understanding.period or PeriodSpec()).model_dump()
+            update["report_request"] = (understanding.report or ReportSpec()).model_dump()
+            return Command(goto="report", update=update)
         if intent in ("spending_summary", "search_transactions"):
             update["period"] = (understanding.period or PeriodSpec()).model_dump()
             update["search"] = understanding.search.model_dump() if understanding.search else None
@@ -1036,6 +1044,37 @@ class FinanceNodes:
             ).summary(ctx.user, period)
         return {"summary": summary.model_dump(mode="json", by_alias=True), "outcome": "summary"}
 
+    async def report(self, state: FinanceState, runtime: Runtime[TurnContext]) -> dict[str, Any]:
+        """Read a report; only the reporting service computes its financial values."""
+        ctx = runtime.context
+        runtime.stream_writer(status_event("reporting", "Preparing your report…"))
+        spec = PeriodSpec.model_validate(state.get("period") or {})
+        request = ReportSpec.model_validate(state.get("report_request") or {})
+        try:
+            period = resolve_period(
+                spec.kind,
+                ctx.today,
+                month=spec.month,
+                start=spec.start,
+                end=spec.end,
+                days=spec.days,
+            )
+        except PeriodError:
+            return {"outcome": "invalid_report_period"}
+        async with self._deps.session_factory() as session:
+            overview = await ReportService(
+                session,
+                clock=self._deps.clock,
+                redis=self._deps.redis,
+                generation=self._deps.generation,
+                cache_ttl_seconds=self._deps.settings.cache_summary_ttl_seconds,
+            ).overview(ctx.user, period)
+        try:
+            card = report_interaction(overview, request, f"report-{state.get('message_id')}")
+        except ValueError:
+            return {"outcome": "invalid_report_currency"}
+        return {"report_result": card.model_dump(mode="json", by_alias=True), "outcome": "report"}
+
     async def search(self, state: FinanceState, runtime: Runtime[TurnContext]) -> dict[str, Any]:
         ctx = runtime.context
         runtime.stream_writer(status_event("searching", "Looking through your transactions…"))
@@ -1115,6 +1154,14 @@ class FinanceNodes:
                 {"category": (state.get("search") or {}).get("category")},
                 interaction_id=f"{base_id}-summary",
             )
+        elif outcome == "report" and state.get("report_result"):
+            card = ReportInteraction.model_validate(state["report_result"])
+            text = f"Your {card.currency} {card.kind} report for {card.period.start} to {card.period.end}. Other currencies stay separate."
+            ui = [card]
+        elif outcome == "invalid_report_period":
+            text = "That report period is invalid. Choose inclusive start and end dates covering at most five years."
+        elif outcome == "invalid_report_currency":
+            text = "Choose a supported ISO currency for the report."
         elif outcome == "search" and state.get("results"):
             text, ui = compose_search(state["results"] or {}, interaction_id=f"{base_id}-list")
         elif outcome == "settlement_saved" and state.get("settlement_saved"):
