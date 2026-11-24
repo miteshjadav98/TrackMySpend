@@ -22,6 +22,7 @@ from finance_core.categories.models import Category
 from finance_core.clock import Clock
 from finance_core.dates import DateRange, preceding_period
 from finance_core.merchants.report_groups import report_merchant_groups
+from finance_core.reports.insights import build_insights
 from finance_core.reports.schemas import (
     CategoryTotal,
     CurrencyReport,
@@ -138,7 +139,7 @@ class ReportService:
             try:
                 generation = await self._generation.current(ctx.user_id)
                 cache_key = self._redis.key(
-                    "report-overview",
+                    "report-overview-v2",
                     _OVERVIEW_CACHE_VERSION,
                     ctx.user_id,
                     generation,
@@ -290,6 +291,9 @@ class ReportService:
             )
             for currency, kinds in current.items()
         ]
+        period_view = PeriodView(start=period.start, end=period.end, label=period.label)
+        for report in reports:
+            report.insights = build_insights(report, period_view, ctx.locale)
         reports.sort(
             key=lambda item: (
                 item.currency != ctx.base_currency,

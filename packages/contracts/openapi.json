@@ -4530,6 +4530,13 @@
             },
             "type": "array",
             "title": "Trend"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/ReportInsight"
+            },
+            "type": "array",
+            "title": "Insights"
           }
         },
         "type": "object",
@@ -4540,7 +4547,8 @@
           "net",
           "expenseByCategory",
           "topMerchants",
-          "trend"
+          "trend",
+          "insights"
         ],
         "title": "CurrencyReport"
       },
@@ -6434,6 +6442,114 @@
           "displayName"
         ],
         "title": "RegisterRequest"
+      },
+      "ReportInsight": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "spending_change",
+              "largest_category",
+              "largest_merchant"
+            ],
+            "title": "Kind"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "current": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneyAmount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneyAmount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changePercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changepercent"
+          },
+          "sharePercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharepercent"
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoryid"
+          },
+          "merchantKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchantkey"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "currency",
+          "period",
+          "text",
+          "current",
+          "previous",
+          "change",
+          "changePercent",
+          "sharePercent",
+          "categoryId",
+          "merchantKey"
+        ],
+        "title": "ReportInsight",
+        "description": "A deterministic fact and the exact evidence needed to explain or drill into it."
       },
       "ReportOverview": {
         "properties": {

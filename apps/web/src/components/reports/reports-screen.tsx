@@ -8,6 +8,7 @@ import { type FormEvent, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ReportCharts } from "@/components/reports/report-charts";
+import { reportTransactionsHref } from "@/lib/report-links";
 import { Field, Input, Select } from "@/components/ui/field";
 import { useMe, useReport } from "@/lib/queries";
 import {
@@ -212,6 +213,19 @@ export function ReportsScreen() {
                   <MetricCard label="Net" metric={selected.net} locale={locale} icon={<Wallet aria-hidden className="size-4" />}
                     note="Received minus spent" noPrevious="Previous net was zero" />
                 </div>
+                {selected.insights?.length ? <section aria-label="Period insights" className="mt-6 grid gap-3 lg:grid-cols-3">
+                  {selected.insights.map((insight) => {
+                    const href = insight.kind === "largest_category"
+                      ? reportTransactionsHref(insight.period, insight.currency, { type: "expense", ...(insight.categoryId ? { categoryId: insight.categoryId } : { uncategorized: "true" }) })
+                      : insight.kind === "largest_merchant" && insight.merchantKey
+                        ? reportTransactionsHref(insight.period, insight.currency, { type: "expense", merchantKey: insight.merchantKey }) : null;
+                    return <article key={insight.kind} className="min-w-0 rounded-xl border border-line bg-sky-wash/40 p-4">
+                      <h2 className="font-semibold">{insight.kind === "spending_change" ? "Spending change" : insight.kind === "largest_category" ? "Largest category" : "Largest named merchant"}</h2>
+                      <p className="mt-2 text-sm leading-relaxed text-ink-soft [overflow-wrap:anywhere]">{insight.text}</p>
+                      {href ? <Link href={href} className="mt-3 inline-block text-sm font-medium text-sky-deep underline underline-offset-4">View supporting transactions</Link> : null}
+                    </article>;
+                  })}
+                </section> : null}
                 <ReportCharts key={`${currency}:${data.period.start}:${data.period.end}`} report={selected} period={data.period} locale={locale} />
               </> : <EmptyReport currency={currency} />}
               <footer className="mt-6 border-t border-line pt-4 text-xs leading-relaxed text-ink-faint">

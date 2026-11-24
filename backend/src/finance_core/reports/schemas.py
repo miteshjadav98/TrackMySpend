@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from typing import Literal
+
+from pydantic import Field
 
 from finance_core.schemas import ApiModel, MoneyAmount
 
@@ -73,6 +76,22 @@ class MerchantTotal(ApiModel):
     is_other: bool = False
 
 
+class ReportInsight(ApiModel):
+    """A deterministic fact and the exact evidence needed to explain or drill into it."""
+
+    kind: Literal["spending_change", "largest_category", "largest_merchant"]
+    currency: str
+    period: PeriodView
+    text: str
+    current: MoneyAmount
+    previous: MoneyAmount | None = None
+    change: MoneyAmount | None = None
+    change_percent: float | None = None
+    share_percent: float | None = None
+    category_id: uuid.UUID | None = None
+    merchant_key: str | None = None
+
+
 class CurrencyReport(ApiModel):
     currency: str
     income: MetricComparison
@@ -81,6 +100,7 @@ class CurrencyReport(ApiModel):
     expense_by_category: list[CategoryTotal]
     top_merchants: list[MerchantTotal]
     trend: list[TrendBucket]
+    insights: list[ReportInsight] = Field(default_factory=list)
 
 
 class ReportOverview(ApiModel):
