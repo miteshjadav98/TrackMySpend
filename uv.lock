@@ -594,7 +594,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.120" },
     { name = "finance-core", editable = "backend" },
     { name = "python-multipart", specifier = ">=0.0.33" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.38" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
 ]
 
 [[package]]
