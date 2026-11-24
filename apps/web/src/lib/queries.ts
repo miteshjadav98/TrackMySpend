@@ -15,6 +15,7 @@ import type {
   NoticeList,
   UnreadCount,
   MeView,
+  ReportOverview,
   SettlementView,
   SharedExpenseView,
   SpendingSummary,
@@ -29,12 +30,14 @@ import {
 } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/lib/api";
+import type { ReportQuery } from "@/lib/report-filters";
 
 export const keys = {
   me: ["me"] as const,
   conversations: ["conversations"] as const,
   conversation: (id: string) => ["conversation", id] as const,
   summary: (period: string) => ["summary", period] as const,
+  report: (filters: ReportQuery) => ["reports", filters] as const,
   categories: ["categories"] as const,
   accounts: (includeArchived: boolean) => ["accounts", { includeArchived }] as const,
   transactions: (filters: TransactionFilters) => ["transactions", filters] as const,
@@ -56,6 +59,7 @@ export const keys = {
 export function invalidateLedger(client: QueryClient): Promise<unknown> {
   return Promise.all([
     client.invalidateQueries({ queryKey: ["summary"] }),
+    client.invalidateQueries({ queryKey: ["reports"] }),
     client.invalidateQueries({ queryKey: ["transactions"] }),
     client.invalidateQueries({ queryKey: ["shared-expense"] }),
     client.invalidateQueries({ queryKey: keys.categories }),
@@ -102,6 +106,17 @@ export function useSummary(period = "this_month") {
         api.GET("/api/v1/reports/summary", {
           params: { query: { period: period as "this_month" } },
         }),
+      ),
+  });
+}
+
+/** Report values are computed and formatted by the API, and refreshed with the ledger. */
+export function useReport(filters: ReportQuery) {
+  return useQuery({
+    queryKey: keys.report(filters),
+    queryFn: ({ signal }) =>
+      unwrap<ReportOverview>(
+        api.GET("/api/v1/reports/overview", { params: { query: filters }, signal }),
       ),
   });
 }

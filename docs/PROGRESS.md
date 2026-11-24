@@ -137,11 +137,56 @@ Reporting stays in the modular monolith and uses Postgres plus the existing gene
 Redis cache. FX conversion, report exports, budgets/forecasts and arbitrary generated UI remain
 out of scope.
 
+### Checkpoint — 24 November 2026 (stopped at the user's request)
+
+- Working checkout: `tms-phase4-integration/`; current branch: `phase-5/t02-reports`.
+- Ticket 01 is complete on `phase-5/integration` (merge `94adb66`).
+- The verified Next.js 16.4.6 security branch was merged into `phase-5/integration` as
+  `f73e2d4`, before creating the ticket 02 branch. This integration merge has not been pushed.
+- Ticket 02 is implemented and locally verified on `phase-5/t02-reports`, but **has not been
+  merged or pushed**. Its tracker status remains unchanged until integration, per the issue
+  tracker convention.
+- Delivered for ticket 02: authenticated `/reports`, desktop/mobile navigation, URL-restored
+  period and currency filters, date validation, exact spent/received/net and comparison cards,
+  base currency first, loading/error/empty states, and report invalidation through the existing
+  ledger mutation helper. Three/six-month selections include the current month to date plus
+  the preceding two/five calendar months and pin explicit dates in the URL.
+- Browser coverage found an expired-session loop: the proxy treated cookie presence as valid
+  authentication and redirected login back to chat. Login now stays reachable with a stale
+  cookie, and the app's sign-in redirect preserves the report query string. The regression
+  failed before the fix and passed afterward.
+- Verified: web typecheck, ESLint, Next.js production build, **12 Playwright tests passed**
+  against the production build using installed Chrome, **5 reporting integration tests passed**
+  against real Postgres/Redis, generated OpenAPI/TypeScript contracts had no drift, and the
+  local database migration was already current. Desktop light/mobile dark screenshots were
+  inspected. Full backend tests, full Python static checks and container builds were not rerun
+  for this frontend ticket.
+- Playwright tests use isolated API fixtures on port 3100 and never modify the demo ledger.
+  CI now installs Chromium and runs the same browser suite after the web build.
+- Local Postgres and Redis were started; dependencies are installed. No API or web demo server
+  was left running, so port 3000 does not yet serve this new Reports page. No `.env` exists in
+  this checkout; local HTTP API startup needs `COOKIE_SECURE=false`.
+- User requested a checkpoint and stop before ticket integration, publishing or ticket 03.
+
 ## Next
 
-1. Build ticket 01: the reporting read model, equal-length comparison and currency-policy ADR.
-2. Add the Reports page, accessible charts, deterministic insights and the fixed chat interaction
-   in tickets 02 through 05, then document and verify the phase in ticket 06.
+1. Resume from `phase-5/t02-reports` in the checkout above. Integrate ticket 02 into
+   `phase-5/integration`, then mark its acceptance criteria/status in
+   [02-reports-page.md](../.scratch/phase-5/issues/02-reports-page.md). Fetch before publishing
+   the ticket and integration branches; preserve upstream work.
+2. Start ticket 03: accessible trend, category and merchant charts with exact transaction
+   drill-down. Continue with insights (04), chat reports (05), then phase verification/docs (06).
+3. FX conversion, exports, budgets/forecasts, account balances and AG-UI/A2UI remain out of scope.
+
+To rerun ticket 02's checks locally (from this checkout; use installed Chrome, or install
+Playwright Chromium and omit `PLAYWRIGHT_CHANNEL`):
+
+```bash
+npm run check:web
+npm run build:web
+PLAYWRIGHT_CHANNEL=chrome npm run test:browser -w web
+uv run pytest tests/integration/test_reports.py
+```
 
 ## Resume
 

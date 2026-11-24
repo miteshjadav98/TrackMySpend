@@ -64,6 +64,9 @@ export type MerchantRuleView = S["MerchantRuleView"];
 export type MerchantRulePage = S["MerchantRulePage"];
 
 export type SpendingSummary = S["SpendingSummary"];
+export type ReportOverview = S["ReportOverview"];
+export type CurrencyReport = S["CurrencyReport"];
+export type MetricComparison = S["MetricComparison"];
 export type CurrencySummary = S["CurrencySummary"];
 export type CategoryTotal = S["CategoryTotal"];
 export type PeriodView = S["PeriodView"];
