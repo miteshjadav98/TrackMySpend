@@ -7,16 +7,24 @@ Spec: `../spec.md` (all sections).
 
 **Blocked by:** 01, 02, 03, 04, 05
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] README explains Reports, its period/currency behavior, chat examples and endpoints; the
+- [x] README explains Reports, its period/currency behavior, chat examples and endpoints; the
   roadmap marks Phase 5 built.
-- [ ] Architecture documents the reporting read path, cache/failure behavior, chart contract,
+- [x] Architecture documents the reporting read path, cache/failure behavior, chart contract,
   insight rules, performance boundary and currency ADR.
-- [ ] GLOSSARY matches final terms in code and UI.
-- [ ] `docs/phase-5-report.md` records delivered scope, full checks, query/response measurements,
+- [x] GLOSSARY matches final terms in code and UI.
+- [x] `docs/phase-5-report.md` records delivered scope, full checks, query/response measurements,
   live intent eval, accessibility verification, known limits and next steps.
-- [ ] `docs/PROGRESS.md` is current and explicitly keeps FX conversion, exports, budgets/forecasts,
+- [x] `docs/PROGRESS.md` is current and explicitly keeps FX conversion, exports, budgets/forecasts,
   account balances and AG-UI/A2UI out of scope.
-- [ ] Final full API/web/build/contract/migration checks pass and their exact results are recorded.
+- [x] Final full API/web/build/contract/migration checks pass and their exact results are recorded.
 
+
+## Comments
+
+2026-11-24: Merged as `5e306c2`.
+README, architecture, glossary, progress and the phase report match the delivered behavior.
+Final verification: 797 backend tests, 24 browser tests, strict API/web checks, production build,
+stable contract generation, single migration head 0017 and no database drift. Repeated live
+report evaluation passed 40/40; 100k-row five-year cold-cache report p95 is 249.48 ms.

@@ -1,6 +1,6 @@
 # Phase 5: charts and deterministic insights
 
-Status: ready-for-agent
+Status: done
 Integration branch: `phase-5/integration`
 Tickets: `issues/` in this directory
 
@@ -219,3 +219,9 @@ summary endpoint or its chat contract.
   jobs.
 - Account balances and net-worth reporting.
 
+
+## Completion
+
+All six tickets are integrated on `phase-5/integration`. See
+[the Phase 5 report](../../docs/phase-5-report.md) for verification, measurements and known limits.
+Owner acceptance testing precedes the main-branch release.
