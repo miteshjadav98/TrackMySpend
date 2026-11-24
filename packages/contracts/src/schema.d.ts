@@ -4207,6 +4207,9 @@ export interface operations {
                 minAmount?: number | string | null;
                 maxAmount?: number | string | null;
                 currency?: string | null;
+                merchantKey?: string | null;
+                otherMerchants?: boolean;
+                uncategorized?: boolean;
                 sort?: "recent" | "largest";
                 limit?: number;
                 cursor?: string | null;

@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ReportCharts } from "@/components/reports/report-charts";
 import { Field, Input, Select } from "@/components/ui/field";
 import { useMe, useReport } from "@/lib/queries";
 import {
@@ -211,6 +212,7 @@ export function ReportsScreen() {
                   <MetricCard label="Net" metric={selected.net} locale={locale} icon={<Wallet aria-hidden className="size-4" />}
                     note="Received minus spent" noPrevious="Previous net was zero" />
                 </div>
+                <ReportCharts key={`${currency}:${data.period.start}:${data.period.end}`} report={selected} period={data.period} locale={locale} />
               </> : <EmptyReport currency={currency} />}
               <footer className="mt-6 border-t border-line pt-4 text-xs leading-relaxed text-ink-faint">
                 <p>{data.dataSource}. Transfers and deleted transactions are excluded; shared expenses include your own share.</p>

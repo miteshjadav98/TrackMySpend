@@ -2431,6 +2431,44 @@
             }
           },
           {
+            "name": "merchantKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 600
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Merchantkey"
+            }
+          },
+          {
+            "name": "otherMerchants",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Othermerchants"
+            }
+          },
+          {
+            "name": "uncategorized",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Uncategorized"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "required": false,

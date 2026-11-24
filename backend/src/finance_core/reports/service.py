@@ -21,6 +21,7 @@ from finance_core.cache.redis import RedisClient, RedisUnavailableError
 from finance_core.categories.models import Category
 from finance_core.clock import Clock
 from finance_core.dates import DateRange, preceding_period
+from finance_core.merchants.report_groups import report_merchant_groups
 from finance_core.reports.schemas import (
     CategoryTotal,
     CurrencyReport,
@@ -391,44 +392,16 @@ class ReportService:
     def _merchant_totals(
         rows: list[tuple[str | None, int, int]], currency: str, locale: str
     ) -> list[MerchantTotal]:
-        named: dict[str, tuple[str, int, int]] = {}
-        other_total = 0
-        other_count = 0
-        for merchant, total, count in rows:
-            name = merchant.strip() if merchant else ""
-            if not name:
-                other_total += total
-                other_count += count
-                continue
-            key = name.casefold()
-            label, old_total, old_count = named.get(key, (name, 0, 0))
-            label = min(label, name, key=lambda value: (value.casefold(), value))
-            named[key] = (label, old_total + total, old_count + count)
-
-        ranked = sorted(named.items(), key=lambda item: (-item[1][1], item[1][0].casefold()))
-        top, remainder = ranked[:10], ranked[10:]
-        other_total += sum(item[1][1] for item in remainder)
-        other_count += sum(item[1][2] for item in remainder)
-        result = [
+        return [
             MerchantTotal(
-                key=key,
-                name=label,
-                total=MoneyAmount.of(total, currency, locale),
-                count=count,
+                key=group.key,
+                name=group.name,
+                total=MoneyAmount.of(group.total, currency, locale),
+                count=group.count,
+                is_other=group.is_other,
             )
-            for key, (label, total, count) in top
+            for group in report_merchant_groups(rows)
         ]
-        if other_count:
-            result.append(
-                MerchantTotal(
-                    key="other",
-                    name="Other merchants",
-                    total=MoneyAmount.of(other_total, currency, locale),
-                    count=other_count,
-                    is_other=True,
-                )
-            )
-        return result
 
     async def _compute(self, ctx: UserContext, period: DateRange) -> SpendingSummary:
         rows = (

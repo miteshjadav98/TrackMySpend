@@ -103,6 +103,9 @@ class TransactionQuery:
     min_amount: Decimal | None = None
     max_amount: Decimal | None = None
     currency: str | None = None
+    merchant_key: str | None = None
+    other_merchants: bool = False
+    uncategorized: bool = False
     shared_only: bool = False  # only the user's shares of shared expenses
     sort: SortField = "recent"
     limit: int = 50

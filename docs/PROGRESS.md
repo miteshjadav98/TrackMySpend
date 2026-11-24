@@ -172,13 +172,42 @@ out of scope.
 
 Ticket 02's verified Reports page (`7a49b73`) is now integrated into `phase-5/integration`.
 Its tracker acceptance criteria are complete. The Next.js 16.4.6 security update is included.
-Ticket 03 is next: accessible charts, table alternatives and exact transaction drill-down.
+Ticket 02 was merged as `9fb6d7b` and both the ticket and integration branches were pushed.
+
+### Ticket 03 testing checkpoint — 24 November 2026
+
+- Current branch: `phase-5/t03-charts`, based on integration merge `9fb6d7b`.
+- Implemented: income/expense SVG trend (circle/square and solid/dashed encodings), category and
+  merchant bars, keyboard/hover values, exact table alternatives, mobile/dark/reduced-motion
+  support and transaction drill-down. Money, category percentages and formatting come from the API.
+- Transactions restore filters from the URL, including currency, exact merchant, remainder and
+  uncategorized buckets. Shared Unicode merchant grouping keeps every report bucket identical to
+  its paginated transaction rows. Browser coverage caught and fixed rapid typing losing characters
+  while Next transitions URL state; the native input now preserves typing and restores history.
+- Verification: web typecheck, lint and production build passed; **19 production-browser tests
+  passed**; strict Python checks and import boundaries passed; **10 focused report/grouping tests
+  passed**. Contracts regenerated and Alembic reports no drift. Desktop/light and mobile/dark chart
+  screenshots inspected.
+- Full backend suite: **776 passed, 2 skipped, 1 failed**. The failure is the existing
+  `test_five_thousand_rows_import_in_one_go`: returning the confirmation detail hits the database's
+  five-second statement timeout in the import-row matched-transaction join. It reproduces in
+  isolation on both this branch and the unchanged pre-chart `tms-next-security` checkout. Do not
+  describe the full suite as green. Investigate the import detail query's plan separately.
+- User requested a running UI for testing. API is running on `127.0.0.1:8000`; production web is
+  running on `127.0.0.1:3000`. Database and Redis readiness passed; `/login` returns 200 and the
+  proxied unauthenticated `/api/v1/me` returns 401. The browser is open at the sign-in page with
+  `/reports?period=this_year` preserved as its destination. Existing user data was not seeded or
+  changed by the browser tests. Chat currently uses the default offline rules provider.
+- This ticket is saved locally for user testing, **not merged or pushed**. Its tracker status
+  remains unchanged until integration. Keep the current build stable while feedback arrives.
 
 ## Next
 
-1. Build ticket 03 on `phase-5/t03-charts`.
-2. Continue with deterministic insights (04), chat reports (05), then phase verification/docs (06).
-3. FX conversion, exports, budgets/forecasts, account balances and AG-UI/A2UI remain out of scope.
+1. Collect UI feedback on ticket 03, resolve it, then integrate and update
+   [03-report-charts.md](../.scratch/phase-5/issues/03-report-charts.md).
+2. Investigate the pre-existing 5,000-row import confirmation/detail timeout before phase release.
+3. Continue with deterministic insights (04), chat reports (05), then phase verification/docs (06).
+4. FX conversion, exports, budgets/forecasts, account balances and AG-UI/A2UI remain out of scope.
 
 To rerun ticket 02's checks locally (from this checkout; use installed Chrome, or install
 Playwright Chromium and omit `PLAYWRIGHT_CHANNEL`):
