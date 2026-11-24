@@ -1758,6 +1758,8 @@ export interface components {
             likelyDuplicates: number;
             /** Transfers */
             transfers: number;
+            /** Matchedtransfers */
+            matchedTransfers: number;
             /** Selected */
             selected: number;
             /** Selectedoutminor */
@@ -1791,6 +1793,9 @@ export interface components {
             category: components["schemas"]["CategoryRef"] | null;
             /** Categorysource */
             categorySource: ("rule" | "ai" | "keyword" | "default" | "user") | null;
+            transferAccount: components["schemas"]["AccountRef"] | null;
+            /** Matchesexistingtransfer */
+            matchesExistingTransfer: boolean;
             /**
              * Status
              * @enum {string}
@@ -1861,7 +1866,7 @@ export interface components {
         };
         /**
          * RowChange
-         * @description One preview row edited: ticked or unticked, or filed under another category.
+         * @description One editable preview row. Null explicitly removes a transfer target.
          */
         RowChange: {
             /**
@@ -1873,6 +1878,8 @@ export interface components {
             isSelected?: boolean | null;
             /** Categoryid */
             categoryId?: string | null;
+            /** Transferaccountid */
+            transferAccountId?: string | null;
         };
         /** RowChanges */
         RowChanges: {

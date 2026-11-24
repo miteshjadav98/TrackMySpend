@@ -16,11 +16,12 @@ from hashlib import sha256
 from pathlib import PurePath
 from typing import Any
 
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import delete, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from finance_core.accounts.models import Account
-from finance_core.accounts.schemas import AccountRef
+from finance_core.accounts.schemas import AccountRef, AccountView
 from finance_core.accounts.service import AccountService
 from finance_core.audit.service import record_audit
 from finance_core.cache.primitives import UserDataGeneration
@@ -35,7 +36,12 @@ from finance_core.imports.cells import cell_text, guess_date_order
 from finance_core.imports.columns import guess_columns, header_signature
 from finance_core.imports.fingerprint import assign_fingerprints
 from finance_core.imports.merchant import extract_merchant
-from finance_core.imports.models import ImportRow, StatementImport, StatementLayout
+from finance_core.imports.models import (
+    ImportRow,
+    StatementImport,
+    StatementLayout,
+    StatementTransferSide,
+)
 from finance_core.imports.readers import read_csv
 from finance_core.imports.rows import ParsedRow, parse_data_rows
 from finance_core.imports.schemas import (
@@ -49,6 +55,12 @@ from finance_core.imports.schemas import (
     RowStatusField,
 )
 from finance_core.imports.table import StatementTable, check_file_size, locate_table
+from finance_core.imports.transfers import (
+    infer_transfer_accounts,
+    lock_statement_transfers,
+    match_statement_transfers,
+    transfer_account_candidates,
+)
 from finance_core.imports.workbook import read_workbook
 from finance_core.merchants.service import MerchantRuleService
 from finance_core.money import format_money, from_minor
@@ -303,12 +315,20 @@ class ImportService:
         }
         if wanted - rows.keys():
             raise NotFoundError("Import row not found")
+        refresh_transfers = False
         for change in changes.rows:
             row = rows[change.id]
+            if "transfer_account_id" in change.model_fields_set:
+                await self._set_transfer_account(ctx, imp, row, change.transfer_account_id)
+                refresh_transfers = True
             if change.is_selected is not None:
                 self._tick(row, change.is_selected)
+                refresh_transfers |= row.transfer_account_id is not None
             if change.category_id is not None:
                 await self._set_category(ctx, row, change.category_id)
+        if refresh_transfers:
+            await self._session.flush()
+            await self._refresh_transfer_matches(ctx, imp, await self._selected_transfers(ctx, imp))
         record_audit(
             self._session, user_id=ctx.user_id, actor="user", action="import.rows_changed",
             entity_type="statement_import", entity_id=imp.id,
@@ -324,8 +344,14 @@ class ImportService:
                 details={"field": "isSelected"},
             )
         row.is_selected = selected
+        if not selected:
+            row.matched_transfer_id = None
 
     async def _set_category(self, ctx: UserContext, row: ImportRow, category_id: uuid.UUID) -> None:
+        if row.transfer_account_id is not None:
+            raise ValidationFailedError(
+                "A transfer has no category.", details={"field": "categoryId"}
+            )
         row_type = _type_of(row.direction)
         if row_type is None:
             raise ValidationFailedError(
@@ -341,6 +367,25 @@ class ImportService:
         row.category_id = category.id
         row.category_source = "user"
 
+    async def _set_transfer_account(
+        self, ctx: UserContext, imp: StatementImport, row: ImportRow, other_id: uuid.UUID | None
+    ) -> None:
+        if row.status == "skipped":
+            raise ValidationFailedError(
+                "That row was skipped.", details={"field": "transferAccountId"}
+            )
+        if other_id is not None:
+            other = await self._accounts.pick_for_transaction(
+                ctx, other_id, field="transferAccountId"
+            )
+            _validate_transfer_account(imp, other)
+            row.status = "transfer"
+        elif row.transfer_account_id is not None:
+            row.status = "to_import"
+        row.transfer_account_id = other_id
+        row.transfer_account_chosen = True
+        row.matched_transfer_id = None
+
     # -- saving and undoing -----------------------------------------------------------------
 
     async def confirm(
@@ -355,6 +400,7 @@ class ImportService:
                 "Confirm which columns are the date, description and amount first.",
                 code="layout_not_confirmed",
             )
+        await lock_statement_transfers(self._session, ctx.user_id)
         account = await self._accounts.pick_for_transaction(ctx, imp.account_id, field="accountId")
         rows = (
             await self._session.scalars(
@@ -368,22 +414,69 @@ class ImportService:
                 .order_by(ImportRow.position)
             )
         ).all()
+        keys = [row.fingerprint for row in rows if row.fingerprint is not None]
+        already_saved = await self._saved_keys(ctx.user_id, keys)
+        for row in rows:
+            if row.fingerprint in already_saved:
+                row.status = "skipped"
+                row.note = "Already imported"
+                row.is_selected = False
+                row.matched_transfer_id = None
+        rows = [row for row in rows if row.is_selected]
+        discovered = await self._suggest_transfers(
+            ctx,
+            imp,
+            [
+                row
+                for row in rows
+                if not row.transfer_account_chosen and row.transfer_account_id is None
+            ],
+        )
+        transfers = [row for row in rows if row.transfer_account_id is not None]
+        await self._check_transfer_accounts(ctx, imp, transfers)
+        matches_changed = await self._refresh_transfer_matches(ctx, imp, transfers, lock=True)
+        if discovered or matches_changed:
+            record_audit(
+                self._session, user_id=ctx.user_id, actor="user", action="import.transfer_matches_refreshed",
+                entity_type="statement_import", entity_id=imp.id, request_id=request_id,
+            )  # fmt: skip
+            await self._session.commit()
+            raise ConflictError(
+                "Transfer matches changed. Review the updated preview and confirm again.",
+                code="transfer_matches_changed",
+            )
+        ordinary = [row for row in rows if row.transfer_account_id is None]
+        new_transfers = [row for row in transfers if row.matched_transfer_id is None]
+        matched = [row for row in transfers if row.matched_transfer_id is not None]
         # Only a category the user chose in the preview teaches a merchant rule.
-        chosen = [row for row in rows if row.category_source == "user"]
-        guessed = [row for row in rows if row.category_source != "user"]
-        created = 0
+        chosen = [row for row in ordinary if row.category_source == "user"]
+        guessed = [row for row in ordinary if row.category_source != "user"] + new_transfers
+        created: dict[str, uuid.UUID] = {}
         for group, learns in ((chosen, True), (guessed, False)):
             items = [
                 (_new_transaction(row, account.id, imp.currency), row.fingerprint or "")
                 for row in group
             ]
-            created += await self._transactions.create_imported(
-                ctx, items, source_ref=str(imp.id), learn_merchants=learns, request_id=request_id
+            created.update(
+                await self._transactions.create_imported(
+                    ctx,
+                    items,
+                    source_ref=str(imp.id),
+                    learn_merchants=learns,
+                    request_id=request_id,
+                )
             )
+        for row in transfers:
+            assert row.fingerprint is not None
+            if transfer_id := row.matched_transfer_id or created.get(row.fingerprint):
+                self._session.add(StatementTransferSide(
+                    transfer_id=transfer_id, account_id=imp.account_id, import_row_id=row.id,
+                    user_id=ctx.user_id, fingerprint=row.fingerprint,
+                ))  # fmt: skip
 
         imp.status = "imported"
-        imp.imported_count = created
-        imp.skipped_count = imp.row_count - created
+        imp.imported_count = len(created)
+        imp.skipped_count = imp.row_count - len(created)
         imp.confirmed_at = self._clock.now()
         imp.expires_at = None
         imp.workbook_digest = None
@@ -395,7 +488,8 @@ class ImportService:
         record_audit(
             self._session, user_id=ctx.user_id, actor="user", action="import.confirmed",
             entity_type="statement_import", entity_id=imp.id,
-            data={"accountId": str(imp.account_id), "imported": created, "rowCount": imp.row_count},
+            data={"accountId": str(imp.account_id), "imported": len(created),
+                  "matchedTransfers": len(matched), "rowCount": imp.row_count},
             request_id=request_id,
         )  # fmt: skip
         await self._session.commit()
@@ -409,6 +503,7 @@ class ImportService:
         imp = await self._own_import(ctx.user_id, import_id, lock=True)
         if imp.status != "imported":
             raise ConflictError("Only a saved import can be undone.", code="import_not_imported")
+        await lock_statement_transfers(self._session, ctx.user_id)
         mine = (
             Transaction.user_id == ctx.user_id,
             Transaction.source == "import",
@@ -417,6 +512,21 @@ class ImportService:
         live_ids = list(
             await self._session.scalars(
                 select(Transaction.id).where(*mine, Transaction.deleted_at.is_(None))
+            )
+        )
+        # Undoing a matching statement only releases its side. Undoing the creating
+        # statement releases any other sides too, so either statement can be replayed.
+        await self._session.execute(
+            delete(StatementTransferSide).where(
+                StatementTransferSide.user_id == ctx.user_id,
+                or_(
+                    StatementTransferSide.transfer_id.in_(select(Transaction.id).where(*mine)),
+                    StatementTransferSide.import_row_id.in_(
+                        select(ImportRow.id).where(
+                            ImportRow.import_id == imp.id, ImportRow.user_id == ctx.user_id
+                        )
+                    ),
+                ),
             )
         )
         # Clearing the idempotency key on every row of the import (also ones the user deleted
@@ -514,6 +624,7 @@ class ImportService:
         if built:
             await self._session.execute(insert(ImportRow), built)
         imp.row_count = len(built)
+        await self._suggest_transfers(ctx, imp)
 
     def _preview_row(
         self,
@@ -549,15 +660,117 @@ class ImportService:
         }  # fmt: skip
 
     async def _saved_keys(self, user_id: uuid.UUID, fingerprints: list[str]) -> set[str]:
-        """Fingerprints that already belong to a transaction (live, or deleted by hand)."""
+        """Fingerprints already saved as transactions or linked to a transfer side."""
         if not fingerprints:
             return set()
         found = await self._session.scalars(
-            select(Transaction.idempotency_key).where(
-                Transaction.user_id == user_id, Transaction.idempotency_key.in_(fingerprints)
+            select(Transaction.idempotency_key)
+            .where(Transaction.user_id == user_id, Transaction.idempotency_key.in_(fingerprints))
+            .union_all(
+                select(StatementTransferSide.fingerprint).where(
+                    StatementTransferSide.user_id == user_id,
+                    StatementTransferSide.fingerprint.in_(fingerprints),
+                )
             )
         )
         return {key for key in found if key}
+
+    async def _suggest_transfers(
+        self, ctx: UserContext, imp: StatementImport, rows: list[ImportRow] | None = None
+    ) -> bool:
+        if rows == []:
+            return False
+        accounts = await self._accounts.list_accounts(ctx)
+        current = next((account for account in accounts if account.id == imp.account_id), None)
+        if current is None or len(accounts) < 2:
+            return False
+        if rows is None:
+            rows = list(
+                await self._session.scalars(
+                    select(ImportRow).where(
+                        ImportRow.import_id == imp.id,
+                        ImportRow.user_id == ctx.user_id,
+                        ImportRow.status.in_(("to_import", "likely_duplicate")),
+                    )
+                )
+            )
+        suggestions: list[ImportRow] = []
+        ambiguous: list[tuple[ImportRow, list[uuid.UUID]]] = []
+        for row in rows:
+            assert row.direction is not None
+            targets = transfer_account_candidates(
+                row.description, direction=row.direction, account=current, accounts=accounts
+            )
+            if len(targets) == 1:
+                row.transfer_account_id = targets[0]
+                row.status = "transfer"
+                suggestions.append(row)
+            elif targets:
+                ambiguous.append((row, targets))
+        inferred = await infer_transfer_accounts(
+            self._session, user_id=ctx.user_id, account_id=imp.account_id,
+            currency=imp.currency, ambiguous=ambiguous,
+        )  # fmt: skip
+        for row, _ in ambiguous:
+            if target := inferred.get(row.id):
+                row.transfer_account_id = target
+                suggestions.append(row)
+        await self._refresh_transfer_matches(ctx, imp, suggestions)
+        for row in suggestions:
+            if row.matched_transfer_id is not None:
+                row.status = "transfer"
+                row.is_selected = True
+            elif row.id in inferred:
+                # Another row took the only match, so its statement did not resolve the account.
+                row.transfer_account_id = None
+        return any(row.transfer_account_id is not None for row in suggestions)
+
+    async def _selected_transfers(self, ctx: UserContext, imp: StatementImport) -> list[ImportRow]:
+        return list(
+            await self._session.scalars(
+                select(ImportRow).where(
+                    ImportRow.import_id == imp.id,
+                    ImportRow.user_id == ctx.user_id,
+                    ImportRow.status == "transfer",
+                    ImportRow.is_selected.is_(True),
+                )
+            )
+        )
+
+    async def _check_transfer_accounts(
+        self, ctx: UserContext, imp: StatementImport, rows: list[ImportRow]
+    ) -> None:
+        if not rows:
+            return
+        accounts = {account.id: account for account in await self._accounts.list_accounts(ctx)}
+        for other_id in {row.transfer_account_id for row in rows if row.transfer_account_id}:
+            other = accounts.get(other_id)
+            if other is None:
+                # Archived accounts can appear in a preview created earlier.
+                other = await self._accounts.pick_for_transaction(
+                    ctx, other_id, field="transferAccountId"
+                )
+            _validate_transfer_account(imp, other)
+
+    async def _refresh_transfer_matches(
+        self,
+        ctx: UserContext,
+        imp: StatementImport,
+        rows: list[ImportRow],
+        *,
+        lock: bool = False,
+    ) -> bool:
+        matches = await match_statement_transfers(
+            self._session, user_id=ctx.user_id, account_id=imp.account_id,
+            currency=imp.currency, rows=rows, lock=lock,
+        )  # fmt: skip
+        changed = False
+        for row in rows:
+            match = matches.get(row.id)
+            if match != row.matched_transfer_id:
+                row.matched_transfer_id = match
+                changed = True
+        return changed
 
     # -- layouts ----------------------------------------------------------------------------
 
@@ -621,9 +834,13 @@ class ImportService:
     ) -> ImportDetail:
         account = await self._session.get(Account, imp.account_id)
         assert account is not None
+        other = aliased(Account)
         page = (
-            select(ImportRow, Category)
+            select(ImportRow, Category, other)
             .outerjoin(Category, Category.id == ImportRow.category_id)
+            .outerjoin(
+                other, (other.id == ImportRow.transfer_account_id) & (other.user_id == ctx.user_id)
+            )
             .where(ImportRow.import_id == imp.id, ImportRow.user_id == ctx.user_id)
         )
         if status is not None:
@@ -654,7 +871,8 @@ class ImportService:
             layout_confirmed=imp.layout_confirmed,
             counts=await self._counts(imp),
             rows=[
-                _preview_row_view(row, category, imp.currency, ctx.locale) for row, category in rows
+                _preview_row_view(row, category, other_account, imp.currency, ctx.locale)
+                for row, category, other_account in rows
             ],
             rows_total=total or 0,
         )
@@ -669,17 +887,19 @@ class ImportService:
                     ImportRow.direction,
                     func.count(),
                     func.coalesce(func.sum(ImportRow.amount_minor), 0),
+                    func.count(ImportRow.matched_transfer_id),
                 )
                 .where(ImportRow.import_id == imp.id)
                 .group_by(ImportRow.status, ImportRow.is_selected, ImportRow.direction)
             )
         ).all()
         by_status: dict[str, int] = defaultdict(int)
-        selected = selected_out = selected_in = 0
-        for status, is_selected, direction, count, amount in grouped:
+        selected = selected_out = selected_in = matched_transfers = 0
+        for status, is_selected, direction, count, amount, matches in grouped:
             by_status[status] += count
             if is_selected:
                 selected += count
+                matched_transfers += matches
                 if direction == "out":
                     selected_out += int(amount or 0)
                 elif direction == "in":
@@ -689,6 +909,7 @@ class ImportService:
             skipped=by_status["skipped"],
             likely_duplicates=by_status["likely_duplicate"],
             transfers=by_status["transfer"],
+            matched_transfers=matched_transfers,
             selected=selected,
             selected_out_minor=selected_out,
             selected_in_minor=selected_in,
@@ -725,8 +946,10 @@ def _summary(imp: StatementImport, account: Account) -> ImportSummary:
 
 
 def _preview_row_view(
-    row: ImportRow, category: Category | None, currency: str, locale: str
+    row: ImportRow, category: Category | None, other: Account | None, currency: str, locale: str
 ) -> PreviewRow:
+    is_transfer = row.status == "transfer"
+    matches_existing = row.matched_transfer_id is not None
     return PreviewRow(
         id=row.id,
         position=row.position,
@@ -740,15 +963,19 @@ def _preview_row_view(
             else None
         ),
         description=row.description,
-        merchant=row.merchant,
+        merchant=None if is_transfer else row.merchant,
         category=(
             CategoryRef(id=category.id, slug=category.slug, name=category.name, icon=category.icon)
-            if category
+            if category and not is_transfer
             else None
         ),
-        category_source=row.category_source,
+        category_source=None if is_transfer else row.category_source,
+        transfer_account=AccountRef(id=other.id, name=other.name, kind=other.kind)
+        if other
+        else None,
+        matches_existing_transfer=matches_existing,
         status=row.status,
-        note=row.note,
+        note="Already recorded as a transfer" if matches_existing else row.note,
         is_selected=row.is_selected,
     )
 
@@ -756,6 +983,15 @@ def _preview_row_view(
 def _new_transaction(row: ImportRow, account_id: uuid.UUID, currency: str) -> NewTransaction:
     row_type = _type_of(row.direction)
     assert row_type is not None and row.amount_minor is not None and row.occurred_on is not None
+    if (other_id := row.transfer_account_id) is not None:
+        from_id, to_id = (
+            (account_id, other_id) if row.direction == "out" else (other_id, account_id)
+        )
+        return NewTransaction(
+            type="transfer", amount_minor=row.amount_minor, currency=currency,
+            occurred_on=row.occurred_on, category_id=None, description=row.description,
+            merchant=None, payment_method=None, account_id=from_id, to_account_id=to_id,
+        )  # fmt: skip
     return NewTransaction(
         type=row_type,
         amount_minor=row.amount_minor,
@@ -767,3 +1003,13 @@ def _new_transaction(row: ImportRow, account_id: uuid.UUID, currency: str) -> Ne
         payment_method=None,
         account_id=account_id,
     )
+
+
+def _validate_transfer_account(imp: StatementImport, other: AccountView) -> None:
+    details = {"field": "transferAccountId"}
+    if imp.account_id == other.id:
+        raise ValidationFailedError("A transfer needs two different accounts.", details=details)
+    if imp.currency != other.currency:
+        raise ValidationFailedError(
+            "Transfers between currencies are not supported.", details=details
+        )

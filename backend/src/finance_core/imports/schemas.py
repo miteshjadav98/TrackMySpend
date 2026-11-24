@@ -76,6 +76,7 @@ class PreviewCounts(ApiModel):
     skipped: int
     likely_duplicates: int
     transfers: int
+    matched_transfers: int
     selected: int
     selected_out_minor: int
     selected_in_minor: int
@@ -93,6 +94,8 @@ class PreviewRow(ApiModel):
     merchant: str | None
     category: CategoryRef | None
     category_source: CategorySourceField | None
+    transfer_account: AccountRef | None
+    matches_existing_transfer: bool
     status: RowStatusField
     # Why a row is skipped or flagged, in words for the user.
     note: str | None
@@ -116,11 +119,12 @@ class ImportDetail(ImportSummary):
 
 
 class RowChange(ApiInput):
-    """One preview row edited: ticked or unticked, or filed under another category."""
+    """One editable preview row. Null explicitly removes a transfer target."""
 
     id: uuid.UUID
     is_selected: bool | None = None
     category_id: uuid.UUID | None = None
+    transfer_account_id: uuid.UUID | None = None
 
 
 class RowChanges(ApiInput):

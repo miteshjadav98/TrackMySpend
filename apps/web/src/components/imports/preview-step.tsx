@@ -1,6 +1,6 @@
 "use client";
 
-import type { CategoryView, ImportDetail, PreviewRow, RowChange, RowStatus } from "@moneymoney/contracts";
+import type { AccountRef, CategoryView, ImportDetail, PreviewRow, RowChange, RowStatus } from "@moneymoney/contracts";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/field";
@@ -34,6 +34,7 @@ function Count({ label, value }: { label: string; value: number }) {
 export function PreviewStep({
   detail,
   categories,
+  transferAccounts,
   statusFilter,
   onStatusFilter,
   onChangeRows,
@@ -45,6 +46,7 @@ export function PreviewStep({
 }: {
   detail: ImportDetail;
   categories: CategoryView[];
+  transferAccounts: AccountRef[];
   statusFilter: RowStatus | "";
   onStatusFilter: (status: RowStatus | "") => void;
   onChangeRows: (changes: RowChange[]) => void;
@@ -95,7 +97,7 @@ export function PreviewStep({
                   aria-label="Tick or untick every row shown"
                   className="size-4 accent-lavender-deep"
                   checked={allTicked}
-                  disabled={selectable.length === 0}
+                  disabled={busy || selectable.length === 0}
                   onChange={(event) =>
                     onChangeRows(selectable.map((row) => ({ id: row.id, isSelected: event.target.checked })))
                   }
@@ -103,13 +105,13 @@ export function PreviewStep({
               </th>
               <th scope="col" className="px-3 py-2 font-semibold">Date</th>
               <th scope="col" className="px-3 py-2 font-semibold">Description</th>
-              <th scope="col" className="px-3 py-2 font-semibold">Category</th>
+            <th scope="col" className="px-3 py-2 font-semibold">Category or transfer</th>
               <th scope="col" className="px-3 py-2 text-right font-semibold">Amount</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {detail.rows.map((row) => (
-              <Row key={row.id} row={row} categories={categories} onChange={(change) => onChangeRows([change])} />
+            <Row key={row.id} row={row} categories={categories} transferAccounts={transferAccounts} busy={busy} onChange={(change) => onChangeRows([change])} />
             ))}
             {detail.rows.length === 0 ? (
               <tr>
@@ -141,7 +143,7 @@ export function PreviewStep({
           {formatMinor(counts.selectedInMinor, detail.currency)}
         </p>
         <Button variant="primary" busy={busy} disabled={counts.selected === 0} onClick={onConfirm}>
-          {counts.selected === 1 ? "Import 1 row" : `Import ${counts.selected} rows`}
+          {counts.matchedTransfers > 0 ? "Confirm statement" : counts.selected === 1 ? "Import 1 row" : `Import ${counts.selected} rows`}
         </Button>
       </div>
     </div>
@@ -151,16 +153,22 @@ export function PreviewStep({
 function Row({
   row,
   categories,
+  transferAccounts,
+  busy,
   onChange,
 }: {
   row: PreviewRow;
   categories: CategoryView[];
+  transferAccounts: AccountRef[];
+  busy: boolean;
   onChange: (change: RowChange) => void;
 }) {
   const skipped = row.status === "skipped";
   const kind = row.direction === "in" ? "income" : "expense";
   const options = categories.filter((category) => category.kind === kind);
   const note = row.categorySource ? SOURCE_NOTES[row.categorySource] : null;
+  const currentTransfer = row.transferAccount;
+  const direction = row.direction === "in" ? "from" : "to";
   return (
     <tr className={skipped ? "text-ink-faint" : undefined}>
       <td className="px-3 py-2">
@@ -169,7 +177,7 @@ function Row({
           className="size-4 accent-lavender-deep"
           aria-label={`Import row ${row.position}`}
           checked={row.isSelected}
-          disabled={skipped}
+          disabled={skipped || busy}
           onChange={(event) => onChange({ id: row.id, isSelected: event.target.checked })}
         />
       </td>
@@ -180,7 +188,27 @@ function Row({
         </span>
         {row.note ? <span className="block text-xs">{row.note}</span> : null}
       </td>
-      <td className="px-3 py-2">
+      <td className="space-y-1 px-3 py-2">
+        {!skipped && (currentTransfer || transferAccounts.length > 0) ? (
+          <>
+            <label className="sr-only" htmlFor={`transfer-${row.id}`}>Movement for row {row.position}</label>
+            <Select
+              id={`transfer-${row.id}`}
+              className="h-8 min-w-40 text-sm"
+              value={currentTransfer?.id ?? ""}
+              disabled={busy}
+              onChange={(event) => onChange({ id: row.id, transferAccountId: event.target.value || null })}
+            >
+              <option value="">{kind === "income" ? "Income" : "Expense"}</option>
+              {currentTransfer && !transferAccounts.some((account) => account.id === currentTransfer.id) ? (
+                <option value={currentTransfer.id} disabled>Transfer {direction} {currentTransfer.name}</option>
+              ) : null}
+              {transferAccounts.map((account) => (
+                <option key={account.id} value={account.id}>Transfer {direction} {account.name}</option>
+              ))}
+            </Select>
+          </>
+        ) : null}
         {row.category && !skipped ? (
           <>
             <label className="sr-only" htmlFor={`category-${row.id}`}>
@@ -190,6 +218,7 @@ function Row({
               id={`category-${row.id}`}
               className="h-8 min-w-40 text-sm"
               value={row.category.id}
+              disabled={busy}
               onChange={(event) => onChange({ id: row.id, categoryId: event.target.value })}
             >
               {options.map((category) => (
