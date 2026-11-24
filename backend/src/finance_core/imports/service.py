@@ -16,7 +16,7 @@ from hashlib import sha256
 from pathlib import PurePath
 from typing import Any
 
-from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy import and_, delete, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_core.accounts.models import Account
@@ -33,6 +33,7 @@ from finance_core.ids import uuid7
 from finance_core.imports.categorise import CategoryPicker
 from finance_core.imports.cells import cell_text, guess_date_order
 from finance_core.imports.columns import guess_columns, header_signature
+from finance_core.imports.duplicates import mark_likely_duplicates
 from finance_core.imports.fingerprint import assign_fingerprints
 from finance_core.imports.merchant import extract_merchant
 from finance_core.imports.models import ImportRow, StatementImport, StatementLayout
@@ -43,6 +44,7 @@ from finance_core.imports.schemas import (
     ColumnMapInput,
     ImportDetail,
     ImportSummary,
+    MatchedTransaction,
     PreviewCounts,
     PreviewRow,
     RowChanges,
@@ -530,7 +532,6 @@ class ImportService:
                 for row, merchant in zip(parsed, merchants, strict=True)
             ]
         )
-        # Later steps (likely duplicates, transfers) add their own statuses on top of this one.
         built = [
             self._preview_row(ctx, imp, picker, row, merchant, fingerprint, already_saved)
             for row, merchant, fingerprint in zip(parsed, merchants, fingerprints, strict=True)
@@ -538,6 +539,7 @@ class ImportService:
         await self._session.execute(delete(ImportRow).where(ImportRow.import_id == imp.id))
         if built:
             await self._session.execute(insert(ImportRow), built)
+            await mark_likely_duplicates(self._session, imp)
         imp.row_count = len(built)
 
     def _preview_row(
@@ -655,8 +657,20 @@ class ImportService:
         account = await self._session.get(Account, imp.account_id)
         assert account is not None
         page = (
-            select(ImportRow, Category)
+            select(ImportRow, Category, Transaction)
             .outerjoin(Category, Category.id == ImportRow.category_id)
+            .outerjoin(
+                Transaction,
+                and_(
+                    Transaction.id == ImportRow.matched_transaction_id,
+                    Transaction.user_id == ctx.user_id,
+                    or_(
+                        Transaction.account_id == imp.account_id,
+                        Transaction.to_account_id == imp.account_id,
+                    ),
+                    Transaction.deleted_at.is_(None),
+                ),
+            )
             .where(ImportRow.import_id == imp.id, ImportRow.user_id == ctx.user_id)
         )
         if status is not None:
@@ -688,7 +702,8 @@ class ImportService:
             layout_confirmed=imp.layout_confirmed,
             counts=await self._counts(imp),
             rows=[
-                _preview_row_view(row, category, imp.currency, ctx.locale) for row, category in rows
+                _preview_row_view(row, category, match, imp.currency, ctx.locale)
+                for row, category, match in rows
             ],
             rows_total=total or 0,
         )
@@ -759,7 +774,11 @@ def _summary(imp: StatementImport, account: Account) -> ImportSummary:
 
 
 def _preview_row_view(
-    row: ImportRow, category: Category | None, currency: str, locale: str
+    row: ImportRow,
+    category: Category | None,
+    matched: Transaction | None,
+    currency: str,
+    locale: str,
 ) -> PreviewRow:
     return PreviewRow(
         id=row.id,
@@ -784,6 +803,13 @@ def _preview_row_view(
         status=row.status,
         note=row.note,
         is_selected=row.is_selected,
+        matched_transaction=(
+            MatchedTransaction(
+                id=matched.id, description=matched.description, source=matched.source
+            )
+            if matched
+            else None
+        ),
     )
 
 

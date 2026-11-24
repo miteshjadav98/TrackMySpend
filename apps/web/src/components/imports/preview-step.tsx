@@ -21,6 +21,13 @@ const SOURCE_NOTES: Record<string, string> = {
   user: "Your pick",
 };
 
+const TRANSACTION_SOURCE_NAMES = {
+  chat: "Chat",
+  manual: "Manual",
+  import: "Statement import",
+  api: "API",
+};
+
 function Count({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border border-line bg-paper/60 px-3 py-2">
@@ -161,6 +168,8 @@ function Row({
   const kind = row.direction === "in" ? "income" : "expense";
   const options = categories.filter((category) => category.kind === kind);
   const note = row.categorySource ? SOURCE_NOTES[row.categorySource] : null;
+  const match = row.matchedTransaction;
+  const duplicateNoteId = row.status === "likely_duplicate" ? `duplicate-${row.id}` : undefined;
   return (
     <tr className={skipped ? "text-ink-faint" : undefined}>
       <td className="px-3 py-2">
@@ -168,6 +177,7 @@ function Row({
           type="checkbox"
           className="size-4 accent-lavender-deep"
           aria-label={`Import row ${row.position}`}
+          aria-describedby={duplicateNoteId}
           checked={row.isSelected}
           disabled={skipped}
           onChange={(event) => onChange({ id: row.id, isSelected: event.target.checked })}
@@ -179,6 +189,14 @@ function Row({
           {row.description ?? "—"}
         </span>
         {row.note ? <span className="block text-xs">{row.note}</span> : null}
+        {duplicateNoteId ? (
+          <span id={duplicateNoteId} className="block text-xs text-ink-soft">
+            Likely duplicate
+            {match
+              ? ` · ${match.description || "Existing transaction"} (${TRANSACTION_SOURCE_NAMES[match.source]})`
+              : null}
+          </span>
+        ) : null}
       </td>
       <td className="px-3 py-2">
         {row.category && !skipped ? (

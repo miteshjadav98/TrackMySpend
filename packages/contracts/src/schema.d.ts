@@ -1501,6 +1501,24 @@ export interface components {
              */
             password: string;
         };
+        /**
+         * MatchedTransaction
+         * @description The existing transaction that made a statement row a likely duplicate.
+         */
+        MatchedTransaction: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "chat" | "manual" | "import" | "api";
+        };
         /** MeView */
         MeView: {
             user: components["schemas"]["UserView"];
@@ -1802,6 +1820,7 @@ export interface components {
             note: string | null;
             /** Isselected */
             isSelected: boolean;
+            matchedTransaction: components["schemas"]["MatchedTransaction"] | null;
         };
         /** ProfileUpdate */
         ProfileUpdate: {
