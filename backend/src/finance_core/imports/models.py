@@ -129,6 +129,11 @@ class ImportRow(Base):
         ),
         CheckConstraint("direction IS NULL OR direction IN ('out', 'in')", name="direction"),
         Index("ix_statement_import_rows_import_position", "import_id", "position"),
+        Index(
+            "ix_statement_import_rows_matched_transaction_id",
+            "matched_transaction_id",
+            postgresql_where=text("matched_transaction_id IS NOT NULL"),
+        ),
         {"schema": SCHEMA_LEDGER},
     )
 
@@ -155,3 +160,6 @@ class ImportRow(Base):
     note: Mapped[str | None] = mapped_column(String(200))
     is_selected: Mapped[bool] = mapped_column(Boolean, default=False)
     fingerprint: Mapped[str | None] = mapped_column(String(128))
+    matched_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.transactions.id", ondelete="SET NULL")
+    )

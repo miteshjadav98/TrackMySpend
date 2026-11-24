@@ -12,11 +12,11 @@ from pydantic import Field
 from finance_core.accounts.schemas import AccountRef
 from finance_core.categories.schemas import CategoryRef
 from finance_core.schemas import ApiInput, ApiModel
+from finance_core.transactions.schemas import SourceField
 
 DateOrderField = Literal["day_first", "month_first"]
 ImportStatusField = Literal["previewing", "imported", "undone"]
-# What will happen to a preview row. Likely duplicates and transfers are filled by later
-# steps (duplicate detection, transfer suggestions); every row starts as to_import or skipped.
+# What will happen to a preview row. Every row starts as to_import or skipped.
 RowStatusField = Literal["to_import", "skipped", "likely_duplicate", "transfer"]
 # Where a row's category came from; the preview shows it so a guess can be told from a rule.
 CategorySourceField = Literal["rule", "ai", "keyword", "default", "user"]
@@ -81,6 +81,14 @@ class PreviewCounts(ApiModel):
     selected_in_minor: int
 
 
+class MatchedTransaction(ApiModel):
+    """The existing transaction that made a statement row a likely duplicate."""
+
+    id: uuid.UUID
+    description: str | None
+    source: SourceField
+
+
 class PreviewRow(ApiModel):
     id: uuid.UUID
     position: int
@@ -97,6 +105,7 @@ class PreviewRow(ApiModel):
     # Why a row is skipped or flagged, in words for the user.
     note: str | None
     is_selected: bool
+    matched_transaction: MatchedTransaction | None
 
 
 class ImportDetail(ImportSummary):

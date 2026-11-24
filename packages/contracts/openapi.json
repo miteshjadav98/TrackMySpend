@@ -5097,6 +5097,44 @@
         ],
         "title": "LoginRequest"
       },
+      "MatchedTransaction": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "manual",
+              "import",
+              "api"
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "description",
+          "source"
+        ],
+        "title": "MatchedTransaction",
+        "description": "The existing transaction that made a statement row a likely duplicate."
+      },
       "MeView": {
         "properties": {
           "user": {
@@ -5871,6 +5909,16 @@
           "isSelected": {
             "type": "boolean",
             "title": "Isselected"
+          },
+          "matchedTransaction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchedTransaction"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -5888,7 +5936,8 @@
           "categorySource",
           "status",
           "note",
-          "isSelected"
+          "isSelected",
+          "matchedTransaction"
         ],
         "title": "PreviewRow"
       },

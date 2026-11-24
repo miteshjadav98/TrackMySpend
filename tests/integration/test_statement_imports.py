@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from finance_core.audit.models import AuditEvent
 from finance_core.clock import FixedClock
-from tests.conftest import NOW, register
+from tests.conftest import NOW, new_conversation, register, say
 
 IMPORTS = "/api/v1/imports"
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "statements"
@@ -424,6 +424,7 @@ async def test_importing_the_same_file_again_skips_every_row(client: httpx.Async
     again = await upload(client, account_id)
     assert again["counts"]["skipped"] == 6
     assert again["counts"]["toImport"] == 0
+    assert again["counts"]["likelyDuplicates"] == 0
     assert {r["status"] for r in again["rows"]} == {"skipped"}
     assert {r["isSelected"] for r in again["rows"]} == {False}
     assert again["rows"][0]["note"] == "Already imported"
@@ -431,6 +432,127 @@ async def test_importing_the_same_file_again_skips_every_row(client: httpx.Async
     done = await confirm(client, again["id"])
     assert (done["importedCount"], done["skippedCount"]) == (0, 6)
     assert len(await transactions(client)) == 6
+
+
+async def test_a_chat_expense_matches_only_one_identical_row_and_can_be_ticked_back_on(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    account_id = await make_account(client, "HDFC")
+    chat = await new_conversation(client)
+    await say(client, chat, "paid 300 for lunch from HDFC")
+    [saved] = await transactions(client)
+    assert saved["source"] == "chat"
+    assert saved["account"]["id"] == account_id
+    csv = b"Date,Narration,Debit,Credit\n24/10/2026,Cafe,300.00,\n24/10/2026,Cafe,300.00,\n"
+
+    detail = await confirm_layout(client, await upload(client, account_id, csv))
+    first, second = detail["rows"]
+    assert detail["counts"]["likelyDuplicates"] == 1
+    assert detail["counts"]["selected"] == 1
+    assert detail["counts"]["selectedOutMinor"] == 30000
+    assert (first["status"], first["isSelected"]) == ("likely_duplicate", False)
+    assert first["matchedTransaction"] == {
+        "id": saved["id"],
+        "description": saved["description"],
+        "source": "chat",
+    }
+    assert (second["status"], second["isSelected"], second["matchedTransaction"]) == (
+        "to_import", True, None,
+    )  # fmt: skip
+
+    filtered = await client.get(f"{IMPORTS}/{detail['id']}", params={"status": "likely_duplicate"})
+    assert filtered.status_code == 200, filtered.text
+    assert filtered.json()["rows"] == [first]
+
+    ticked = await client.patch(
+        f"{IMPORTS}/{detail['id']}/rows",
+        json={"rows": [{"id": first["id"], "isSelected": True}]},
+    )
+    assert ticked.status_code == 200, ticked.text
+    assert ticked.json()["counts"]["selected"] == 2
+    assert ticked.json()["counts"]["selectedOutMinor"] == 60000
+    done = await confirm(client, detail["id"])
+    assert done["importedCount"] == 2
+    assert len(await transactions(client)) == 3
+
+
+async def test_an_exactly_reimported_row_does_not_match_a_new_payment(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    account_id = await make_account(client)
+    csv = b"Date,Narration,Debit,Credit\n24/10/2026,Lunch debit,300.00,\n"
+    detail = await confirm_layout(client, await upload(client, account_id, csv))
+    await confirm(client, detail["id"])
+
+    again = await upload(client, account_id, csv + b"24/10/2026,Another lunch debit,300.00,\n")
+    exact, new = again["rows"]
+    assert (exact["status"], exact["note"]) == ("skipped", "Already imported")
+    assert (new["status"], new["isSelected"]) == ("to_import", True)
+    assert again["counts"]["likelyDuplicates"] == 0
+
+
+async def test_matching_uses_only_live_transactions_for_the_same_account_date_and_direction(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    account_id = await make_account(client)
+    other = await make_account(client, "Other Savings")
+    for kind, account, day in (
+        ("income", account_id, "24"),
+        ("expense", other, "24"),
+        ("expense", account_id, "23"),
+        ("expense", account_id, "24"),
+    ):
+        recorded = await client.post(
+            "/api/v1/transactions",
+            json={
+                "type": kind,
+                "amount": "300",
+                "accountId": account,
+                "occurredOn": f"2026-10-{day}",
+            },
+        )
+        assert recorded.status_code == 201, recorded.text
+        if (kind, account, day) == ("expense", account_id, "24"):
+            deleted = await client.delete(f"/api/v1/transactions/{recorded.json()['id']}")
+            assert deleted.status_code == 204, deleted.text
+
+    csv = b"Date,Narration,Debit,Credit\n24/10/2026,Lunch debit,300.00,\n"
+    preview = await upload(client, account_id, csv)
+    [row] = preview["rows"]
+    assert (row["status"], row["isSelected"]) == ("to_import", True)
+    assert preview["counts"]["likelyDuplicates"] == 0
+
+
+async def test_a_recorded_transfer_matches_the_direction_in_each_accounts_statement(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    sender = await make_account(client, "Sending account")
+    receiver = await make_account(client, "Receiving account")
+    recorded = await client.post(
+        "/api/v1/transactions",
+        json={
+            "type": "transfer",
+            "amount": "300",
+            "accountId": sender,
+            "toAccountId": receiver,
+            "description": "Between my accounts",
+            "occurredOn": "2026-10-24",
+        },
+    )
+    assert recorded.status_code == 201, recorded.text
+    csv = b"Date,Narration,Debit,Credit\n24/10/2026,Debit,300.00,\n24/10/2026,Credit,,300.00\n"
+
+    outgoing = await upload(client, sender, csv)
+    incoming = await upload(client, receiver, csv)
+
+    assert [row["status"] for row in outgoing["rows"]] == ["likely_duplicate", "to_import"]
+    assert [row["status"] for row in incoming["rows"]] == ["to_import", "likely_duplicate"]
+    assert outgoing["rows"][0]["matchedTransaction"] == incoming["rows"][1]["matchedTransaction"]
+    assert outgoing["rows"][0]["matchedTransaction"]["id"] == recorded.json()["id"]
 
 
 async def test_a_skipped_row_cannot_be_ticked(client: httpx.AsyncClient) -> None:
