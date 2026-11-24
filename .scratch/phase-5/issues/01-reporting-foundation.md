@@ -9,20 +9,28 @@ Testing and non-functional requirements.
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] ADR 0002 records that monetary totals remain per currency until a named, stored historical FX
+- [x] ADR 0002 records that monetary totals remain per currency until a named, stored historical FX
   policy exists; architecture and glossary terminology agree.
-- [ ] `ReportService` exposes an overview read model with requested and equal-length comparison
+- [x] `ReportService` exposes an overview read model with requested and equal-length comparison
   periods, per-currency totals, absolute/nullable percentage changes, trends, categories and top
   merchants; transfers and deleted rows remain excluded.
-- [ ] Trend buckets are daily/weekly/monthly by the spec, include zero gaps and stay within the
+- [x] Trend buckets are daily/weekly/monthly by the spec, include zero gaps and stay within the
   response cap; merchant output is top ten plus `Other merchants` and reconciles to expenses with a
   merchant dimension.
-- [ ] `GET /api/v1/reports/overview` supports the existing bounded period parameters, is user-scoped
+- [x] `GET /api/v1/reports/overview` supports the existing bounded period parameters, is user-scoped
   and uses the generation-keyed cache with Postgres fallback.
-- [ ] Integration tests cover period boundaries, partial-period comparison, one and several
+- [x] Integration tests cover period boundaries, partial-period comparison, one and several
   currencies, transfers, deleted/shared rows, cache invalidation and user isolation.
-- [ ] Unit tests cover bucket selection/filling and percentage-change zero cases.
-- [ ] Contracts regenerate; API checks, full pytest and Alembic drift checks pass.
+- [x] Unit tests cover bucket selection/filling and percentage-change zero cases.
+- [x] Contracts regenerate; API checks, full pytest and Alembic drift checks pass.
+
+## Comments
+
+Implemented on `phase-5/t01-reporting`. The overview endpoint returns exact chart-ready values from
+SQL and logs only range/cardinality/cache/duration metadata. Verification: 772 tests passed and 2
+opt-in live LLM tests skipped; focused report tests 7 passed; strict API checks and import
+boundaries passed; web typecheck/lint passed; Alembic reported
+no schema drift; OpenAPI and TypeScript contracts were regenerated.
 

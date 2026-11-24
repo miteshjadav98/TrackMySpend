@@ -2865,6 +2865,132 @@
         }
       }
     },
+    "/api/v1/reports/overview": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Overview",
+        "description": "Chart-ready exact aggregates, always separated by currency.",
+        "operationId": "get_overview_api_v1_reports_overview_get",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_year",
+                "last_year",
+                "last_n_days",
+                "month",
+                "range"
+              ],
+              "type": "string",
+              "default": "this_month",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1830,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOverview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/conversations": {
       "get": {
         "tags": [
@@ -4331,6 +4457,55 @@
         ],
         "title": "ConversationView"
       },
+      "CurrencyReport": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "income": {
+            "$ref": "#/components/schemas/MetricComparison"
+          },
+          "expense": {
+            "$ref": "#/components/schemas/MetricComparison"
+          },
+          "net": {
+            "$ref": "#/components/schemas/MetricComparison"
+          },
+          "expenseByCategory": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryTotal"
+            },
+            "type": "array",
+            "title": "Expensebycategory"
+          },
+          "topMerchants": {
+            "items": {
+              "$ref": "#/components/schemas/MerchantTotal"
+            },
+            "type": "array",
+            "title": "Topmerchants"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/TrendBucket"
+            },
+            "type": "array",
+            "title": "Trend"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "income",
+          "expense",
+          "net",
+          "expenseByCategory",
+          "topMerchants",
+          "trend"
+        ],
+        "title": "CurrencyReport"
+      },
       "CurrencySummary": {
         "properties": {
           "currency": {
@@ -5312,6 +5487,39 @@
         "title": "MerchantRuleView",
         "description": "One learned rule: the merchant, the category it files them under, and how often."
       },
+      "MerchantTotal": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "isOther": {
+            "type": "boolean",
+            "title": "Isother",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "total",
+          "count",
+          "isOther"
+        ],
+        "title": "MerchantTotal"
+      },
       "MessagePage": {
         "properties": {
           "items": {
@@ -5439,6 +5647,39 @@
           "createdAt"
         ],
         "title": "MessageView"
+      },
+      "MetricComparison": {
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "change": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "changePercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changepercent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "previous",
+          "change",
+          "changePercent"
+        ],
+        "title": "MetricComparison",
+        "description": "One exact monetary metric and its equal-length previous-period comparison."
       },
       "MoneyAmount": {
         "properties": {
@@ -6155,6 +6396,58 @@
           "displayName"
         ],
         "title": "RegisterRequest"
+      },
+      "ReportOverview": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "comparisonPeriod": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "bucketKind": {
+            "type": "string",
+            "title": "Bucketkind"
+          },
+          "baseCurrency": {
+            "type": "string",
+            "title": "Basecurrency"
+          },
+          "currencies": {
+            "items": {
+              "$ref": "#/components/schemas/CurrencyReport"
+            },
+            "type": "array",
+            "title": "Currencies"
+          },
+          "transactionCount": {
+            "type": "integer",
+            "title": "Transactioncount"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generatedat"
+          },
+          "dataSource": {
+            "type": "string",
+            "title": "Datasource",
+            "default": "Transactions recorded in MoneyMoney"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "comparisonPeriod",
+          "bucketKind",
+          "baseCurrency",
+          "currencies",
+          "transactionCount",
+          "generatedAt",
+          "dataSource"
+        ],
+        "title": "ReportOverview",
+        "description": "A deterministic chart/report read model; monetary values never cross currencies."
       },
       "RevokedSessionsView": {
         "properties": {
@@ -7849,6 +8142,43 @@
           "shared"
         ],
         "title": "TransactionsSavedInteraction"
+      },
+      "TrendBucket": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "income": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "expense": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "net": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "label",
+          "income",
+          "expense",
+          "net"
+        ],
+        "title": "TrendBucket"
       },
       "TurnResult": {
         "properties": {

@@ -736,6 +736,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Overview
+         * @description Chart-ready exact aggregates, always separated by currency.
+         */
+        get: operations["get_overview_api_v1_reports_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations": {
         parameters: {
             query?: never;
@@ -1196,6 +1216,20 @@ export interface components {
              */
             lastMessageAt: string;
         };
+        /** CurrencyReport */
+        CurrencyReport: {
+            /** Currency */
+            currency: string;
+            income: components["schemas"]["MetricComparison"];
+            expense: components["schemas"]["MetricComparison"];
+            net: components["schemas"]["MetricComparison"];
+            /** Expensebycategory */
+            expenseByCategory: components["schemas"]["CategoryTotal"][];
+            /** Topmerchants */
+            topMerchants: components["schemas"]["MerchantTotal"][];
+            /** Trend */
+            trend: components["schemas"]["TrendBucket"][];
+        };
         /** CurrencySummary */
         CurrencySummary: {
             /** Currency */
@@ -1568,6 +1602,21 @@ export interface components {
              */
             lastUsedAt: string;
         };
+        /** MerchantTotal */
+        MerchantTotal: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            total: components["schemas"]["MoneyAmount"];
+            /** Count */
+            count: number;
+            /**
+             * Isother
+             * @default false
+             */
+            isOther: boolean;
+        };
         /** MessagePage */
         MessagePage: {
             /** Items */
@@ -1605,6 +1654,17 @@ export interface components {
              * Format: date-time
              */
             createdAt: string;
+        };
+        /**
+         * MetricComparison
+         * @description One exact monetary metric and its equal-length previous-period comparison.
+         */
+        MetricComparison: {
+            current: components["schemas"]["MoneyAmount"];
+            previous: components["schemas"]["MoneyAmount"];
+            change: components["schemas"]["MoneyAmount"];
+            /** Changepercent */
+            changePercent: number | null;
         };
         /**
          * MoneyAmount
@@ -1876,6 +1936,32 @@ export interface components {
              * @default en-IN
              */
             locale: string;
+        };
+        /**
+         * ReportOverview
+         * @description A deterministic chart/report read model; monetary values never cross currencies.
+         */
+        ReportOverview: {
+            period: components["schemas"]["PeriodView"];
+            comparisonPeriod: components["schemas"]["PeriodView"];
+            /** Bucketkind */
+            bucketKind: string;
+            /** Basecurrency */
+            baseCurrency: string;
+            /** Currencies */
+            currencies: components["schemas"]["CurrencyReport"][];
+            /** Transactioncount */
+            transactionCount: number;
+            /**
+             * Generatedat
+             * Format: date-time
+             */
+            generatedAt: string;
+            /**
+             * Datasource
+             * @default Transactions recorded in MoneyMoney
+             */
+            dataSource: string;
         };
         /**
          * RevokedSessionsView
@@ -2435,6 +2521,24 @@ export interface components {
             totals: components["schemas"]["MoneyAmount"][];
             /** Shared */
             shared: components["schemas"]["SharedExpenseView"][];
+        };
+        /** TrendBucket */
+        TrendBucket: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Label */
+            label: string;
+            income: components["schemas"]["MoneyAmount"];
+            expense: components["schemas"]["MoneyAmount"];
+            net: components["schemas"]["MoneyAmount"];
         };
         /** TurnResult */
         TurnResult: {
@@ -4326,6 +4430,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpendingSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_overview_api_v1_reports_overview_get: {
+        parameters: {
+            query?: {
+                period?: "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "last_month" | "this_year" | "last_year" | "last_n_days" | "month" | "range";
+                month?: string | null;
+                start?: string | null;
+                end?: string | null;
+                days?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOverview"];
                 };
             };
             /** @description Validation Error */

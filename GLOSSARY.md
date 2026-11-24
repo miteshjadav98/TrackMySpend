@@ -57,7 +57,17 @@ _Avoid_: timeframe, window
 
 **Summary**:
 Income and expense totals for a period, per currency, computed from the saved transactions.
-_Avoid_: report, stats
+_Avoid_: stats
+
+**Report**:
+A chart-ready view of one period: exact totals, an equal-length comparison, trends, categories and
+merchants, always kept separate by currency.
+_Avoid_: dashboard, analytics (the reports module computes it)
+
+**Insight**:
+A short deterministic fact supported by report values, such as the largest expense category or the
+change from the preceding period. It is not a forecast, anomaly claim or financial advice.
+_Avoid_: recommendation, prediction, AI insight
 
 ### Imports
 

@@ -20,6 +20,7 @@ async def test_users_cannot_read_or_modify_each_others_data(make_client) -> None
     assert (await bob.post(f"{path}/restore")).status_code == 404
     assert (await bob.get("/api/v1/transactions")).json()["items"] == []
     assert (await bob.get("/api/v1/reports/summary")).json()["transactionCount"] == 0
+    assert (await bob.get("/api/v1/reports/overview")).json()["transactionCount"] == 0
 
     conversation = await new_conversation(alice)
     assert (await bob.get(f"/api/v1/conversations/{conversation}")).status_code == 404

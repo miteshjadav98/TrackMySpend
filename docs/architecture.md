@@ -488,8 +488,10 @@ The LLM interprets intent. It never calculates. Every total comes from SQL.
 ## Financial correctness
 
 - **Totals are SQL sums** over live rows, grouped by currency, inside the period resolved
-  in the user's timezone. Different currencies are never added together (there is no FX
-  conversion yet). Transfers are excluded from income and expense, so paying a
+  in the user's timezone. Different currencies are never added together: the profile's base
+  currency is a default, not an exchange rate. [ADR 0002](adr/0002-monetary-totals-stay-per-currency.md)
+  records the reproducibility requirements for any future conversion. Transfers are excluded from
+  income and expense, so paying a
   credit card bill from a bank account is not counted twice.
 - **Every summary states its period and label** ("October 2026", 1–26 Oct), so the user can
   see exactly what was counted.

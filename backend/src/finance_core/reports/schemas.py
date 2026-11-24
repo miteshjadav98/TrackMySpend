@@ -45,3 +45,52 @@ class SpendingSummary(ApiModel):
     transaction_count: int
     generated_at: datetime
     data_source: str = "Transactions recorded in MoneyMoney"
+
+
+class MetricComparison(ApiModel):
+    """One exact monetary metric and its equal-length previous-period comparison."""
+
+    current: MoneyAmount
+    previous: MoneyAmount
+    change: MoneyAmount
+    change_percent: float | None
+
+
+class TrendBucket(ApiModel):
+    start: date
+    end: date
+    label: str
+    income: MoneyAmount
+    expense: MoneyAmount
+    net: MoneyAmount
+
+
+class MerchantTotal(ApiModel):
+    key: str
+    name: str
+    total: MoneyAmount
+    count: int
+    is_other: bool = False
+
+
+class CurrencyReport(ApiModel):
+    currency: str
+    income: MetricComparison
+    expense: MetricComparison
+    net: MetricComparison
+    expense_by_category: list[CategoryTotal]
+    top_merchants: list[MerchantTotal]
+    trend: list[TrendBucket]
+
+
+class ReportOverview(ApiModel):
+    """A deterministic chart/report read model; monetary values never cross currencies."""
+
+    period: PeriodView
+    comparison_period: PeriodView
+    bucket_kind: str
+    base_currency: str
+    currencies: list[CurrencyReport]
+    transaction_count: int
+    generated_at: datetime
+    data_source: str = "Transactions recorded in MoneyMoney"

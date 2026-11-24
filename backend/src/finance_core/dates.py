@@ -165,6 +165,14 @@ class DateRange:
         return (self.end - self.start).days + 1
 
 
+def preceding_period(period: DateRange) -> DateRange:
+    """The immediately preceding inclusive range with exactly the same number of days."""
+
+    end = period.start - timedelta(days=1)
+    start = end - timedelta(days=period.days - 1)
+    return DateRange(start=start, end=end, label=f"Previous {period.days} days")
+
+
 class PeriodError(ValueError):
     pass
 
