@@ -8,17 +8,23 @@ Spec: `../spec.md` → User stories 13-16; Comparison and insights.
 
 **Blocked by:** 01, 02
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Typed insight schemas cover spending change, largest category and largest merchant, with
+- [x] Typed insight schemas cover spending change, largest category and largest merchant, with
   currency, period and structured supporting values.
-- [ ] Insights are omitted when prerequisites are absent; zero previous spending is described
+- [x] Insights are omitted when prerequisites are absent; zero previous spending is described
   explicitly and never becomes Infinity/NaN or a misleading percentage.
-- [ ] Wording is deterministic, localized with the existing money/date formatters, and makes no
+- [x] Wording is deterministic, localized with the existing money/date formatters, and makes no
   forecast, anomaly, cause or recommendation claim.
-- [ ] Each category/merchant insight links to the same exact Transactions drill-down as its chart.
-- [ ] Unit tests assert rule boundaries, evidence and wording; integration tests prove values match
+- [x] Each category/merchant insight links to the same exact Transactions drill-down as its chart.
+- [x] Unit tests assert rule boundaries, evidence and wording; integration tests prove values match
   the overview aggregates for single- and multi-currency users.
-- [ ] Reports page remains useful when there are no insight cards.
-- [ ] Contracts, API checks, full pytest and web checks pass.
+- [x] Reports page remains useful when there are no insight cards.
+- [x] Contracts, API checks, full pytest and web checks pass.
 
+
+## Comments
+
+Integrated the verified implementation at `3642808`, including the separately committed
+bulk-import fix `595aa32`. Verification: 779 backend tests passed, 2 opt-in live tests
+skipped, 20 browser tests passed, API/web static checks and production build passed.
