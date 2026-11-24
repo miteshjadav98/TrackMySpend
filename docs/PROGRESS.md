@@ -1,6 +1,6 @@
 # Build progress
 
-Living checklist for the Phase 1 build. Update it at each checkpoint commit.
+Living build history. The latest checkpoint is at the end of the Phase 5 section.
 
 ## Done
 
@@ -129,7 +129,7 @@ See the [Phase 4 report](phase-4-report.md) for the verification, Vertex evaluat
 limitations. The [README](../README.md#trying-a-statement-import-locally) has synthetic
 statements for trying the flow locally.
 
-## Phase 5 (started on `phase-5/integration`)
+## Phase 5 (built on `phase-5/integration`)
 
 Charts and deterministic insights, with exact monetary totals kept separate by currency. The
 spec is `.scratch/phase-5/spec.md`; six ordered tickets live in `.scratch/phase-5/issues/`.
@@ -219,23 +219,33 @@ Ticket 02 was merged as `9fb6d7b` and both the ticket and integration branches w
 - Only ticket 02 and its integration were pushed earlier. Ticket 03 integration and ticket 04
   commits remain local; do not claim them published.
 
+### Phase complete — 24 November 2026
+
+Tickets 03 and 04 are integrated (`fb90b08`, `2850f60`); the accepted charts and deterministic
+insights are included. Ticket 05 adds version-1 saved report snapshots in chat, trusted values
+from `ReportService`, pinned full-report links, ordinary-summary compatibility and prompt v5.
+Ticket 06 records the final behavior, currency policy, measured performance and verification.
+All six ticket criteria are complete after their integration merges.
+
+Final checks: **797 backend tests passed, 2 opt-in live tests skipped; 24 browser tests passed**.
+Python/web static checks, production build, regenerated contracts and Alembic drift checks pass
+(single head `0017`). Five live production-pipeline evaluations: **298/300** overall,
+**40/40** report cases; six provider failures used rules fallback. Two remaining misses involve
+existing shared-expense wording. The local 100,000-transaction benchmark's five-year report
+p95 is **249.48 ms**, JSON **53,452 bytes**, with 61 trend and 11 merchant buckets per currency.
+See [phase-5-report.md](phase-5-report.md) for exact commands, results and limits.
+
+The owner requested ticket integration, a push of the completed phase and a refreshed local UI
+for testing. The integration branch is the saved release candidate; main remains at Phase 4
+until this local acceptance pass. Use the normal local API on port 8000 and web on port 3000.
+
 ## Next
 
-1. Validate the insight cards in the running Reports page, then integrate ticket 04 and update
-   [04-deterministic-insights.md](../.scratch/phase-5/issues/04-deterministic-insights.md).
-2. Continue with chat reports (05), then full phase verification/docs (06), including performance
-   measurements and live intent evaluations before releasing the phase.
+1. Test Reports and chat requests such as “show my spending trend for six months” and
+   “where did my money go this month?”. Full report links read the current ledger; saved chat
+   cards keep their original snapshot.
+2. After owner acceptance, merge the phase into main and verify hosted CI/container builds.
 3. FX conversion, exports, budgets/forecasts, account balances and AG-UI/A2UI remain out of scope.
-
-To rerun ticket 02's checks locally (from this checkout; use installed Chrome, or install
-Playwright Chromium and omit `PLAYWRIGHT_CHANNEL`):
-
-```bash
-npm run check:web
-npm run build:web
-PLAYWRIGHT_CHANNEL=chrome npm run test:browser -w web
-uv run pytest tests/integration/test_reports.py
-```
 
 ## Resume
 

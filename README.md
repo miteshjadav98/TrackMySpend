@@ -10,10 +10,9 @@ model's memory.
 - **Core:** domain services, Postgres, Redis, LangGraph workflow, Gemini on Vertex AI
   (`backend`, the `finance-core` library shared by the API and the future MCP server)
 
-Status: Phases 1 and 2 are built; the Phase 2 code review is next (see
-[Roadmap](#roadmap)). See [docs/architecture.md](docs/architecture.md) for how it fits
-together, and [docs/phase-1-report.md](docs/phase-1-report.md) and
-[docs/phase-2-report.md](docs/phase-2-report.md) for the phase reports.
+Status: Phases 1–5 are built (see [Roadmap](#roadmap)). See
+[docs/architecture.md](docs/architecture.md) for the design and
+[docs/phase-5-report.md](docs/phase-5-report.md) for the latest verification and limits.
 
 ## What you can do
 
@@ -58,6 +57,30 @@ together, and [docs/phase-1-report.md](docs/phase-1-report.md) and
   account, review suggested categories, duplicates and transfers, then import selected rows.
   Find past imports and undo them from the Imports list.
 
+### Understand your spending with Reports
+
+- Open **Reports** for spent, received and net totals, an equal-length preceding-period
+  comparison, income/expense trends, category shares, top merchants and deterministic insights.
+- Pick this/last month, the last 3/6 months, this/last year, or inclusive custom dates up to
+  1,830 days. The 3/6-month presets include the current month so far and the preceding 2/5 months.
+  Dates use your profile timezone; the URL preserves dates and currency through reload/history.
+- Each currency has separate totals and charts, with your base currency first. Choosing INR
+  never converts USD. Counts may include all currencies; monetary values never combine them.
+- Every chart has an exact data table and keyboard-accessible links to its matching transactions.
+  Select a category, merchant or trend point to inspect the rows behind it.
+- Ask “show my spending trend for six months”, “where did my money go this month?”,
+  “give me spending insights this year”, or “show USD spending breakdown last month”.
+  Chat saves one report snapshot with its generation time and pinned period/currency links.
+  Opening the full report reads the current ledger; a saved card keeps its original values.
+  Ordinary questions such as “how much did I spend this month?” keep their compact summary.
+- Insights describe historical facts: spending change, largest category and largest named merchant.
+  Ties are explicit; a zero previous total has no percentage change. There is no advice or forecast.
+
+`GET /api/v1/reports/overview` accepts `period`, `month`, `start`, `end` and `days`, and returns
+all available currency sections. The existing `GET /api/v1/reports/summary` stays compatible.
+Exact transaction drill-down also accepts `uncategorized=true`, `merchantKey`, or
+`otherMerchants=true` with the report's dates, expense type and currency.
+
 ### Your login
 
 - **Security** in Settings: see every signed-in device, sign one out or all the others, and
@@ -83,7 +106,7 @@ together, and [docs/phase-1-report.md](docs/phase-1-report.md) and
 | 2 | Merchant rules, accounts, transfers, account security, dark mode | Done |
 | 3 | Split expenses with friends, Splitwise-style: "me and Jaymin spent 1000 on pizza, split it"; who owes whom, settling up, and the friend sees it in their own records | Done |
 | 4 | CSV and Excel bank and card statements, with preview, duplicate detection, categorisation, transfers and undo | Done |
-| 5 | Charts and deterministic insights; exact totals stay separate by currency | In progress on `phase-5/integration` |
+| 5 | Charts and deterministic insights; exact totals stay separate by currency | Built on `phase-5/integration` |
 | 6 | Voice and Indian languages (Gujarati, Hinglish, lakh/crore), debt and credit-card bill tracking | Planned |
 | 7 | MCP server over the same domain services (OAuth 2.1, confirmation before writes) | Planned |
 
@@ -93,7 +116,7 @@ Phase 2 in detail:
   transactions with an account (on the page and in chat), transfers (on the page and in
   chat), security settings (devices, change password), "Forgot password?" with an emailed
   reset link (printed in the API log until an email provider is chosen), and dark mode.
-- Next: a code review of the whole branch, then merging it into `main`.
+- Reviewed and merged into `main`; see the [Phase 2 report](docs/phase-2-report.md).
 - Deliberately later: account balances, transfers between currencies, a real email provider,
   two-factor sign-in, data export and account deletion.
 
@@ -104,7 +127,7 @@ Phase 3 in detail:
 - Built: a friends list with invites, shared expenses (equal or exact split, the user or a
   friend as payer), balances per currency, settlements, "Shared with you" notices for linked
   friends, and all of it in chat (prompt `understand_v4`).
-- Next: a code review of the whole branch, then merging it into `main`.
+- Reviewed and merged into `main`; see the [Phase 3 report](docs/phase-3-report.md).
 - Deliberately later: groups, percentage splits, currency conversion, push or email notices.
   See the [Phase 3 report](docs/phase-3-report.md) for the known limitations.
 
