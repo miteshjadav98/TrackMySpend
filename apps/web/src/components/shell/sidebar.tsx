@@ -1,7 +1,7 @@
 "use client";
 
 import type { ConversationView, MeView } from "@moneymoney/contracts";
-import { List, LogOut, MessageSquare, Plus, Settings, Users, X } from "lucide-react";
+import { ChartNoAxesCombined, List, LogOut, MessageSquare, Plus, Settings, Users, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -14,6 +14,7 @@ import { keys, useConversations, useNotices, useQueryClient } from "@/lib/querie
 const NAV = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/transactions", label: "Transactions", icon: List },
+  { href: "/reports", label: "Reports", icon: ChartNoAxesCombined },
   { href: "/friends", label: "Friends", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

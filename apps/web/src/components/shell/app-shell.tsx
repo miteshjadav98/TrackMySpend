@@ -17,7 +17,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const signedOut = isUnauthenticated(me.error);
 
   useEffect(() => {
-    if (signedOut) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    if (signedOut) router.replace(`/login?next=${encodeURIComponent(pathname + window.location.search)}`);
   }, [signedOut, pathname, router]);
 
 
