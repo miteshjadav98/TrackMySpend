@@ -2,6 +2,7 @@
 
     python -m finance_core.manage migrate             # Alembic upgrade + LangGraph checkpoint tables
     python -m finance_core.manage prune-checkpoints   # retention job (schedule daily)
+    python -m finance_core.manage prune-import-previews  # sweep when the API may be idle
 
 `migrate` is the single deploy-time step for the database; the API never runs DDL itself.
 """
@@ -18,7 +19,10 @@ from alembic.config import Config
 from finance_core import compat
 from finance_core.agents.checkpointer import setup_checkpointer
 from finance_core.agents.maintenance import prune_checkpoints
+from finance_core.clock import SystemClock
 from finance_core.config import Settings, get_settings
+from finance_core.database import create_engine, create_session_factory
+from finance_core.imports.maintenance import prune_import_previews
 from finance_core.observability import configure_logging
 
 _ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
@@ -32,12 +36,21 @@ def migrate(settings: Settings, *, database_url: str | None = None) -> None:
     compat.run(setup_checkpointer(settings))
 
 
+async def _prune_import_previews(settings: Settings) -> int:
+    engine = create_engine(settings)
+    try:
+        return await prune_import_previews(create_session_factory(engine), clock=SystemClock())
+    finally:
+        await engine.dispose()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="finance_core.manage")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("migrate", help="apply database migrations and checkpoint tables")
     prune = sub.add_parser("prune-checkpoints", help="apply checkpoint retention")
     prune.add_argument("--inactive-days", type=int, default=30)
+    sub.add_parser("prune-import-previews", help="delete expired statement previews")
     args = parser.parse_args()
 
     settings = get_settings()
@@ -48,6 +61,9 @@ def main() -> None:
     elif args.command == "prune-checkpoints":
         stats = compat.run(prune_checkpoints(settings, inactive_days=args.inactive_days))
         print(json.dumps(stats))  # noqa: T201
+    elif args.command == "prune-import-previews":
+        removed = compat.run(_prune_import_previews(settings))
+        print(json.dumps({"previewsDeleted": removed}))  # noqa: T201
 
 
 if __name__ == "__main__":

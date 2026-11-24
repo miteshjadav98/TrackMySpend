@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Coroutine
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 from fastapi import FastAPI
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from finance_core.agents.chat import ChatService
@@ -20,6 +21,7 @@ from finance_core.clock import Clock, SystemClock
 from finance_core.config import Settings
 from finance_core.database import create_engine, create_session_factory
 from finance_core.email_sender import ConsoleEmailSender, EmailSender
+from finance_core.imports.maintenance import prune_import_previews
 from finance_core.llm import LLMClient, build_llm_client
 from finance_core.workflows.state import AgentDeps
 
@@ -30,6 +32,19 @@ T = TypeVar("T")
 # In-flight chat turns get this long to finish when the instance is asked to stop
 # (Cloud Run sends SIGTERM and allows ~10 s by default).
 _DRAIN_SECONDS = 8.0
+_IMPORT_RETENTION_INTERVAL_SECONDS = 15 * 60
+
+
+async def _prune_import_previews_periodically(
+    session_factory: async_sessionmaker[AsyncSession], clock: Clock
+) -> None:
+    """Sweep once at startup, then between requests while the API is running."""
+    while True:
+        try:
+            await prune_import_previews(session_factory, clock=clock)
+        except SQLAlchemyError:
+            logger.warning("statement preview retention failed", exc_info=True)
+        await asyncio.sleep(_IMPORT_RETENTION_INTERVAL_SECONDS)
 
 
 @dataclass
@@ -108,8 +123,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "api started",
                 extra={"environment": settings.environment, "llmProvider": llm.name},
             )
-            yield
-            await container.drain()
+            retention = asyncio.create_task(
+                _prune_import_previews_periodically(session_factory, clock)
+            )
+            try:
+                yield
+            finally:
+                retention.cancel()
+                with suppress(asyncio.CancelledError):
+                    await retention
+                await container.drain()
     finally:
         await redis.close()
         await engine.dispose()
