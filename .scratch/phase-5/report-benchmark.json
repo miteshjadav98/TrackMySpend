@@ -1,0 +1,68 @@
+{
+  "recordedAt": "2026-11-24T13:00:39.654388+00:00",
+  "syntheticTransactions": 100000,
+  "database": "Postgres 17, local Docker",
+  "cache": "Redis bypassed; DB/OS buffers retained",
+  "distribution": "two currencies, 1000 merchants, five years, 80% expenses",
+  "results": [
+    {
+      "period": "month",
+      "rangeDays": 24,
+      "samples": 20,
+      "p50Ms": 10.28,
+      "p95Ms": 14.02,
+      "maxMs": 28.86,
+      "jsonBytes": 24531,
+      "currencies": 2,
+      "maxTrendBuckets": 24,
+      "maxMerchantBuckets": 11,
+      "transactionCount": 1296
+    },
+    {
+      "period": "year",
+      "rangeDays": 328,
+      "samples": 20,
+      "p50Ms": 70.86,
+      "p95Ms": 86.69,
+      "maxMs": 88.95,
+      "jsonBytes": 42295,
+      "currencies": 2,
+      "maxTrendBuckets": 47,
+      "maxMerchantBuckets": 11,
+      "transactionCount": 17712
+    },
+    {
+      "period": "five_years",
+      "rangeDays": 1830,
+      "samples": 20,
+      "p50Ms": 231.13,
+      "p95Ms": 249.48,
+      "maxMs": 251.33,
+      "jsonBytes": 53452,
+      "currencies": 2,
+      "maxTrendBuckets": 61,
+      "maxMerchantBuckets": 11,
+      "transactionCount": 100000
+    },
+    {
+      "period": "named_merchant",
+      "rangeDays": 1830,
+      "samples": 20,
+      "p50Ms": 57.12,
+      "p95Ms": 58.87,
+      "maxMs": 60.0,
+      "jsonBytes": 21898,
+      "pageRows": 50
+    },
+    {
+      "period": "other_merchants",
+      "rangeDays": 1830,
+      "samples": 20,
+      "p50Ms": 129.42,
+      "p95Ms": 130.76,
+      "maxMs": 131.19,
+      "jsonBytes": 21965,
+      "pageRows": 50
+    }
+  ]
+}

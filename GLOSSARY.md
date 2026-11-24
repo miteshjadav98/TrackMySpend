@@ -64,6 +64,16 @@ A chart-ready view of one period: exact totals, an equal-length comparison, tren
 merchants, always kept separate by currency.
 _Avoid_: dashboard, analytics (the reports module computes it)
 
+**Saved report snapshot**:
+A report kept in a conversation as it was when generated, with its period, currency and generation
+time. Opening its full report link shows the current records for the same period and currency.
+_Avoid_: live chat report, cached report
+
+**Comparison period**:
+The immediately preceding period with the same number of days as the selected report, clipped only
+by the earliest allowed date.
+_Avoid_: previous month (unless the dates actually cover that month)
+
 **Insight**:
 A short deterministic fact supported by report values, such as the largest expense category or the
 change from the preceding period. It is not a forecast, anomaly claim or financial advice.
