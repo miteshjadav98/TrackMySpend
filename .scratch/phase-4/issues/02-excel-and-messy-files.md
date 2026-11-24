@@ -9,13 +9,18 @@ Spec: `../spec.md` → User Stories 4, 6-8; Implementation Decisions → Module 
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] .xlsx files are read with openpyxl in read-only mode, with dates and numbers from cells read correctly (real dates, not serial numbers or strings).
-- [ ] Header-row detection skips preamble lines in both CSV and Excel (unit tests on samples with 0, 5 and 15 preamble lines).
-- [ ] The first sheet with a table is used; the preview offers a sheet picker when there are several; the sheet name is saved in the statement layout.
-- [ ] Password-protected, corrupt or .xls files get a clear error.
-- [ ] Integration tests with an ICICI-shaped multi-sheet .xlsx and an Axis-shaped CSV with a preamble.
-- [ ] API checks, full pytest, and web typecheck, lint and build pass.
+- [x] .xlsx files are read with openpyxl in read-only mode, with dates and numbers from cells read correctly (real dates, not serial numbers or strings).
+- [x] Header-row detection skips preamble lines in both CSV and Excel (unit tests on samples with 0, 5 and 15 preamble lines).
+- [x] The first sheet with a table is used; the preview offers a sheet picker when there are several; the sheet name is saved in the statement layout.
+- [x] Password-protected, corrupt or .xls files get a clear error.
+- [x] Integration tests with an ICICI-shaped multi-sheet .xlsx and an Axis-shaped CSV with a preamble.
+- [x] API checks, full pytest, and web typecheck, lint and build pass.
 
 ## Comments
+
+Merged as `f211486`. The review added preview revision checks, positional header
+signatures and tests for unfamiliar headings and empty workbooks. The full backend
+suite passed 720 tests with one opt-in live test skipped. The production build passed
+with webpack after Turbopack could not bind its local build-worker socket.
