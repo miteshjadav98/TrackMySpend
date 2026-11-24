@@ -114,27 +114,25 @@ retried settlement request is saved once; a linked friend can tag their own acco
 settlement; and replies tell two friends with the same name apart by email. `uv run pytest`:
 609 passed, 1 skipped.
 
-## Phase 4 (in progress, branch `phase-4/integration`)
+## Phase 4 (built on `phase-4/integration`)
 
 Import CSV and Excel bank and card statements. Settled in a grilling session on 2026-11-01;
 spec `.scratch/phase-4/spec.md`, 6 tickets in `.scratch/phase-4/issues/` (each `Status:` line
 says whether it is merged), subagent briefing `.scratch/phase-4/build-notes.md`.
 
-Checkpoint 2026-11-01: ticket 01 (CSV import end to end: layout confirmed once per account,
-preview, re-imports skipped, one-step undo) merged as e98fa69; `uv run pytest` 703 passed,
-1 skipped. In progress on their own branches, with WIP commits: 02 Excel and messy files
-(`phase-4/t02-excel`, worktree `.claude/worktrees/p4-t02-excel`) and 04 merchant names and AI
-categories (`phase-4/t04-categories`, worktree `.claude/worktrees/p4-t04-categories`).
-Left: 03 likely duplicates and 05 transfers in statements (both after 01), 06 docs, then a code
-review of the branch and one fix-up ticket. Roadmap reordered: 6 is voice and Indian
-languages, 7 is the MCP server.
+The integration branch includes CSV and Excel parsing, remembered layouts, full preview
+pagination, one-to-one likely duplicate matching, merchant extraction and category labels,
+and both sides of a transfer. Import confirmation and undo write audit events. Expired
+previews are swept without waiting for an import request from the owner.
+
+See the [Phase 4 report](phase-4-report.md) for the verification, Vertex evaluation and
+limitations. The [README](../README.md#trying-a-statement-import-locally) has synthetic
+statements for trying the flow locally.
 
 ## Next
 
-1. Finish 02 and 04 (check each worktree's `git log`; restart an implementer from its WIP
-   commit if it stopped), merge them, then build 03 and 05, then 06.
-2. Code review of `phase-4/integration`, fix the findings, then merge into `main` with the
-   owner's OK.
+1. Confirm the Phase 4 integration changes with the owner before merging into `main`.
+2. Phase 5 covers charts, insights and a policy for totals across currencies.
 
 ## Resume
 

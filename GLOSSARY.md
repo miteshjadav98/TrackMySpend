@@ -70,12 +70,21 @@ One upload of a statement into one account, which becomes many transactions afte
 _Avoid_: upload (that is the act), batch, sync
 
 **Statement layout**:
-Which column of an account's statement holds the date, description and amounts, confirmed by the user once and remembered for that account's next import.
+The columns, date order and worksheet used to read an account's statements. The confirmed layout is remembered for the next import with the same headers.
 _Avoid_: mapping, template, format
 
+**Import preview**:
+The statement rows, detected layout and proposed changes shown for review before confirming an import.
+
+**Row fingerprint**:
+The identity of one occurrence of a statement row within an account. An identical payment can appear more than once in the same statement and each occurrence can be imported once.
+
 **Likely duplicate**:
-A statement row that matches a transaction the user already has in that account (same date, amount and direction). It is left out of the import unless the user ticks it.
+A statement row that matches a transaction the user already has in that account on date, amount and direction. The preview shows the match and leaves the row unticked for the user to review.
 _Avoid_: dupe, conflict
+
+**Matched transfer**:
+A statement row that represents one side of a transfer already recorded between the user's accounts. Both statement sides can refer to the same transfer.
 
 ### Conversation
 
