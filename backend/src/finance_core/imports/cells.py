@@ -39,7 +39,7 @@ def parse_amount(cell: Cell) -> Decimal | None:
 
     Raises ValueError for text that is not an amount, so a footer line is never read as zero.
     """
-    if isinstance(cell, int | float | Decimal):
+    if isinstance(cell, int | float | Decimal) and not isinstance(cell, bool):
         return Decimal(str(cell))
     text = cell_text(cell).lower()
     if text in ("", "-"):
