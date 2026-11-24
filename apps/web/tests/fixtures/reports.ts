@@ -20,7 +20,7 @@ function currencyReport(currency: string): CurrencyReport {
     expense: { current, previous: zero, change: current, changePercent: null },
     income: { current: zero, previous: zero, change: zero, changePercent: null },
     net: { current: money(currency, -12345, currency === "INR" ? "-₹123.45" : "-$123.45"), previous: zero, change: money(currency, -12345, currency === "INR" ? "-₹123.45" : "-$123.45"), changePercent: null },
-    expenseByCategory: [], topMerchants: [], trend: [],
+    expenseByCategory: [], topMerchants: [], trend: [], insights: [],
   };
 }
 

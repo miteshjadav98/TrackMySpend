@@ -201,13 +201,31 @@ Ticket 02 was merged as `9fb6d7b` and both the ticket and integration branches w
 - This ticket is saved locally for user testing, **not merged or pushed**. Its tracker status
   remains unchanged until integration. Keep the current build stable while feedback arrives.
 
+### Ticket 04 checkpoint — 24 November 2026
+
+- User accepted ticket 03; merged locally as `fb90b08`, tracker recorded in `a74dbe8`.
+- Ticket 04 implements typed server-side spending-change, largest-category and largest-named-
+  merchant facts with period/currency/evidence. Ties are explicit; zero previous spending has
+  no invented percentage; the aggregate Other merchants bucket is never called one merchant.
+  Cards reuse the exact transaction drill-down links. Cache namespace is versioned for insights.
+- Fixed the reproduced 5,000-row import timeout by counting unjoined import rows and materializing
+  the bounded page before joining duplicate/category/account detail. The original failing test
+  now passes without increasing the database timeout. All import regression cases pass.
+- Verification: **779 backend tests passed, 2 opt-in live LLM tests skipped; 20 browser tests
+  passed**. Ruff, strict mypy, import boundaries, web typecheck/lint and production build passed.
+  OpenAPI and TypeScript contracts regenerated. No schema or prompt change.
+- Local API and UI restarted on ports 8000 and 3000 with the new implementation. The API uses
+  offline rules for chat. Ticket 04 is saved for user testing before integration/publication.
+- Only ticket 02 and its integration were pushed earlier. Ticket 03 integration and ticket 04
+  commits remain local; do not claim them published.
+
 ## Next
 
-1. Collect UI feedback on ticket 03, resolve it, then integrate and update
-   [03-report-charts.md](../.scratch/phase-5/issues/03-report-charts.md).
-2. Investigate the pre-existing 5,000-row import confirmation/detail timeout before phase release.
-3. Continue with deterministic insights (04), chat reports (05), then phase verification/docs (06).
-4. FX conversion, exports, budgets/forecasts, account balances and AG-UI/A2UI remain out of scope.
+1. Validate the insight cards in the running Reports page, then integrate ticket 04 and update
+   [04-deterministic-insights.md](../.scratch/phase-5/issues/04-deterministic-insights.md).
+2. Continue with chat reports (05), then full phase verification/docs (06), including performance
+   measurements and live intent evaluations before releasing the phase.
+3. FX conversion, exports, budgets/forecasts, account balances and AG-UI/A2UI remain out of scope.
 
 To rerun ticket 02's checks locally (from this checkout; use installed Chrome, or install
 Playwright Chromium and omit `PLAYWRIGHT_CHANNEL`):

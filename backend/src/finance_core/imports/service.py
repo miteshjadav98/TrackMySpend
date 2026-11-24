@@ -917,23 +917,34 @@ class ImportService:
         account = await self._session.get(Account, imp.account_id)
         assert account is not None
         other = aliased(Account)
-        page = (
-            select(ImportRow, Category, Transaction, other)
-            .outerjoin(Category, Category.id == ImportRow.category_id)
-            .outerjoin(Transaction, current_duplicate_match(imp))
-            .outerjoin(
-                other, (other.id == ImportRow.transfer_account_id) & (other.user_id == ctx.user_id)
-            )
-            .where(ImportRow.import_id == imp.id, ImportRow.user_id == ctx.user_id)
-        )
+        row_filter = [ImportRow.import_id == imp.id, ImportRow.user_id == ctx.user_id]
         if status is not None:
-            page = page.where(ImportRow.status == status)
-        total = await self._session.scalar(select(func.count()).select_from(page.subquery()))
+            row_filter.append(ImportRow.status == status)
+        total = await self._session.scalar(
+            select(func.count()).select_from(ImportRow).where(*row_filter)
+        )
+        # Bound the input before joining duplicate details. The materialized page prevents
+        # a poor nested-loop plan from scanning the entire imported ledger for each row.
+        page_ids = (
+            select(ImportRow.id)
+            .where(*row_filter)
+            .order_by(ImportRow.position)
+            .offset(max(offset, 0))
+            .limit(max(1, min(limit, MAX_PAGE_SIZE)))
+            .cte("import_detail_page")
+            .prefix_with("MATERIALIZED")
+        )
         rows = (
             await self._session.execute(
-                page.order_by(ImportRow.position)
-                .offset(max(offset, 0))
-                .limit(max(1, min(limit, MAX_PAGE_SIZE)))
+                select(ImportRow, Category, Transaction, other)
+                .join(page_ids, page_ids.c.id == ImportRow.id)
+                .outerjoin(Category, Category.id == ImportRow.category_id)
+                .outerjoin(Transaction, current_duplicate_match(imp))
+                .outerjoin(
+                    other,
+                    (other.id == ImportRow.transfer_account_id) & (other.user_id == ctx.user_id),
+                )
+                .order_by(ImportRow.position)
             )
         ).all()
         sample_rows = list(

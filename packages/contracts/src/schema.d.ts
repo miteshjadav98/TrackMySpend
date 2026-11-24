@@ -1229,6 +1229,8 @@ export interface components {
             topMerchants: components["schemas"]["MerchantTotal"][];
             /** Trend */
             trend: components["schemas"]["TrendBucket"][];
+            /** Insights */
+            insights: components["schemas"]["ReportInsight"][];
         };
         /** CurrencySummary */
         CurrencySummary: {
@@ -1936,6 +1938,33 @@ export interface components {
              * @default en-IN
              */
             locale: string;
+        };
+        /**
+         * ReportInsight
+         * @description A deterministic fact and the exact evidence needed to explain or drill into it.
+         */
+        ReportInsight: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "spending_change" | "largest_category" | "largest_merchant";
+            /** Currency */
+            currency: string;
+            period: components["schemas"]["PeriodView"];
+            /** Text */
+            text: string;
+            current: components["schemas"]["MoneyAmount"];
+            previous: components["schemas"]["MoneyAmount"] | null;
+            change: components["schemas"]["MoneyAmount"] | null;
+            /** Changepercent */
+            changePercent: number | null;
+            /** Sharepercent */
+            sharePercent: number | null;
+            /** Categoryid */
+            categoryId: string | null;
+            /** Merchantkey */
+            merchantKey: string | null;
         };
         /**
          * ReportOverview

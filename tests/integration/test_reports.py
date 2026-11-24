@@ -169,6 +169,16 @@ async def test_overview_compares_equal_periods_and_fills_chart_gaps(
     assert [point["income"]["amountMinor"] for point in inr["trend"]] == [0, 0, 0, 10000]
 
     usd = report["currencies"][1]
+    for currency_report in report["currencies"]:
+        facts = {fact["kind"]: fact for fact in currency_report["insights"]}
+        assert facts["spending_change"]["current"] == currency_report["expense"]["current"]
+        assert facts["spending_change"]["previous"] == currency_report["expense"]["previous"]
+        assert (
+            facts["largest_category"]["current"] == currency_report["expenseByCategory"][0]["total"]
+        )
+        assert facts["largest_merchant"]["current"] == currency_report["topMerchants"][0]["total"]
+        assert all(fact["currency"] == currency_report["currency"] for fact in facts.values())
+        assert all(fact["period"] == report["period"] for fact in facts.values())
     assert usd["expense"]["current"]["amountMinor"] == 500
     assert usd["expense"]["previous"]["amountMinor"] == 0
     assert usd["expense"]["changePercent"] is None
