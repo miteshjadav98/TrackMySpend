@@ -109,7 +109,7 @@ export function PreviewStep({
                 <input
                   type="checkbox"
                   aria-label="Tick or untick every row shown"
-                  className="size-4 accent-lavender-deep"
+                  className="size-4 accent-sky-deep"
                   checked={allTicked}
                   disabled={busy || selectable.length === 0}
                   onChange={(event) =>
@@ -192,7 +192,7 @@ function Row({
       <td className="px-3 py-2">
         <input
           type="checkbox"
-          className="size-4 accent-lavender-deep"
+          className="size-4 accent-sky-deep"
           aria-label={`Import row ${row.position}`}
           aria-describedby={duplicateNoteId}
           checked={row.isSelected}

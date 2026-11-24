@@ -84,7 +84,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
       {passwordWasReset ? (
         <p
           role="status"
-          className="mt-6 rounded-[10px] bg-lavender-wash px-3 py-2 text-sm text-lavender-ink"
+          className="mt-6 rounded-[10px] bg-sky-wash px-3 py-2 text-sm text-sky-ink"
         >
           Password changed. You&apos;ve been signed out everywhere, so sign in with your new
           password.
@@ -128,7 +128,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         {mode === "login" ? (
           <Link
             href="/forgot-password"
-            className="-mt-2 self-end text-sm font-medium text-lavender-deep underline-offset-2 hover:underline"
+            className="-mt-2 self-end text-sm font-medium text-sky-deep underline-offset-2 hover:underline"
           >
             Forgot password?
           </Link>
@@ -146,7 +146,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         {mode === "login" ? "New here? " : "Already have an account? "}
         <Link
           href={mode === "login" ? "/register" : "/login"}
-          className="font-medium text-lavender-deep underline-offset-2 hover:underline"
+          className="font-medium text-sky-deep underline-offset-2 hover:underline"
         >
           {mode === "login" ? "Create an account" : "Sign in"}
         </Link>

@@ -155,7 +155,7 @@ function HistoryRow({
           type="button"
           onClick={deleteSettlement}
           disabled={busy}
-          className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash hover:text-danger disabled:opacity-50"
+          className="rounded-lg p-1.5 text-ink-faint hover:bg-sky-wash hover:text-danger disabled:opacity-50"
           aria-label="Delete settlement"
           title="Delete settlement"
         >

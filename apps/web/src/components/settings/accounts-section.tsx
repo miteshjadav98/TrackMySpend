@@ -45,7 +45,7 @@ export function AccountsSection() {
             type="checkbox"
             checked={showArchived}
             onChange={(event) => setShowArchived(event.target.checked)}
-            className="size-4 accent-lavender-deep"
+            className="size-4 accent-sky-deep"
           />
           Show archived
         </label>
@@ -131,7 +131,7 @@ function AccountRow({ account }: { account: AccountView }) {
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash hover:text-ink"
+        className="rounded-lg p-1.5 text-ink-faint hover:bg-sky-wash hover:text-ink"
         aria-label={`Edit ${account.name}`}
         title="Rename or change kind"
       >

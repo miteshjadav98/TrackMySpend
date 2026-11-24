@@ -72,7 +72,7 @@ export function Sidebar({ me, open, onClose }: { me: MeView; open: boolean; onCl
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash md:hidden"
+            className="rounded-lg p-1.5 text-ink-faint hover:bg-sky-wash md:hidden"
             aria-label="Close navigation"
           >
             <X className="size-5" aria-hidden />
@@ -84,7 +84,7 @@ export function Sidebar({ me, open, onClose }: { me: MeView; open: boolean; onCl
             type="button"
             onClick={newChat}
             disabled={creating}
-            className="flex w-full items-center gap-2 rounded-[10px] border border-dashed border-line-strong px-3 py-2.5 text-[15px] font-medium text-lavender-deep transition-colors hover:border-lavender-deep hover:bg-lavender-wash disabled:opacity-60"
+            className="flex w-full items-center gap-2 rounded-[10px] border border-dashed border-line-strong px-3 py-2.5 text-[15px] font-medium text-sky-deep transition-colors hover:border-sky-deep hover:bg-sky-wash disabled:opacity-60"
           >
             <Plus className="size-4" aria-hidden />
             New chat
@@ -102,7 +102,7 @@ export function Sidebar({ me, open, onClose }: { me: MeView; open: boolean; onCl
                 aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-3 rounded-[10px] px-3 py-2 text-[15px] transition-colors ${
                   active
-                    ? "bg-lavender-wash font-medium text-lavender-ink"
+                    ? "bg-sky-wash font-medium text-sky-ink"
                     : "text-ink-soft hover:bg-paper hover:text-ink"
                 }`}
               >
@@ -110,7 +110,7 @@ export function Sidebar({ me, open, onClose }: { me: MeView; open: boolean; onCl
                 {label}
                 {href === "/friends" && unreadNotices > 0 ? (
                   <span
-                    className="ml-auto rounded-full bg-lavender-fill px-2 py-0.5 text-xs font-semibold text-white"
+                    className="ml-auto rounded-full bg-sky-fill px-2 py-0.5 text-xs font-semibold text-white"
                     aria-label={`${unreadNotices} unread ${unreadNotices === 1 ? "notice" : "notices"}`}
                   >
                     {unreadNotices > 99 ? "99+" : unreadNotices}
@@ -166,7 +166,7 @@ export function Sidebar({ me, open, onClose }: { me: MeView; open: boolean; onCl
           <button
             type="button"
             onClick={signOut}
-            className="rounded-lg p-2 text-ink-faint hover:bg-lavender-wash hover:text-ink"
+            className="rounded-lg p-2 text-ink-faint hover:bg-sky-wash hover:text-ink"
             aria-label="Sign out"
             title="Sign out"
           >

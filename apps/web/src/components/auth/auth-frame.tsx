@@ -13,10 +13,10 @@ export function AuthFrame({ children }: { children: ReactNode }) {
           <p className="display text-[2.6rem] leading-[1.08] font-semibold">
             Say what you spent.
             <br />
-            <span className="text-lavender">It&apos;s in your books.</span>
+            <span className="text-sky">It&apos;s in your books.</span>
           </p>
           <div className="mt-10 space-y-3">
-            <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-lavender-fill px-4 py-2.5 text-[15px]">
+            <div className="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-sky-fill px-4 py-2.5 text-[15px]">
               ₹350 on dinner yesterday, paid by UPI
             </div>
             <div className="w-[88%] rounded-2xl rounded-bl-md bg-white/[0.07] p-4 ring-1 ring-white/10">

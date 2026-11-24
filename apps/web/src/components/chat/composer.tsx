@@ -52,7 +52,7 @@ export function Composer({
 
   return (
     <form onSubmit={submit} className="border-t border-line bg-surface px-4 py-3 md:px-8">
-      <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-[14px] border border-line-strong bg-surface px-3 py-2 transition-colors focus-within:border-lavender-deep focus-within:ring-2 focus-within:ring-lavender/25">
+      <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-[14px] border border-line-strong bg-surface px-3 py-2 transition-colors focus-within:border-sky-deep focus-within:ring-2 focus-within:ring-sky/25">
         <label htmlFor="composer" className="sr-only">
           Message
         </label>
@@ -75,7 +75,7 @@ export function Composer({
           <button
             type="button"
             onClick={onStop}
-            className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-paper text-ink-soft hover:bg-lavender-wash"
+            className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-paper text-ink-soft hover:bg-sky-wash"
             aria-label="Stop waiting for this reply"
             title="Stop waiting"
           >
@@ -85,7 +85,7 @@ export function Composer({
           <button
             type="submit"
             disabled={!value.trim()}
-            className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-lavender-fill text-white transition-colors hover:bg-lavender-press disabled:bg-line-strong"
+            className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-sky-fill text-white transition-colors hover:bg-sky-press disabled:bg-line-strong"
             aria-label="Send"
           >
             <SendHorizontal className="size-4" aria-hidden />

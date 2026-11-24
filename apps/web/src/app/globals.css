@@ -1,28 +1,28 @@
 @import "tailwindcss";
 
 /*
- * Palette drawn from Indian banknotes: intaglio ink, the lavender of the ₹100 note, and the
- * turmeric of the ₹200 note (used only for "waiting on you"). Expenses are ink, not red:
+ * A calm ledger palette: soft sky blue, warm off-white paper, and the turmeric of the
+ * ₹200 note (used only for "waiting on you"). Expenses are ink, not red:
  * spending is normal, not an error. Red is reserved for destructive actions and failures.
  */
 @theme {
-  --color-paper: #f6f5f9;
-  --color-surface: #ffffff;
-  --color-ink: #1e1b3a;
-  --color-ink-soft: #46435f;
-  --color-ink-faint: #6b6884;
-  --color-line: #e3e0ec;
-  --color-line-strong: #cfcadd;
-  --color-lavender: #8e7cc3;
-  --color-lavender-deep: #5b4ba0;
-  --color-lavender-ink: #463a80;
-  --color-lavender-wash: #eeeaf8;
+  --color-paper: #f8faf8;
+  --color-surface: #fffefb;
+  --color-ink: #1f3447;
+  --color-ink-soft: #44596c;
+  --color-ink-faint: #637385;
+  --color-line: #e1e9ed;
+  --color-line-strong: #c8d7df;
+  --color-sky: #83c8e8;
+  --color-sky-deep: #246783;
+  --color-sky-ink: #1f5c77;
+  --color-sky-wash: #e4f3f9;
   /* Fills that carry white text (buttons, your chat bubbles). Kept separate from
-     lavender-deep, which is also a text colour and must turn light in dark mode. */
-  --color-lavender-fill: #5b4ba0;
-  --color-lavender-press: #463a80;
+     sky-deep, which is also a text colour and must turn light in dark mode. */
+  --color-sky-fill: #2f7898;
+  --color-sky-press: #246783;
   /* Always-dark surfaces under white text: the sign-in panel, toasts, overlays. */
-  --color-night: #1e1b3a;
+  --color-night: #172536;
   --color-turmeric: #e8a317;
   --color-turmeric-ink: #7a5300;
   --color-turmeric-wash: #fdf3dc;
@@ -35,12 +35,12 @@
   --font-body: var(--font-hind), ui-sans-serif, system-ui, sans-serif;
 
   --radius-card: 14px;
-  --shadow-card: 0 1px 0 rgb(30 27 58 / 0.04), 0 6px 20px -12px rgb(30 27 58 / 0.18);
+  --shadow-card: 0 1px 0 rgb(31 52 71 / 0.04), 0 6px 20px -12px rgb(31 52 71 / 0.18);
 }
 
 /*
- * Dark theme: the same banknote palette at night. The paper is deep indigo ink rather than
- * black, and text, lines and accents are lifted so they keep their contrast. The theme
+ * Dark theme: the same sky palette after dusk. The paper becomes deep blue-grey, and text,
+ * lines and accents are lifted so they keep their contrast. The theme
  * script in the root layout sets data-theme before the first paint (see lib/theme.ts).
  */
 :root {
@@ -49,19 +49,19 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-paper: #12101f;
-  --color-surface: #1b1830;
-  --color-ink: #ece9f7;
-  --color-ink-soft: #c3bfd8;
-  --color-ink-faint: #9792b0;
-  --color-line: #2c2845;
-  --color-line-strong: #3e395f;
-  --color-lavender: #a594dc;
-  --color-lavender-deep: #b9acee;
-  --color-lavender-ink: #d6cdf6;
-  --color-lavender-wash: #2a2450;
-  --color-lavender-fill: #6a59b8;
-  --color-lavender-press: #7b6bc9;
+  --color-paper: #111c27;
+  --color-surface: #172536;
+  --color-ink: #eef6f8;
+  --color-ink-soft: #c7d5dc;
+  --color-ink-faint: #91a6b2;
+  --color-line: #293b4a;
+  --color-line-strong: #3b5263;
+  --color-sky: #84cbe8;
+  --color-sky-deep: #a9ddf2;
+  --color-sky-ink: #c9effb;
+  --color-sky-wash: #204052;
+  --color-sky-fill: #2d7f9f;
+  --color-sky-press: #256c88;
   --color-turmeric: #f0b43a;
   --color-turmeric-ink: #f6cd72;
   --color-turmeric-wash: #3a2e12;
@@ -69,7 +69,7 @@
   --color-income-wash: #12352d;
   --color-danger: #e8635b;
   --color-danger-wash: #3d1a19;
-  --color-night: #0b0a16;
+  --color-night: #0b121b;
   --shadow-card: 0 1px 0 rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.6);
 }
 
@@ -100,7 +100,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-lavender-deep);
+  outline: 2px solid var(--color-sky-deep);
   outline-offset: 2px;
   border-radius: 6px;
 }

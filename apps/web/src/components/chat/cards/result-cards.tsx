@@ -115,7 +115,7 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
             .join(" · ");
           return (
             <li key={tx.id} className={`flex items-center gap-3 px-4 py-3 ${gone ? "opacity-55" : ""}`}>
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-lavender-wash text-lavender-ink">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sky-wash text-sky-ink">
                 <NamedIcon name={isTransfer ? "arrow-left-right" : tx.category?.icon} />
               </span>
               <div className="min-w-0 flex-1">
@@ -131,7 +131,7 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
                   <button
                     type="button"
                     onClick={() => restore(tx)}
-                    className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash hover:text-ink"
+                    className="rounded-lg p-1.5 text-ink-faint hover:bg-sky-wash hover:text-ink"
                     aria-label={`Restore ${tx.amountFormatted}`}
                     title="Restore"
                   >
@@ -142,7 +142,7 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
                     <button
                       type="button"
                       onClick={() => (tx.sharedExpenseId ? setOpenShared(tx.sharedExpenseId) : setEditing(tx))}
-                      className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash hover:text-ink"
+                      className="rounded-lg p-1.5 text-ink-faint hover:bg-sky-wash hover:text-ink"
                       aria-label={`Edit ${tx.amountFormatted}`}
                       title="Edit"
                     >
@@ -151,7 +151,7 @@ export function SavedCard({ interaction }: { interaction: TransactionsSavedInter
                     <button
                       type="button"
                       onClick={() => undo(tx)}
-                      className="rounded-lg p-1.5 text-ink-faint hover:bg-lavender-wash hover:text-ink"
+                      className="rounded-lg p-1.5 text-ink-faint hover:bg-sky-wash hover:text-ink"
                       aria-label={`Undo ${tx.amountFormatted}`}
                       title="Undo"
                     >
@@ -206,7 +206,7 @@ function CurrencyBlock({ summary }: { summary: CurrencySummary }) {
             <li key={category.slug}>
               <div className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="flex items-center gap-1.5 truncate">
-                  <NamedIcon name={category.icon} className="size-3.5 text-lavender-deep" />
+                  <NamedIcon name={category.icon} className="size-3.5 text-sky-deep" />
                   {category.name}
                 </span>
                 <span className="shrink-0 text-ink-soft">
@@ -214,9 +214,9 @@ function CurrencyBlock({ summary }: { summary: CurrencySummary }) {
                   <span className="ml-2 text-xs">{category.sharePercent}%</span>
                 </span>
               </div>
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-lavender-wash" aria-hidden>
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-sky-wash" aria-hidden>
                 <div
-                  className="h-full rounded-full bg-lavender-deep"
+                  className="h-full rounded-full bg-sky-deep"
                   style={{ width: `${Math.max(2, category.sharePercent)}%` }}
                 />
               </div>
@@ -287,7 +287,7 @@ export function TransactionListCard({ interaction }: { interaction: TransactionL
       )}
       <Link
         href="/transactions"
-        className="flex items-center justify-end gap-1 border-t border-line px-4 py-2 text-sm font-medium text-lavender-deep hover:bg-lavender-wash/50"
+        className="flex items-center justify-end gap-1 border-t border-line px-4 py-2 text-sm font-medium text-sky-deep hover:bg-sky-wash/50"
       >
         All transactions <ArrowRight className="size-3.5" aria-hidden />
       </Link>

@@ -140,7 +140,7 @@ function RuleRow({ rule, categories }: { rule: MerchantRuleView; categories: Cat
           <span className="truncate font-medium text-ink">{rule.merchant}</span>
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
-              rule.type === "income" ? "bg-income-wash text-income" : "bg-lavender-wash text-lavender-ink"
+              rule.type === "income" ? "bg-income-wash text-income" : "bg-sky-wash text-sky-ink"
             }`}
           >
             {rule.type === "income" ? "Income" : "Expense"}

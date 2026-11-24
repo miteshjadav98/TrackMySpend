@@ -194,7 +194,7 @@ export function TransactionsScreen() {
                   return (
                   <tr
                     key={tx.id}
-                    className="cursor-pointer transition-colors hover:bg-lavender-wash/40"
+                    className="cursor-pointer transition-colors hover:bg-sky-wash/40"
                     onClick={() => setDialog({ open: true, transaction: tx })}
                   >
                     <td className="hidden px-5 py-3 whitespace-nowrap text-ink-soft md:table-cell">{formatDay(tx.occurredOn)}</td>
@@ -210,7 +210,7 @@ export function TransactionsScreen() {
                         {isTransfer ? transferRoute(tx) : (tx.description ?? tx.category?.name ?? "Transaction")}
                       </button>
                       {tx.sharedExpenseId ? (
-                        <span className="ml-2 rounded-full bg-lavender-wash px-2 py-0.5 text-xs font-medium text-lavender-ink">
+                        <span className="ml-2 rounded-full bg-sky-wash px-2 py-0.5 text-xs font-medium text-sky-ink">
                           Shared
                         </span>
                       ) : null}
@@ -232,7 +232,7 @@ export function TransactionsScreen() {
                       <span className="inline-flex items-center gap-1.5 text-ink-soft">
                         <NamedIcon
                           name={isTransfer ? "arrow-left-right" : tx.category?.icon}
-                          className="size-3.5 text-lavender-deep"
+                          className="size-3.5 text-sky-deep"
                         />
                         {categoryName}
                       </span>

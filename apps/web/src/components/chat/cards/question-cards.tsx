@@ -118,7 +118,7 @@ export function ClarificationCard({
                       variant="chip"
                       size="sm"
                       aria-pressed={on}
-                      className={on ? "border-lavender-deep bg-lavender-wash" : ""}
+                      className={on ? "border-sky-deep bg-sky-wash" : ""}
                       onClick={() =>
                         setPicked((current) =>
                           on ? current.filter((v) => v !== option.value) : [...current, option.value],
@@ -170,7 +170,7 @@ export function ClarificationCard({
                 onChange={(event) => setCustom(event.target.value)}
                 maxLength={64}
                 placeholder={interaction.placeholder ?? "Type your answer"}
-                className="h-9 min-w-0 flex-1 rounded-[10px] border border-line-strong bg-surface px-3 text-sm focus:border-lavender-deep focus:ring-2 focus:ring-lavender/30 focus:outline-none"
+                className="h-9 min-w-0 flex-1 rounded-[10px] border border-line-strong bg-surface px-3 text-sm focus:border-sky-deep focus:ring-2 focus:ring-sky/30 focus:outline-none"
               />
               <Button type="submit" size="sm" disabled={!custom.trim()}>
                 Use this
@@ -222,7 +222,7 @@ function AmountInput({
       }}
       className="flex gap-2"
     >
-      <div className="flex h-10 flex-1 items-center rounded-[10px] border border-line-strong bg-surface px-3 focus-within:border-lavender-deep focus-within:ring-2 focus-within:ring-lavender/30">
+      <div className="flex h-10 flex-1 items-center rounded-[10px] border border-line-strong bg-surface px-3 focus-within:border-sky-deep focus-within:ring-2 focus-within:ring-sky/30">
         <span className="figure mr-1 text-lg text-ink-faint" aria-hidden>
           {currencySymbol(currency)}
         </span>
@@ -278,7 +278,7 @@ function DateInput({ max, onSubmit }: { max: string; onSubmit: (value: string, l
           value={value}
           max={max}
           onChange={(event) => setValue(event.target.value)}
-          className="h-9 rounded-[10px] border border-line-strong bg-surface px-3 text-sm focus:border-lavender-deep focus:outline-none"
+          className="h-9 rounded-[10px] border border-line-strong bg-surface px-3 text-sm focus:border-sky-deep focus:outline-none"
         />
         <Button type="submit" size="sm">
           Use this date
