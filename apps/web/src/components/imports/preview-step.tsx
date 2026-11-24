@@ -1,6 +1,6 @@
 "use client";
 
-import type { CategoryView, ImportDetail, PreviewRow, RowChange, RowStatus } from "@moneymoney/contracts";
+import type { AccountRef, CategoryView, ImportDetail, PreviewRow, RowChange, RowStatus } from "@moneymoney/contracts";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/field";
@@ -41,6 +41,7 @@ function Count({ label, value }: { label: string; value: number }) {
 export function PreviewStep({
   detail,
   categories,
+  transferAccounts,
   statusFilter,
   offset,
   onStatusFilter,
@@ -54,6 +55,7 @@ export function PreviewStep({
 }: {
   detail: ImportDetail;
   categories: CategoryView[];
+  transferAccounts: AccountRef[];
   statusFilter: RowStatus | "";
   offset: number;
   onStatusFilter: (status: RowStatus | "") => void;
@@ -116,13 +118,13 @@ export function PreviewStep({
               </th>
               <th scope="col" className="px-3 py-2 font-semibold">Date</th>
               <th scope="col" className="px-3 py-2 font-semibold">Description</th>
-              <th scope="col" className="px-3 py-2 font-semibold">Category</th>
+            <th scope="col" className="px-3 py-2 font-semibold">Category or transfer</th>
               <th scope="col" className="px-3 py-2 text-right font-semibold">Amount</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {detail.rows.map((row) => (
-              <Row key={row.id} row={row} categories={categories} busy={busy} onChange={(change) => onChangeRows([change])} />
+            <Row key={row.id} row={row} categories={categories} transferAccounts={transferAccounts} busy={busy} onChange={(change) => onChangeRows([change])} />
             ))}
             {detail.rows.length === 0 ? (
               <tr>
@@ -156,7 +158,7 @@ export function PreviewStep({
           {formatMinor(counts.selectedInMinor, detail.currency)}
         </p>
         <Button variant="primary" busy={busy} disabled={counts.selected === 0} onClick={onConfirm}>
-          {counts.selected === 1 ? "Import 1 row" : `Import ${counts.selected} rows`}
+          {counts.matchedTransfers > 0 ? "Confirm statement" : counts.selected === 1 ? "Import 1 row" : `Import ${counts.selected} rows`}
         </Button>
       </div>
     </div>
@@ -166,11 +168,13 @@ export function PreviewStep({
 function Row({
   row,
   categories,
+  transferAccounts,
   busy,
   onChange,
 }: {
   row: PreviewRow;
   categories: CategoryView[];
+  transferAccounts: AccountRef[];
   busy: boolean;
   onChange: (change: RowChange) => void;
 }) {
@@ -180,6 +184,8 @@ function Row({
   const note = row.categorySource ? SOURCE_NOTES[row.categorySource] : null;
   const match = row.matchedTransaction;
   const duplicateNoteId = row.status === "likely_duplicate" ? `duplicate-${row.id}` : undefined;
+  const currentTransfer = row.transferAccount;
+  const direction = row.direction === "in" ? "from" : "to";
   return (
     <tr className={skipped ? "text-ink-faint" : undefined}>
       <td className="px-3 py-2">
@@ -208,7 +214,27 @@ function Row({
           </span>
         ) : null}
       </td>
-      <td className="px-3 py-2">
+      <td className="space-y-1 px-3 py-2">
+        {!skipped && (currentTransfer || transferAccounts.length > 0) ? (
+          <>
+            <label className="sr-only" htmlFor={`transfer-${row.id}`}>Movement for row {row.position}</label>
+            <Select
+              id={`transfer-${row.id}`}
+              className="h-8 min-w-40 text-sm"
+              value={currentTransfer?.id ?? ""}
+              disabled={busy}
+              onChange={(event) => onChange({ id: row.id, transferAccountId: event.target.value || null })}
+            >
+              <option value="">{kind === "income" ? "Income" : "Expense"}</option>
+              {currentTransfer && !transferAccounts.some((account) => account.id === currentTransfer.id) ? (
+                <option value={currentTransfer.id} disabled>Transfer {direction} {currentTransfer.name}</option>
+              ) : null}
+              {transferAccounts.map((account) => (
+                <option key={account.id} value={account.id}>Transfer {direction} {account.name}</option>
+              ))}
+            </Select>
+          </>
+        ) : null}
         {row.category && !skipped ? (
           <>
             <label className="sr-only" htmlFor={`category-${row.id}`}>

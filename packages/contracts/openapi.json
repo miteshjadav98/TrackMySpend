@@ -5808,6 +5808,10 @@
             "type": "integer",
             "title": "Transfers"
           },
+          "matchedTransfers": {
+            "type": "integer",
+            "title": "Matchedtransfers"
+          },
           "selected": {
             "type": "integer",
             "title": "Selected"
@@ -5827,6 +5831,7 @@
           "skipped",
           "likelyDuplicates",
           "transfers",
+          "matchedTransfers",
           "selected",
           "selectedOutMinor",
           "selectedInMinor"
@@ -5958,6 +5963,20 @@
             ],
             "title": "Categorysource"
           },
+          "transferAccount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matchesExistingTransfer": {
+            "type": "boolean",
+            "title": "Matchesexistingtransfer"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -6007,6 +6026,8 @@
           "merchant",
           "category",
           "categorySource",
+          "transferAccount",
+          "matchesExistingTransfer",
           "status",
           "note",
           "isSelected",
@@ -6178,6 +6199,18 @@
               }
             ],
             "title": "Categoryid"
+          },
+          "transferAccountId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transferaccountid"
           }
         },
         "additionalProperties": false,
@@ -6186,7 +6219,7 @@
           "id"
         ],
         "title": "RowChange",
-        "description": "One preview row edited: ticked or unticked, or filed under another category."
+        "description": "One editable preview row. Null explicitly removes a transfer target."
       },
       "RowChanges": {
         "properties": {

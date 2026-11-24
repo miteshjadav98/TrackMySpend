@@ -56,7 +56,7 @@ export function ImportStatementDialog({
       await action();
     } catch (caught) {
       setError(messageOf(caught));
-      if (caught instanceof ApiError && caught.code === "stale_preview") {
+      if (caught instanceof ApiError && ["stale_preview", "transfer_matches_changed"].includes(caught.code)) {
         setChangingColumns(false);
         await refresh();
       }
@@ -150,7 +150,7 @@ export function ImportStatementDialog({
         }),
       );
       await invalidateLedger(queryClient);
-      toast(`Imported ${done.importedCount} transactions from ${done.fileName}`);
+      toast(done.counts.matchedTransfers > 0 ? `Confirmed ${done.fileName}` : `Imported ${done.importedCount} transactions from ${done.fileName}`);
     });
   }
 
@@ -159,7 +159,7 @@ export function ImportStatementDialog({
     void run(async () => {
       await unwrap<ImportDetail>(api.POST("/api/v1/imports/{import_id}/undo", { params: { path: { import_id: importId } } }));
       await invalidateLedger(queryClient);
-      toast("Import undone. Its transactions are removed.");
+      toast("Import undone.");
       onClose();
     });
   }
@@ -200,6 +200,9 @@ export function ImportStatementDialog({
       <PreviewStep
         detail={detail}
         categories={categories.data ?? []}
+        transferAccounts={(accounts.data ?? []).filter((account) =>
+          account.id !== detail.account.id && !account.isArchived && account.currency === detail.currency,
+        )}
         statusFilter={statusFilter}
         offset={offset}
         onStatusFilter={(status) => {
@@ -325,13 +328,20 @@ function DoneStep({
   onUndo: () => void;
   onClose: () => void;
 }) {
+  const matched = detail.counts.matchedTransfers;
+  const skipped = detail.skippedCount - matched;
   return (
     <div className="flex flex-col items-center gap-4 py-6 text-center">
       <p className="display text-lg font-semibold">
         {detail.importedCount} {detail.importedCount === 1 ? "transaction" : "transactions"} imported
       </p>
+      {matched > 0 ? (
+        <p className="text-sm text-ink-soft">
+          {matched} {matched === 1 ? "row matched a transfer" : "rows matched transfers"} already recorded.
+        </p>
+      ) : null}
       <p className="text-sm text-ink-soft">
-        {detail.skippedCount} {detail.skippedCount === 1 ? "row was" : "rows were"} left out. You can undo this import
+        {skipped} {skipped === 1 ? "row was" : "rows were"} left out. You can undo this import
         from the Imports list at any time.
       </p>
       {error ? (

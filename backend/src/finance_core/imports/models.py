@@ -164,3 +164,35 @@ class ImportRow(Base):
     matched_transaction_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(f"{SCHEMA_LEDGER}.transactions.id", ondelete="SET NULL")
     )
+    transfer_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.accounts.id")
+    )
+    transfer_account_chosen: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    matched_transfer_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.transactions.id", ondelete="SET NULL")
+    )
+
+
+class StatementTransferSide(Base):
+    """A confirmed statement row documenting one side of a ledger transfer."""
+
+    __tablename__ = "statement_transfer_sides"
+    __table_args__ = (
+        UniqueConstraint("import_row_id", name="uq_statement_transfer_sides_import_row"),
+        UniqueConstraint("user_id", "fingerprint", name="uq_statement_transfer_sides_fingerprint"),
+        {"schema": SCHEMA_LEDGER},
+    )
+
+    transfer_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.transactions.id", ondelete="CASCADE"), primary_key=True
+    )
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.accounts.id"), primary_key=True
+    )
+    import_row_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA_LEDGER}.statement_import_rows.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey(f"{SCHEMA_IDENTITY}.users.id", ondelete="CASCADE")
+    )
+    fingerprint: Mapped[str] = mapped_column(String(128))

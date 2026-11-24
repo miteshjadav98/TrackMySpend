@@ -107,7 +107,9 @@ function ImportItem({ item, onReview }: { item: ImportSummary; onReview: (import
       ) : null}
       {item.status === "imported" && asking ? (
         <div className="flex items-center gap-2">
-          <span className="text-sm text-ink-soft">Remove {item.importedCount} transactions?</span>
+          <span className="text-sm text-ink-soft">
+            {item.importedCount === 0 ? "Undo this statement?" : `Remove ${item.importedCount} transactions?`}
+          </span>
           <Button size="sm" variant="danger" busy={busy} onClick={undo}>
             Yes, undo
           </Button>

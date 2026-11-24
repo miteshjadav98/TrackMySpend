@@ -3,7 +3,7 @@
 from sqlalchemy import ColumnElement, and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from finance_core.imports.models import ImportRow, StatementImport
+from finance_core.imports.models import ImportRow, StatementImport, StatementTransferSide
 from finance_core.transactions.models import Transaction
 
 
@@ -82,6 +82,17 @@ async def mark_likely_duplicates(session: AsyncSession, imp: StatementImport) ->
         .where(*in_import, ImportRow.fingerprint == Transaction.idempotency_key)
         .exists()
     )
+    already_linked = (
+        select(StatementTransferSide.transfer_id)
+        .join(ImportRow, ImportRow.fingerprint == StatementTransferSide.fingerprint)
+        .where(
+            *in_import,
+            StatementTransferSide.user_id == imp.user_id,
+            StatementTransferSide.account_id == imp.account_id,
+            StatementTransferSide.transfer_id == Transaction.id,
+        )
+        .exists()
+    )
     # A transfer is outgoing from its source account and incoming to its destination account.
     direction = _transaction_direction(imp)
     matches = (
@@ -112,6 +123,7 @@ async def mark_likely_duplicates(session: AsyncSession, imp: StatementImport) ->
             Transaction.currency == imp.currency,
             Transaction.deleted_at.is_(None),
             ~already_imported,
+            ~already_linked,
         )
         .subquery()
     )

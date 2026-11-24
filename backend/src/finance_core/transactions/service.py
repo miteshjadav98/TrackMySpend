@@ -414,15 +414,15 @@ class TransactionService:
         source_ref: str,
         learn_merchants: bool,
         request_id: str | None = None,
-    ) -> int:
-        """Insert statement-import rows in bulk, without committing; returns how many were new.
+    ) -> dict[str, uuid.UUID]:
+        """Insert statement-import rows in bulk and return new ids by fingerprint.
 
         Each item carries its fingerprint as the idempotency key, so a row already saved is
         skipped rather than doubled. One INSERT per batch keeps a 5,000-row import quick.
         Only rows whose category the user chose (`learn_merchants`) teach merchant rules.
         The caller commits and then calls `bump_pending_generations`.
         """
-        created = 0
+        created: dict[str, uuid.UUID] = {}
         for start in range(0, len(items), IMPORT_INSERT_BATCH):
             batch = items[start : start + IMPORT_INSERT_BATCH]
             by_key = {key: new for new, key in batch}
@@ -440,6 +440,7 @@ class TransactionService:
                                 "occurred_on": new.occurred_on,
                                 "category_id": new.category_id,
                                 "account_id": new.account_id,
+                                "to_account_id": new.to_account_id,
                                 "description": new.description,
                                 "merchant": new.merchant,
                                 "payment_method": new.payment_method,
@@ -458,6 +459,7 @@ class TransactionService:
             ).all()
             for transaction_id, key in inserted:
                 assert key is not None  # every item carries a key
+                created[key] = transaction_id
                 new = by_key[key]
                 record_audit(
                     self._session, user_id=ctx.user_id, actor="user",
@@ -470,7 +472,6 @@ class TransactionService:
                         ctx.user_id, type=new.type, merchant=new.merchant,
                         category_id=new.category_id,
                     )  # fmt: skip
-            created += len(inserted)
         if created:
             self._unbumped.add(ctx.user_id)
         await self._session.flush()

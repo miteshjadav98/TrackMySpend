@@ -130,7 +130,7 @@ async def test_an_uploaded_statement_is_previewed_with_its_guessed_layout(
     assert first["status"] == "to_import"
     assert first["isSelected"] is True
     assert detail["counts"] == {
-        "toImport": 6, "skipped": 0, "likelyDuplicates": 0, "transfers": 0, "selected": 6,
+        "toImport": 6, "skipped": 0, "likelyDuplicates": 0, "transfers": 0, "matchedTransfers": 0, "selected": 6,
         "selectedOutMinor": 45000 + 21800 * 2 + 231040 + 500000, "selectedInMinor": 12345678,
     }  # fmt: skip
 
