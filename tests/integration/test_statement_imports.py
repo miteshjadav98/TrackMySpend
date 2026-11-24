@@ -114,9 +114,8 @@ async def test_an_uploaded_statement_is_previewed_with_its_guessed_layout(
     )  # fmt: skip
     assert first["merchant"] == "SWIGGY"
     assert (salary["direction"], salary["amountMinor"]) == ("in", 12345678)
-    assert first["category"]["slug"] == "other"
-    assert first["categorySource"] == "default"
-    assert salary["category"]["slug"] == "other_income"
+    assert (first["category"]["slug"], first["categorySource"]) == ("food", "keyword")
+    assert (salary["category"]["slug"], salary["categorySource"]) == ("salary", "keyword")
     assert first["status"] == "to_import"
     assert first["isSelected"] is True
     assert detail["counts"] == {
@@ -213,7 +212,7 @@ async def test_excel_errors_explain_what_to_upload(
     assert ".xlsx" in response["error"]["message"]
 
 
-async def test_a_merchant_rule_files_a_row_instead_of_other(client: httpx.AsyncClient) -> None:
+async def test_a_merchant_rule_takes_priority_in_the_preview(client: httpx.AsyncClient) -> None:
     await register(client)
     food = next(
         c for c in (await client.get("/api/v1/categories", params={"kind": "expense"})).json()
@@ -227,7 +226,7 @@ async def test_a_merchant_rule_files_a_row_instead_of_other(client: httpx.AsyncC
     swiggy = detail["rows"][0]
     assert swiggy["category"]["slug"] == "food"
     assert swiggy["categorySource"] == "rule"
-    assert detail["rows"][1]["categorySource"] == "default"
+    assert detail["rows"][1]["categorySource"] == "keyword"
 
 
 async def test_changing_the_date_order_re_reads_every_date(client: httpx.AsyncClient) -> None:

@@ -20,7 +20,9 @@ from finance_core.clock import Clock, SystemClock
 from finance_core.config import Settings
 from finance_core.database import create_engine, create_session_factory
 from finance_core.email_sender import ConsoleEmailSender, EmailSender
+from finance_core.imports.categorise import StatementCategorizer
 from finance_core.llm import LLMClient, build_llm_client
+from finance_core.llm.statement_categories import build_statement_categorizer
 from finance_core.workflows.state import AgentDeps
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,7 @@ class AppContainer:
     email_sender: EmailSender
     agent: FinanceAgent
     chat: ChatService
+    statement_categorizer: StatementCategorizer | None = None
     background: set[asyncio.Task[Any]] = field(default_factory=set)
 
     def spawn(self, coro: Coroutine[Any, Any, T]) -> asyncio.Task[T]:
@@ -73,6 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     redis = RedisClient.from_settings(settings)
     generation = UserDataGeneration(redis)
     llm: LLMClient = getattr(app.state, "llm_override", None) or build_llm_client(settings)
+    statement_categorizer = build_statement_categorizer(settings)
     email_sender: EmailSender = getattr(app.state, "email_sender", None) or ConsoleEmailSender(
         settings.environment
     )
@@ -102,6 +106,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 email_sender=email_sender,
                 agent=agent,
                 chat=ChatService(deps, agent, lock=lock, rate_limiter=rate_limiter),
+                statement_categorizer=statement_categorizer,
             )
             app.state.container = container
             logger.info(

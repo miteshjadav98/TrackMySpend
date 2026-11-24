@@ -23,7 +23,12 @@ router = APIRouter(prefix="/api/v1/imports", tags=["imports"])
 
 
 def _service(session: SessionDep, container: ContainerDep) -> ImportService:
-    return ImportService(session, clock=container.clock, generation=container.generation)
+    return ImportService(
+        session,
+        clock=container.clock,
+        generation=container.generation,
+        categorizer=container.statement_categorizer,
+    )
 
 
 ServiceDep = Annotated[ImportService, Depends(_service)]
