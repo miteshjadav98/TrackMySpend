@@ -55,8 +55,8 @@ def test_excel_uses_the_first_real_table_even_if_it_needs_manual_mapping() -> No
     book.active.append(["Statement", "Account", "Dates"])
     book.active.append(["Savings", "1234", "January"])
     first = book.create_sheet("January")
-    first.append(["Booked", "Memo", "Net"])
-    first.append([date(2026, 1, 3), "Tea", -250.5])
+    first.append(["Booked", "Memo", "Cleared", "Net"])
+    first.append([date(2026, 1, 3), "Tea", True, -250.5])
     second = book.create_sheet("February")
     second.append(["Date", "Description", "Amount"])
     second.append([date(2026, 2, 3), "Coffee", -150])
@@ -65,7 +65,7 @@ def test_excel_uses_the_first_real_table_even_if_it_needs_manual_mapping() -> No
         selected = read_workbook(file.getvalue())
 
     assert selected.sheet_name == "January"
-    assert selected.table.headers == ["Booked", "Memo", "Net"]
+    assert selected.table.headers == ["Booked", "Memo", "Cleared", "Net"]
 
 
 @pytest.mark.parametrize("with_header", [False, True])
