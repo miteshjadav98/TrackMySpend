@@ -27,6 +27,7 @@ from finance_core.categories.defaults import (
 )
 from finance_core.dates import MONTHS, WEEKDAYS, day_first_for_locale, resolve_date_expression
 from finance_core.llm.base import ReplyRequest, UnderstandRequest, UnderstandResult
+from finance_core.llm.reporting import read_report_spec
 from finance_core.llm.schemas import (
     ExtractedShare,
     ExtractedTransaction,
@@ -439,6 +440,20 @@ def extract_settlement(
 
 def extract_period(text: str, today: date) -> PeriodSpec:
     t = text.lower()
+    if match := re.search(
+        r"\b(\d{4}-\d{2}-\d{2})\s+(?:to|through|until)\s+(\d{4}-\d{2}-\d{2})\b", t
+    ):
+        return PeriodSpec(kind="range", start=match.group(1), end=match.group(2))
+    if match := re.search(
+        r"\b(?:last|past|previous|over|for)\s+(?:the\s+)?(3|three|6|six)\s+months?\b", t
+    ):
+        months = 3 if match.group(1) in ("3", "three") else 6
+        index = today.year * 12 + today.month - months
+        return PeriodSpec(
+            kind="range",
+            start=date(index // 12, index % 12 + 1, 1).isoformat(),
+            end=today.isoformat(),
+        )
     if re.search(r"\byesterday\b", t):
         return PeriodSpec(kind="yesterday")
     if re.search(r"\btoday\b", t):
@@ -495,10 +510,21 @@ def extract_search(text: str) -> SearchSpec:
 
 def classify(text: str) -> Intent:
     stripped = text.strip()
-    has_amount = bool(find_amounts(_strip_dates(stripped)))
+    without_periods = re.sub(
+        r"\b\d{1,4}\s+(?:days?|weeks?|months?|years?)\b", "", stripped, flags=_I
+    )
+    has_amount = bool(find_amounts(_strip_dates(without_periods)))
     question = stripped.endswith("?") or bool(
         re.match(r"^(how|what|which|where|when|show|list)\b", stripped, _I)
     )
+    if read_report_spec(stripped) and (
+        not has_amount
+        or question
+        or re.match(
+            r"^(?:please\s+)?(?:show|plot|chart|graph|compare|give|visuali[sz]e)\b", stripped, _I
+        )
+    ):
+        return "spending_report"
     if _SEARCH.search(stripped) and not (has_amount and not question):
         return "search_transactions"
     if _SUMMARY.search(stripped) and not (has_amount and not question):
@@ -535,9 +561,11 @@ class RulesLLMClient:
             understanding.transactions = extract_transactions(
                 request.text, request.today, request.locale, request.accounts, request.friends
             )
-        elif intent in ("spending_summary", "search_transactions"):
+        elif intent in ("spending_summary", "search_transactions", "spending_report"):
             understanding.period = extract_period(request.text, request.today)
             understanding.search = extract_search(request.text)
+            if intent == "spending_report":
+                understanding.report = read_report_spec(request.text)
         if request.pending is not None:
             # The workflow already tried a deterministic parse of the answer; if we are
             # here, treat the message as a new request.

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ClarificationCard, ConfirmationCard, type Respond } from "@/components/chat/cards/question-cards";
 import { SavedCard, SummaryCard, TransactionListCard } from "@/components/chat/cards/result-cards";
+import { ReportCard } from "@/components/chat/cards/report-card";
 import { Composer } from "@/components/chat/composer";
 import { SharedWithYouCard } from "@/components/notices/shared-with-you-card";
 import { TallyStrip } from "@/components/chat/tally-strip";
@@ -361,6 +362,8 @@ function InteractionView({
       return <SavedCard interaction={item} />;
     case "summary":
       return <SummaryCard interaction={item} />;
+    case "report":
+      return <ReportCard interaction={item} />;
     case "transaction_list":
       return <TransactionListCard interaction={item} />;
     case "suggestions":

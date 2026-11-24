@@ -1641,7 +1641,7 @@ export interface components {
             /** Content */
             content: string;
             /** Ui */
-            ui: (components["schemas"]["ClarificationInteraction"] | components["schemas"]["ConfirmationInteraction"] | components["schemas"]["TransactionsSavedInteraction"] | components["schemas"]["SummaryInteraction"] | components["schemas"]["TransactionListInteraction"] | components["schemas"]["SuggestionsInteraction"])[];
+            ui: (components["schemas"]["ClarificationInteraction"] | components["schemas"]["ConfirmationInteraction"] | components["schemas"]["TransactionsSavedInteraction"] | components["schemas"]["SummaryInteraction"] | components["schemas"]["ReportInteraction"] | components["schemas"]["TransactionListInteraction"] | components["schemas"]["SuggestionsInteraction"])[];
             /**
              * Status
              * @enum {string}
@@ -1965,6 +1965,46 @@ export interface components {
             categoryId: string | null;
             /** Merchantkey */
             merchantKey: string | null;
+        };
+        /**
+         * ReportInteraction
+         * @description Versioned, bounded snapshot of one currency; the full report remains linked.
+         */
+        ReportInteraction: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "report";
+            /** Id */
+            id: string;
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "trend" | "breakdown" | "insights";
+            period: components["schemas"]["PeriodView"];
+            comparisonPeriod: components["schemas"]["PeriodView"];
+            /** Currency */
+            currency: string;
+            /** Availablecurrencies */
+            availableCurrencies: string[];
+            preview: components["schemas"]["CurrencyReport"] | null;
+            /** Transactioncount */
+            transactionCount: number;
+            /**
+             * Generatedat
+             * Format: date-time
+             */
+            generatedAt: string;
+            /** Reporthref */
+            reportHref: string;
         };
         /**
          * ReportOverview
@@ -2627,7 +2667,7 @@ export interface components {
              */
             type: "interaction";
             /** Interaction */
-            interaction: components["schemas"]["ClarificationInteraction"] | components["schemas"]["ConfirmationInteraction"] | components["schemas"]["TransactionsSavedInteraction"] | components["schemas"]["SummaryInteraction"] | components["schemas"]["TransactionListInteraction"] | components["schemas"]["SuggestionsInteraction"];
+            interaction: components["schemas"]["ClarificationInteraction"] | components["schemas"]["ConfirmationInteraction"] | components["schemas"]["TransactionsSavedInteraction"] | components["schemas"]["SummaryInteraction"] | components["schemas"]["ReportInteraction"] | components["schemas"]["TransactionListInteraction"] | components["schemas"]["SuggestionsInteraction"];
         };
         /** StatusEvent */
         StatusEvent: {

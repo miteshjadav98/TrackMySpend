@@ -35,7 +35,7 @@ function ChartPanel({ title, description, children, table }: {
   );
 }
 
-function TrendChart({ report, locale }: { report: CurrencyReport; locale: string }) {
+export function TrendChart({ report, locale }: { report: CurrencyReport; locale: string }) {
   const id = useId();
   const [focused, setFocused] = useState<string | null>(null);
   const points = report.trend;

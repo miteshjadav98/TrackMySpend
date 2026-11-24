@@ -42,7 +42,15 @@ def build_graph(deps: AgentDeps) -> StateGraph[FinanceState, TurnContext, GraphI
     builder.add_node(
         "understand",
         nodes.understand,
-        destinations=("prepare_record", "summarize", "search", "settle", "balances", "respond"),
+        destinations=(
+            "prepare_record",
+            "summarize",
+            "report",
+            "search",
+            "settle",
+            "balances",
+            "respond",
+        ),
     )
     builder.add_node(
         "prepare_record", nodes.prepare_record, destinations=("clarify", "save", "respond")
@@ -52,6 +60,7 @@ def build_graph(deps: AgentDeps) -> StateGraph[FinanceState, TurnContext, GraphI
     )
     builder.add_node("save", nodes.save, retry_policy=_DB_RETRY)
     builder.add_node("summarize", nodes.summarize, retry_policy=_DB_RETRY)
+    builder.add_node("report", nodes.report, retry_policy=_DB_RETRY)
     builder.add_node("search", nodes.search, retry_policy=_DB_RETRY)
     builder.add_node("settle", nodes.settle)  # not retried: see FinanceNodes.settle
     builder.add_node("balances", nodes.balances, retry_policy=_DB_RETRY)
@@ -60,6 +69,7 @@ def build_graph(deps: AgentDeps) -> StateGraph[FinanceState, TurnContext, GraphI
     builder.add_edge(START, "understand")
     builder.add_edge("save", "respond")
     builder.add_edge("summarize", "respond")
+    builder.add_edge("report", "respond")
     builder.add_edge("search", "respond")
     builder.add_edge("settle", "respond")
     builder.add_edge("balances", "respond")

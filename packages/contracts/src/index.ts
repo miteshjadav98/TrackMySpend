@@ -82,6 +82,7 @@ export type ClarificationInteraction = S["ClarificationInteraction"];
 export type ConfirmationInteraction = S["ConfirmationInteraction"];
 export type TransactionsSavedInteraction = S["TransactionsSavedInteraction"];
 export type SummaryInteraction = S["SummaryInteraction"];
+export type ReportInteraction = S["ReportInteraction"];
 export type TransactionListInteraction = S["TransactionListInteraction"];
 export type SuggestionsInteraction = S["SuggestionsInteraction"];
 export type SuggestedPrompt = S["SuggestedPrompt"];

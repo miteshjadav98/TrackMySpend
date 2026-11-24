@@ -11,13 +11,13 @@ interactions are stored in workflow checkpoints): add optional fields freely, an
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import Field
 
 from finance_core.friends.schemas import SharedExpenseView
-from finance_core.reports.schemas import PeriodView, SpendingSummary
+from finance_core.reports.schemas import CurrencyReport, PeriodView, SpendingSummary
 from finance_core.schemas import ApiInput, ApiModel, MoneyAmount
 from finance_core.transactions.schemas import TransactionView
 
@@ -108,6 +108,23 @@ class SummaryInteraction(ApiModel):
     summary: SpendingSummary
 
 
+class ReportInteraction(ApiModel):
+    """Versioned, bounded snapshot of one currency; the full report remains linked."""
+
+    type: Literal["report"] = "report"
+    id: str
+    version: Literal[1] = 1
+    kind: Literal["trend", "breakdown", "insights"]
+    period: PeriodView
+    comparison_period: PeriodView
+    currency: str
+    available_currencies: list[str] = Field(max_length=32)
+    preview: CurrencyReport | None
+    transaction_count: int
+    generated_at: datetime
+    report_href: str = Field(pattern=r"^/reports\?")
+
+
 class TransactionListInteraction(ApiModel):
     type: Literal["transaction_list"] = "transaction_list"
     id: str
@@ -128,6 +145,7 @@ Interaction = Annotated[
     | ConfirmationInteraction
     | TransactionsSavedInteraction
     | SummaryInteraction
+    | ReportInteraction
     | TransactionListInteraction
     | SuggestionsInteraction,
     Field(discriminator="type"),
