@@ -49,7 +49,7 @@ export const keys = {
   merchantRules: (search: string) => ["merchant-rules", search] as const,
   imports: ["imports"] as const,
   // Under the imports key, so refreshing the imports list also refreshes an open preview.
-  import: (id: string, status: string, limit: number) => ["imports", id, status, limit] as const,
+  import: (id: string, status: string, offset: number, limit: number) => ["imports", id, status, offset, limit] as const,
 };
 
 /** Anything that changes money: refresh every view that shows totals or rows. */
@@ -192,19 +192,17 @@ export function useImports(enabled = true) {
   });
 }
 
-/** One import with its layout guess and the first `limit` preview rows (optionally one status). */
-export function useImport(id: string | null, status: RowStatus | "", limit: number) {
+/** One import with its layout and a page of preview rows, optionally filtered by status. */
+export function useImport(id: string | null, status: RowStatus | "", offset: number, limit: number) {
   return useQuery({
-    queryKey: keys.import(id ?? "", status, limit),
+    queryKey: keys.import(id ?? "", status, offset, limit),
     enabled: id !== null,
-    // Keep the table on screen while a tick or a bigger page loads.
-    placeholderData: (previous) => previous,
     queryFn: () =>
       unwrap<ImportDetail>(
         api.GET("/api/v1/imports/{import_id}", {
           params: {
             path: { import_id: id ?? "" },
-            query: { status: status || undefined, limit },
+            query: { status: status || undefined, offset, limit },
           },
         }),
       ),

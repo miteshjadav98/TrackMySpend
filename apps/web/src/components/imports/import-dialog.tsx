@@ -42,11 +42,11 @@ export function ImportStatementDialog({
   const [accountId, setAccountId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [statusFilter, setStatusFilter] = useState<RowStatus | "">("");
-  const [limit, setLimit] = useState(PAGE);
+  const [offset, setOffset] = useState(0);
   const [changingColumns, setChangingColumns] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const preview = useImport(importId, statusFilter, limit);
+  const preview = useImport(importId, statusFilter, offset, PAGE);
   const detail = preview.data;
 
   async function run(action: () => Promise<void>) {
@@ -65,7 +65,7 @@ export function ImportStatementDialog({
     }
   }
 
-  // Every query of this import (any filter or page size) shares the ["imports", id] prefix.
+  // Every page and filter of this import shares the ["imports", id] prefix.
   const refresh = () => queryClient.invalidateQueries({ queryKey: [...keys.imports, importId] });
 
   function upload(event: FormEvent) {
@@ -100,6 +100,8 @@ export function ImportStatementDialog({
         }),
       );
       setChangingColumns(false);
+      setStatusFilter("");
+      setOffset(0);
       await refresh();
     });
   }
@@ -121,7 +123,7 @@ export function ImportStatementDialog({
       );
       setChangingColumns(false);
       setStatusFilter("");
-      setLimit(PAGE);
+      setOffset(0);
       await refresh();
     });
   }
@@ -199,12 +201,14 @@ export function ImportStatementDialog({
         detail={detail}
         categories={categories.data ?? []}
         statusFilter={statusFilter}
+        offset={offset}
         onStatusFilter={(status) => {
           setStatusFilter(status);
-          setLimit(PAGE);
+          setOffset(0);
         }}
         onChangeRows={changeRows}
-        onShowMore={() => setLimit((current) => current + PAGE)}
+        onPreviousPage={() => setOffset(Math.max(0, offset - PAGE))}
+        onNextPage={() => setOffset(offset + PAGE)}
         onChangeColumns={() => setChangingColumns(true)}
         onConfirm={confirm}
         busy={busy}

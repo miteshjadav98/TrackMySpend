@@ -16,7 +16,8 @@ from hashlib import sha256
 from pathlib import PurePath
 from typing import Any
 
-from sqlalchemy import and_, delete, func, insert, or_, select, update
+from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_core.accounts.models import Account
@@ -33,7 +34,11 @@ from finance_core.ids import uuid7
 from finance_core.imports.categorise import CategoryPicker
 from finance_core.imports.cells import cell_text, guess_date_order
 from finance_core.imports.columns import guess_columns, header_signature
-from finance_core.imports.duplicates import mark_likely_duplicates
+from finance_core.imports.duplicates import (
+    clear_stale_likely_duplicates,
+    current_duplicate_match,
+    mark_likely_duplicates,
+)
 from finance_core.imports.fingerprint import assign_fingerprints
 from finance_core.imports.merchant import extract_merchant
 from finance_core.imports.models import ImportRow, StatementImport, StatementLayout
@@ -383,6 +388,19 @@ class ImportService:
                 code="layout_not_confirmed",
             )
         account = await self._accounts.pick_for_transaction(ctx, imp.account_id, field="accountId")
+        changed = await clear_stale_likely_duplicates(self._session, imp)
+        if changed:
+            imp.preview_revision += 1
+            record_audit(
+                self._session, user_id=ctx.user_id, actor="user",
+                action="import.duplicate_matches_refreshed", entity_type="statement_import",
+                entity_id=imp.id, data={"rowsChanged": changed}, request_id=request_id,
+            )  # fmt: skip
+            await self._session.commit()
+            raise ConflictError(
+                "Some duplicate matches changed. Review the latest rows and try again.",
+                code="stale_preview",
+            )
         rows = (
             await self._session.scalars(
                 select(ImportRow)
@@ -600,20 +618,21 @@ class ImportService:
     async def _remember_layout(
         self, user_id: uuid.UUID, imp: StatementImport, layout: ColumnMap
     ) -> None:
-        saved = await self._saved_layout(user_id, imp.account_id)
-        if saved is None:
-            saved = StatementLayout(id=uuid7(), user_id=user_id, account_id=imp.account_id)
-            self._session.add(saved)
-        saved.header_signature = imp.header_signature
         assert layout.date_column is not None
-        saved.date_column = layout.date_column
-        saved.description_column = layout.description_column
-        saved.amount_column = layout.amount_column
-        saved.debit_column = layout.debit_column
-        saved.credit_column = layout.credit_column
-        saved.reference_column = layout.reference_column
-        saved.date_order = layout.date_order
-        saved.sheet_name = imp.sheet_name
+        fields = layout.model_dump(by_alias=False) | {
+            "header_signature": imp.header_signature,
+            "sheet_name": imp.sheet_name,
+        }
+        # Two different previews for the same account can confirm a layout at the same time.
+        await self._session.execute(
+            pg_insert(StatementLayout)
+            .values(id=uuid7(), user_id=user_id, account_id=imp.account_id, **fields)
+            .on_conflict_do_update(
+                constraint="uq_statement_layouts_account",
+                set_=fields | {"updated_at": func.now()},
+                where=StatementLayout.user_id == user_id,
+            )
+        )
 
     # -- views ------------------------------------------------------------------------------
 
@@ -659,18 +678,7 @@ class ImportService:
         page = (
             select(ImportRow, Category, Transaction)
             .outerjoin(Category, Category.id == ImportRow.category_id)
-            .outerjoin(
-                Transaction,
-                and_(
-                    Transaction.id == ImportRow.matched_transaction_id,
-                    Transaction.user_id == ctx.user_id,
-                    or_(
-                        Transaction.account_id == imp.account_id,
-                        Transaction.to_account_id == imp.account_id,
-                    ),
-                    Transaction.deleted_at.is_(None),
-                ),
-            )
+            .outerjoin(Transaction, current_duplicate_match(imp))
             .where(ImportRow.import_id == imp.id, ImportRow.user_id == ctx.user_id)
         )
         if status is not None:

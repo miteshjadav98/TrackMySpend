@@ -1,10 +1,58 @@
 """Match statement rows to existing transactions, one row per transaction."""
 
-from sqlalchemy import case, func, or_, select, update
+from sqlalchemy import ColumnElement, and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from finance_core.imports.models import ImportRow, StatementImport
 from finance_core.transactions.models import Transaction
+
+
+def _transaction_direction(imp: StatementImport) -> ColumnElement[str]:
+    return case(
+        (or_(Transaction.type == "income", Transaction.to_account_id == imp.account_id), "in"),
+        else_="out",
+    )
+
+
+def current_duplicate_match(imp: StatementImport) -> ColumnElement[bool]:
+    """Check whether a previously matched transaction still fits its preview row."""
+    return and_(
+        Transaction.id == ImportRow.matched_transaction_id,
+        Transaction.user_id == imp.user_id,
+        or_(Transaction.account_id == imp.account_id, Transaction.to_account_id == imp.account_id),
+        Transaction.deleted_at.is_(None),
+        Transaction.currency == imp.currency,
+        Transaction.occurred_on == ImportRow.occurred_on,
+        Transaction.amount_minor == ImportRow.amount_minor,
+        _transaction_direction(imp) == ImportRow.direction,
+    )
+
+
+async def clear_stale_likely_duplicates(session: AsyncSession, imp: StatementImport) -> int:
+    """Clear duplicate flags whose ledger match changed since the user reviewed the statement."""
+    flagged = (
+        ImportRow.import_id == imp.id,
+        ImportRow.user_id == imp.user_id,
+        ImportRow.status == "likely_duplicate",
+    )
+    live = await session.scalars(
+        select(ImportRow.id)
+        .join(Transaction, current_duplicate_match(imp))
+        .where(*flagged)
+        .order_by(Transaction.id)
+        .with_for_update(read=True, of=Transaction)
+    )
+    changed = await session.scalars(
+        update(ImportRow)
+        .where(*flagged, ImportRow.id.not_in(live.all()))
+        .values(
+            status="to_import",
+            matched_transaction_id=None,
+            note="The earlier match changed. Review whether to include this row.",
+        )
+        .returning(ImportRow.id)
+    )
+    return len(changed.all())
 
 
 async def mark_likely_duplicates(session: AsyncSession, imp: StatementImport) -> None:
@@ -35,10 +83,7 @@ async def mark_likely_duplicates(session: AsyncSession, imp: StatementImport) ->
         .exists()
     )
     # A transfer is outgoing from its source account and incoming to its destination account.
-    direction = case(
-        (or_(Transaction.type == "income", Transaction.to_account_id == imp.account_id), "in"),
-        else_="out",
-    )
+    direction = _transaction_direction(imp)
     matches = (
         select(
             Transaction.id,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Iterator
 from datetime import timedelta
@@ -463,6 +464,20 @@ async def test_the_layout_is_remembered_for_the_account(client: httpx.AsyncClien
     assert second["layoutConfirmed"] is True
 
 
+async def test_two_previews_can_confirm_a_first_layout_for_the_same_account(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    account_id = await make_account(client)
+    first = await upload(client, account_id)
+    second = await upload(client, account_id)
+
+    results = await asyncio.gather(confirm_layout(client, first), confirm_layout(client, second))
+
+    assert all(result["layoutConfirmed"] for result in results)
+    assert (await upload(client, account_id))["layoutConfirmed"] is True
+
+
 async def test_another_accounts_statement_asks_for_its_own_layout(
     client: httpx.AsyncClient,
 ) -> None:
@@ -547,6 +562,53 @@ async def test_an_exactly_reimported_row_does_not_match_a_new_payment(
     assert (exact["status"], exact["note"]) == ("skipped", "Already imported")
     assert (new["status"], new["isSelected"]) == ("to_import", True)
     assert again["counts"]["likelyDuplicates"] == 0
+
+
+@pytest.mark.parametrize("delete_match", [False, True])
+async def test_confirming_rechecks_likely_duplicate_matches(
+    client: httpx.AsyncClient, delete_match: bool
+) -> None:
+    await register(client)
+    account_id = await make_account(client)
+    saved = await client.post(
+        "/api/v1/transactions",
+        json={
+            "type": "expense",
+            "amount": "300",
+            "accountId": account_id,
+            "occurredOn": "2026-10-24",
+        },
+    )
+    saved.raise_for_status()
+    csv = b"Date,Narration,Debit,Credit\n24/10/2026,Cafe,300.00,\n24/10/2026,Tea,50.00,\n"
+    first = await confirm_layout(client, await upload(client, account_id, csv))
+    assert first["rows"][0]["status"] == "likely_duplicate"
+    tx_path = f"/api/v1/transactions/{saved.json()['id']}"
+    changed = (
+        await client.delete(tx_path)
+        if delete_match
+        else await client.patch(tx_path, json={"version": 1, "amount": "350"})
+    )
+    changed.raise_for_status()
+
+    refused = await confirm(client, first["id"], expect=409, revision=first["previewRevision"])
+    assert refused["error"]["code"] == "stale_preview"
+    path = f"{IMPORTS}/{first['id']}"
+    refreshed = (await client.get(path)).json()
+    row = refreshed["rows"][0]
+    assert refreshed["previewRevision"] > first["previewRevision"]
+    assert (row["status"], row["isSelected"], row["matchedTransaction"]) == (
+        "to_import", False, None,
+    )  # fmt: skip
+
+    picked = await client.patch(
+        f"{path}/rows",
+        params={"previewRevision": refreshed["previewRevision"]},
+        json={"rows": [{"id": row["id"], "isSelected": True}]},
+    )
+    picked.raise_for_status()
+    done = await confirm(client, first["id"], revision=picked.json()["previewRevision"])
+    assert done["importedCount"] == 2
 
 
 async def test_matching_uses_only_live_transactions_for_the_same_account_date_and_direction(
@@ -683,6 +745,29 @@ async def test_preview_rows_are_returned_a_page_at_a_time(client: httpx.AsyncCli
     assert body["rowsTotal"] == 6
     only_income = await client.get(f"{IMPORTS}/{detail['id']}", params={"status": "to_import"})
     assert only_income.json()["rowsTotal"] == 6
+
+
+async def test_rows_after_five_hundred_can_be_reviewed_and_changed(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    account_id = await make_account(client)
+    csv = "Date,Narration,Debit,Credit\n" + "24/10/2026,Tea,50.00,\n" * 601
+    detail = await confirm_layout(client, await upload(client, account_id, csv.encode()))
+    path = f"{IMPORTS}/{detail['id']}"
+    page = await client.get(path, params={"limit": 200, "offset": 600})
+    page.raise_for_status()
+    body = page.json()
+    assert body["rowsTotal"] == 601
+    [last] = body["rows"]
+    assert last["position"] == 601
+    changed = await client.patch(
+        f"{path}/rows",
+        params={"previewRevision": body["previewRevision"]},
+        json={"rows": [{"id": last["id"], "isSelected": False}]},
+    )
+    changed.raise_for_status()
+    assert changed.json()["counts"]["selected"] == 600
 
 
 # -- safety ---------------------------------------------------------------------------------

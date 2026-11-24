@@ -42,9 +42,11 @@ export function PreviewStep({
   detail,
   categories,
   statusFilter,
+  offset,
   onStatusFilter,
   onChangeRows,
-  onShowMore,
+  onPreviousPage,
+  onNextPage,
   onChangeColumns,
   onConfirm,
   busy,
@@ -53,9 +55,11 @@ export function PreviewStep({
   detail: ImportDetail;
   categories: CategoryView[];
   statusFilter: RowStatus | "";
+  offset: number;
   onStatusFilter: (status: RowStatus | "") => void;
   onChangeRows: (changes: RowChange[]) => void;
-  onShowMore: () => void;
+  onPreviousPage: () => void;
+  onNextPage: () => void;
   onChangeColumns: () => void;
   onConfirm: () => void;
   busy: boolean;
@@ -64,6 +68,8 @@ export function PreviewStep({
   const { counts } = detail;
   const selectable = detail.rows.filter((row) => row.status !== "skipped");
   const allTicked = selectable.length > 0 && selectable.every((row) => row.isSelected);
+  const pageEnd = offset + detail.rows.length;
+  const hasNextPage = pageEnd < detail.rowsTotal;
 
   return (
     <div className="flex flex-col gap-4">
@@ -78,14 +84,14 @@ export function PreviewStep({
           <label htmlFor="import-filter" className="sr-only">
             Show rows
           </label>
-          <Select id="import-filter" value={statusFilter} onChange={(event) => onStatusFilter(event.target.value as RowStatus | "")}>
+          <Select id="import-filter" value={statusFilter} disabled={busy} onChange={(event) => onStatusFilter(event.target.value as RowStatus | "")}>
             {STATUS_FILTERS.map((filter) => (
               <option key={filter.value} value={filter.value}>
                 {filter.label}
               </option>
             ))}
           </Select>
-          <Button size="sm" onClick={onChangeColumns}>
+          <Button size="sm" disabled={busy} onClick={onChangeColumns}>
             Change columns
           </Button>
         </div>
@@ -102,7 +108,7 @@ export function PreviewStep({
                   aria-label="Tick or untick every row shown"
                   className="size-4 accent-lavender-deep"
                   checked={allTicked}
-                  disabled={selectable.length === 0}
+                  disabled={busy || selectable.length === 0}
                   onChange={(event) =>
                     onChangeRows(selectable.map((row) => ({ id: row.id, isSelected: event.target.checked })))
                   }
@@ -116,7 +122,7 @@ export function PreviewStep({
           </thead>
           <tbody className="divide-y divide-line">
             {detail.rows.map((row) => (
-              <Row key={row.id} row={row} categories={categories} onChange={(change) => onChangeRows([change])} />
+              <Row key={row.id} row={row} categories={categories} busy={busy} onChange={(change) => onChangeRows([change])} />
             ))}
             {detail.rows.length === 0 ? (
               <tr>
@@ -129,11 +135,13 @@ export function PreviewStep({
         </table>
       </div>
 
-      {detail.rows.length < detail.rowsTotal ? (
-        <div className="flex justify-center">
-          <Button size="sm" onClick={onShowMore}>
-            Show more ({detail.rowsTotal - detail.rows.length} left)
-          </Button>
+      {offset > 0 || hasNextPage ? (
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Button size="sm" onClick={onPreviousPage} disabled={busy || offset === 0}>Previous</Button>
+          <span className="text-sm text-ink-soft">
+            {detail.rows.length ? `Rows ${offset + 1}–${pageEnd} of ${detail.rowsTotal}` : "No rows on this page"}
+          </span>
+          <Button size="sm" onClick={onNextPage} disabled={busy || !hasNextPage}>Next</Button>
         </div>
       ) : null}
 
@@ -158,10 +166,12 @@ export function PreviewStep({
 function Row({
   row,
   categories,
+  busy,
   onChange,
 }: {
   row: PreviewRow;
   categories: CategoryView[];
+  busy: boolean;
   onChange: (change: RowChange) => void;
 }) {
   const skipped = row.status === "skipped";
@@ -179,7 +189,7 @@ function Row({
           aria-label={`Import row ${row.position}`}
           aria-describedby={duplicateNoteId}
           checked={row.isSelected}
-          disabled={skipped}
+          disabled={busy || skipped}
           onChange={(event) => onChange({ id: row.id, isSelected: event.target.checked })}
         />
       </td>
@@ -194,7 +204,7 @@ function Row({
             Likely duplicate
             {match
               ? ` · ${match.description || "Existing transaction"} (${TRANSACTION_SOURCE_NAMES[match.source]})`
-              : null}
+              : " · The earlier match changed"}
           </span>
         ) : null}
       </td>
@@ -205,6 +215,7 @@ function Row({
               Category for row {row.position}
             </label>
             <Select
+              disabled={busy}
               id={`category-${row.id}`}
               className="h-8 min-w-40 text-sm"
               value={row.category.id}
