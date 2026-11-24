@@ -54,6 +54,9 @@ together, and [docs/phase-1-report.md](docs/phase-1-report.md) and
   transaction on the transactions page. A transfer is never income or expense, so it stays out
   of every total.
 - **Merchant rules** in Settings: see what was learned, change a rule's category, or forget it.
+- **Statement imports** on the Transactions page: upload a CSV or Excel statement into one
+  account, review suggested categories, duplicates and transfers, then import selected rows.
+  Find past imports and undo them from the Imports list.
 
 ### Your login
 
@@ -79,7 +82,7 @@ together, and [docs/phase-1-report.md](docs/phase-1-report.md) and
 | 1 | Chat entry with clarifications, transaction history, exact summaries, auth and isolation, Gemini + offline parser, tests, containers, CI | Done |
 | 2 | Merchant rules, accounts, transfers, account security, dark mode | Done |
 | 3 | Split expenses with friends, Splitwise-style: "me and Jaymin spent 1000 on pizza, split it"; who owes whom, settling up, and the friend sees it in their own records | Done |
-| 4 | Imports: CSV and Excel first, then receipts and PDF bank statements | In progress |
+| 4 | CSV and Excel bank and card statements, with preview, duplicate detection, categorisation, transfers and undo | Built on `phase-4/integration` |
 | 5 | Charts and insights; a policy for totals across currencies | Planned |
 | 6 | Voice and Indian languages (Gujarati, Hinglish, lakh/crore), debt and credit-card bill tracking | Planned |
 | 7 | MCP server over the same domain services (OAuth 2.1, confirmation before writes) | Planned |
@@ -292,6 +295,47 @@ All are under `/api/v1`, need a signed-in user, and another user's id is a 404.
 
 To try it with one user, add a friend with no email: it works the same, without the invite and
 without the friend's side.
+
+## API endpoints added in Phase 4
+
+These routes are under `/api/v1` and scoped to the signed-in user. An import id owned by
+someone else returns 404.
+
+| Endpoint | Does |
+| --- | --- |
+| `POST /imports` | Upload multipart `accountId` and `file` and build a preview |
+| `GET /imports` | List previews and past imports |
+| `GET /imports/{id}` | Read layout, counts and paginated preview rows (`status`, `offset`, `limit`) |
+| `PUT /imports/{id}/layout` | Confirm or correct the columns and date order and remember them for this account |
+| `PUT /imports/{id}/sheet` | Switch worksheets using multipart `sheetName` and the original workbook as `file` |
+| `PATCH /imports/{id}/rows` | Change row selections, categories and the other account of a transfer |
+| `POST /imports/{id}/confirm` | Save selected preview rows |
+| `POST /imports/{id}/undo` | Soft-delete transactions created by the import and release their row fingerprints |
+| `DELETE /imports/{id}` | Discard an unconfirmed preview |
+
+Pass the returned `previewRevision` as a query parameter to layout, worksheet, row-edit and
+confirm requests. Multi-worksheet previews require it. If the server reports `stale_preview`
+(409), reload the preview and review the latest rows before trying again.
+
+### Trying a statement import locally
+
+1. Follow [Quick start](#quick-start), sign in and add an INR bank account under **Settings**.
+2. Open **Transactions → Import statement**, select the account and upload
+   [the Axis CSV](tests/fixtures/statements/axis_savings.csv) or
+   [the ICICI workbook](tests/fixtures/statements/icici_savings.xlsx). Both hold synthetic data.
+3. Check the date and amount columns. With the workbook, use the **Worksheet** menu to try
+   the other table. Review the rows, edit a category or change which rows to include, then
+   select **Import**. Rows marked **Likely duplicate** begin unticked. The description and
+   source of the existing transaction help you decide whether to tick a row back on.
+4. Check the transactions for that account. Upload the same statement again to see the
+   saved rows marked as skipped. From **Imports**, select the original import to undo it.
+
+To see a payment across two statements, add an INR bank account named **HDFC Savings** and an
+INR credit card named **HDFC Rewards Card**. Import the synthetic
+[savings statement](tests/fixtures/statements/hdfc_card_payment.csv), accepting the card
+payment as a transfer, then import the
+[card statement](tests/fixtures/statements/hdfc_rewards_card.csv). The matching row joins the
+existing transfer. These steps work in either order.
 
 ## Database migrations
 
