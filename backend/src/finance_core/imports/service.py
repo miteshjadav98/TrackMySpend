@@ -8,9 +8,12 @@ confirms the statement layout once per account (`save_layout`), ticks and recate
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections import defaultdict
 from datetime import timedelta
+from hashlib import sha256
+from pathlib import PurePath
 from typing import Any
 
 from sqlalchemy import delete, func, insert, select, update
@@ -45,7 +48,8 @@ from finance_core.imports.schemas import (
     RowChanges,
     RowStatusField,
 )
-from finance_core.imports.table import check_file_size, locate_table
+from finance_core.imports.table import StatementTable, check_file_size, locate_table
+from finance_core.imports.workbook import read_workbook
 from finance_core.merchants.service import MerchantRuleService
 from finance_core.money import format_money, from_minor
 from finance_core.transactions.models import Transaction
@@ -65,6 +69,16 @@ def _not_previewing() -> ConflictError:
     return ConflictError(
         "This import has already been saved or removed.", code="import_not_previewing"
     )
+
+
+def _check_preview_revision(imp: StatementImport, expected: int | None) -> None:
+    # Existing single-table clients can omit the version. Switching worksheets always requires it.
+    if expected is None and len(imp.sheet_names or []) <= 1:
+        return
+    if expected != imp.preview_revision:
+        raise ConflictError(
+            "This preview changed. Review the latest rows and try again.", code="stale_preview"
+        )
 
 
 def _type_of(direction: str | None) -> str | None:
@@ -97,29 +111,10 @@ class ImportService:
         data: bytes,
         request_id: str | None = None,
     ) -> ImportDetail:
-        """Read a CSV statement into a preview. Nothing is saved as a transaction yet."""
+        """Read a CSV or Excel statement into a preview before saving any transactions."""
         account = await self._accounts.pick_for_transaction(ctx, account_id, field="accountId")
         check_file_size(data)
-        table = locate_table(read_csv(data))
-        await self.purge_expired(ctx.user_id)
-
-        columns = guess_columns(table.headers)
-        if columns.date_column is not None:
-            columns.date_order = guess_date_order(
-                [
-                    row[columns.date_column]
-                    for row in table.data_rows
-                    if columns.date_column < len(row)
-                ]
-            )
-        signature = header_signature(table.headers)
         saved = await self._saved_layout(ctx.user_id, account_id)
-        layout_confirmed = saved is not None and saved.header_signature == signature
-        if layout_confirmed:
-            assert saved is not None
-            columns = _columns_of(saved)
-
-        now = self._clock.now()
         imp = StatementImport(
             id=uuid7(),
             user_id=ctx.user_id,
@@ -127,26 +122,67 @@ class ImportService:
             file_name=file_name[:255],
             status="previewing",
             currency=account.currency,
-            header_cells=[cell_text(cell) for cell in table.headers],
-            header_signature=signature,
-            layout=columns.model_dump(),
-            layout_confirmed=layout_confirmed,
-            row_count=len(table.data_rows),
-            expires_at=now + PREVIEW_LIFETIME,
+            expires_at=self._clock.now() + PREVIEW_LIFETIME,
         )
-        self._session.add(imp)
-        await self._session.flush()
-        raw_rows = [[cell_text(cell) for cell in row] for row in table.data_rows]
-        await self._rebuild_rows(ctx, imp, columns, raw_rows)
+        suffix = PurePath(file_name).suffix.lower()
+        if suffix == ".xls":
+            raise ValidationFailedError(
+                "This is an older .xls file. Save it as .xlsx or CSV and try again.",
+                code="unsupported_workbook",
+            )
+        if suffix == ".xlsx":
+            remembered = (
+                (saved.sheet_name, saved.header_signature) if saved and saved.sheet_name else None
+            )
+            workbook = await asyncio.to_thread(read_workbook, data, remembered_sheet=remembered)
+            table = workbook.table
+            imp.sheet_name = workbook.sheet_name
+            imp.sheet_names = workbook.sheet_names
+            imp.workbook_digest = sha256(data).hexdigest()
+        else:
+            table = locate_table(read_csv(data))
+        await self.purge_expired(ctx.user_id)
+        await self._preview_table(ctx, imp, table, saved)
         record_audit(
             self._session, user_id=ctx.user_id, actor="user", action="import.started",
             entity_type="statement_import", entity_id=imp.id,
             data={"accountId": str(account.id), "fileName": imp.file_name,
-                  "rowCount": imp.row_count},
+                  "rowCount": imp.row_count, "sheetName": imp.sheet_name},
             request_id=request_id,
         )  # fmt: skip
         await self._session.commit()
         return await self._detail(ctx, imp)
+
+    async def _preview_table(
+        self,
+        ctx: UserContext,
+        imp: StatementImport,
+        table: StatementTable,
+        saved: StatementLayout | None,
+    ) -> None:
+        signature = header_signature(table.headers)
+        if (
+            saved is not None
+            and saved.header_signature == signature
+            and saved.sheet_name == imp.sheet_name
+        ):
+            columns = _columns_of(saved)
+            imp.layout_confirmed = True
+        else:
+            columns = guess_columns(table.headers)
+            if columns.date_column is not None:
+                column = columns.date_column
+                columns.date_order = guess_date_order(
+                    [row[column] for row in table.data_rows if column < len(row)]
+                )
+            imp.layout_confirmed = False
+        imp.header_cells = [cell_text(cell) for cell in table.headers]
+        imp.header_signature = signature
+        imp.layout = columns.model_dump()
+        self._session.add(imp)
+        await self._session.flush()
+        raw_rows = [[cell_text(cell) for cell in row] for row in table.data_rows]
+        await self._rebuild_rows(ctx, imp, columns, raw_rows)
 
     # -- reading ----------------------------------------------------------------------------
 
@@ -177,18 +213,55 @@ class ImportService:
 
     # -- adjusting the preview --------------------------------------------------------------
 
+    async def select_sheet(
+        self,
+        ctx: UserContext,
+        import_id: uuid.UUID,
+        sheet_name: str,
+        data: bytes,
+        *,
+        preview_revision: int | None = None,
+        request_id: str | None = None,
+    ) -> ImportDetail:
+        """Replace preview rows with a table from another sheet in the original upload."""
+        imp = await self._own_import(ctx.user_id, import_id, lock=True)
+        if imp.status != "previewing":
+            raise _not_previewing()
+        _check_preview_revision(imp, preview_revision)
+        check_file_size(data)
+        if imp.workbook_digest is None or imp.workbook_digest != sha256(data).hexdigest():
+            raise ValidationFailedError(
+                "Choose the original Excel file to change the worksheet.", code="wrong_workbook"
+            )
+        if imp.sheet_name == sheet_name:
+            return await self._detail(ctx, imp)
+        workbook = await asyncio.to_thread(read_workbook, data, sheet_name=sheet_name)
+        imp.sheet_name = workbook.sheet_name
+        imp.preview_revision += 1
+        saved = await self._saved_layout(ctx.user_id, imp.account_id)
+        await self._preview_table(ctx, imp, workbook.table, saved)
+        record_audit(
+            self._session, user_id=ctx.user_id, actor="user", action="import.sheet_selected",
+            entity_type="statement_import", entity_id=imp.id,
+            data={"sheetName": imp.sheet_name, "rowCount": imp.row_count}, request_id=request_id,
+        )  # fmt: skip
+        await self._session.commit()
+        return await self._detail(ctx, imp)
+
     async def save_layout(
         self,
         ctx: UserContext,
         import_id: uuid.UUID,
         columns: ColumnMapInput,
         *,
+        preview_revision: int | None = None,
         request_id: str | None = None,
     ) -> ImportDetail:
         """Confirm (or correct) the layout, remember it for the account, and re-read the rows."""
         imp = await self._own_import(ctx.user_id, import_id, lock=True)
         if imp.status != "previewing":
             raise _not_previewing()
+        _check_preview_revision(imp, preview_revision)
         layout = ColumnMap.model_validate(columns.model_dump())
         if not layout.is_usable():
             raise ValidationFailedError(
@@ -203,6 +276,7 @@ class ImportService:
         await self._remember_layout(ctx.user_id, imp, layout)
         imp.layout = layout.model_dump()
         imp.layout_confirmed = True
+        imp.preview_revision += 1
         raw_rows = list(
             await self._session.scalars(
                 select(ImportRow.raw_cells)
@@ -225,6 +299,7 @@ class ImportService:
         import_id: uuid.UUID,
         changes: RowChanges,
         *,
+        preview_revision: int | None = None,
         request_id: str | None = None,
     ) -> ImportDetail:
         """Tick, untick or recategorise preview rows. A category the user picks is remembered
@@ -232,6 +307,7 @@ class ImportService:
         imp = await self._own_import(ctx.user_id, import_id, lock=True)
         if imp.status != "previewing":
             raise _not_previewing()
+        _check_preview_revision(imp, preview_revision)
         wanted = {change.id for change in changes.rows}
         rows = {
             row.id: row
@@ -251,6 +327,7 @@ class ImportService:
                 self._tick(row, change.is_selected)
             if change.category_id is not None:
                 await self._set_category(ctx, row, change.category_id)
+        imp.preview_revision += 1
         record_audit(
             self._session, user_id=ctx.user_id, actor="user", action="import.rows_changed",
             entity_type="statement_import", entity_id=imp.id,
@@ -286,12 +363,18 @@ class ImportService:
     # -- saving and undoing -----------------------------------------------------------------
 
     async def confirm(
-        self, ctx: UserContext, import_id: uuid.UUID, *, request_id: str | None = None
+        self,
+        ctx: UserContext,
+        import_id: uuid.UUID,
+        *,
+        preview_revision: int | None = None,
+        request_id: str | None = None,
     ) -> ImportDetail:
         """Save every ticked row as a transaction, all in one database transaction."""
         imp = await self._own_import(ctx.user_id, import_id, lock=True)
         if imp.status != "previewing":
             raise _not_previewing()
+        _check_preview_revision(imp, preview_revision)
         if not imp.layout_confirmed:
             raise ConflictError(
                 "Confirm which columns are the date, description and amount first.",
@@ -328,6 +411,8 @@ class ImportService:
         imp.skipped_count = imp.row_count - created
         imp.confirmed_at = self._clock.now()
         imp.expires_at = None
+        imp.workbook_digest = None
+        imp.sheet_names = None
         # The raw cells (references, balances) are not needed once the rows are saved.
         await self._session.execute(
             update(ImportRow).where(ImportRow.import_id == imp.id).values(raw_cells=[])
@@ -526,18 +611,24 @@ class ImportService:
         saved.credit_column = layout.credit_column
         saved.reference_column = layout.reference_column
         saved.date_order = layout.date_order
+        saved.sheet_name = imp.sheet_name
 
     # -- views ------------------------------------------------------------------------------
 
     async def _own_import(
-        self, user_id: uuid.UUID, import_id: uuid.UUID, *, lock: bool = False
+        self,
+        user_id: uuid.UUID,
+        import_id: uuid.UUID,
+        *,
+        lock: bool = False,
+        read_lock: bool = False,
     ) -> StatementImport:
         # Ownership is part of the WHERE clause: another user's import is simply "not found".
         query = select(StatementImport).where(
             StatementImport.id == import_id, StatementImport.user_id == user_id
         )
-        if lock:
-            query = query.with_for_update()  # a double-clicked confirm waits for the first
+        if lock or read_lock:
+            query = query.with_for_update(read=read_lock).execution_options(populate_existing=True)
         imp = await self._session.scalar(query)
         expired = (
             imp is not None
@@ -558,6 +649,9 @@ class ImportService:
         offset: int = 0,
         limit: int = DEFAULT_PAGE_SIZE,
     ) -> ImportDetail:
+        # Read the parent and all its rows under the same lock. A mutation replaces rows only
+        # while it holds an exclusive lock on the parent.
+        imp = await self._own_import(ctx.user_id, imp.id, read_lock=True)
         account = await self._session.get(Account, imp.account_id)
         assert account is not None
         page = (
@@ -588,6 +682,9 @@ class ImportService:
             headers=imp.header_cells,
             sample_rows=sample_rows,
             layout=ColumnMap.model_validate(imp.layout),
+            sheet_name=imp.sheet_name,
+            sheet_names=imp.sheet_names or [],
+            preview_revision=imp.preview_revision,
             layout_confirmed=imp.layout_confirmed,
             counts=await self._counts(imp),
             rows=[

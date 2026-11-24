@@ -1,6 +1,6 @@
 """Finding the table inside the rows a reader returned, and enforcing the size limits.
 
-Any reader (CSV today, Excel later) hands over rows of cells; this is the one place that
+Any reader hands over rows of cells; this is the one place that
 decides where the table starts and whether the file is usable at all.
 """
 
@@ -11,13 +11,15 @@ from dataclasses import dataclass
 
 from finance_core.errors import PayloadTooLargeError, ValidationFailedError
 from finance_core.imports.cells import Cell, cell_text
-from finance_core.imports.columns import find_header_row
+from finance_core.imports.columns import (
+    MIN_FALLBACK_HEADERS,
+    find_header_row,
+    find_statement_data_header,
+)
 from finance_core.imports.readers import NOT_A_STATEMENT
 
 MAX_FILE_BYTES = 5 * 1024 * 1024
 MAX_DATA_ROWS = 5000
-# A header row we cannot recognise still needs at least this many named columns to be a table.
-MIN_FALLBACK_HEADERS = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +54,8 @@ def locate_table(rows: Sequence[Sequence[Cell]]) -> StatementTable:
     if all(_is_blank(row) for row in rows):
         raise ValidationFailedError("That file is empty.", code="empty_file")
     header_index = find_header_row(rows)
+    if header_index is None:
+        header_index = find_statement_data_header(rows)
     if header_index is None:
         header_index = _fallback_header_row(rows)
     if header_index is None:

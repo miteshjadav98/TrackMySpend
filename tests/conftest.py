@@ -13,10 +13,13 @@ import os
 import re
 import subprocess
 import sys
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
+from http import cookiejar
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -221,8 +224,12 @@ async def app(
     from finance_api.main import create_app
 
     application = create_app(settings, llm=llm, clock=clock, email_sender=outbox)
-    async with application.router.lifespan_context(application):
-        yield application
+    # HTTPX's cookie jar must evaluate absolute session expiries on the same clock as the app.
+    browser_time = SimpleNamespace(time=lambda: clock.now().timestamp(), localtime=time.localtime)
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(cookiejar, "time", browser_time)
+        async with application.router.lifespan_context(application):
+            yield application
 
 
 @pytest.fixture

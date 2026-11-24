@@ -14,6 +14,7 @@ import { accountOptionLabel } from "@/lib/format";
 import { invalidateLedger, keys, useAccounts, useCategories, useImport, useQueryClient } from "@/lib/queries";
 
 const PAGE = 200;
+const XLSX = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 function messageOf(caught: unknown): string {
   return caught instanceof ApiError ? caught.message : new ApiError(0, undefined).message;
@@ -55,6 +56,10 @@ export function ImportStatementDialog({
       await action();
     } catch (caught) {
       setError(messageOf(caught));
+      if (caught instanceof ApiError && caught.code === "stale_preview") {
+        setChangingColumns(false);
+        await refresh();
+      }
     } finally {
       setBusy(false);
     }
@@ -86,31 +91,61 @@ export function ImportStatementDialog({
   }
 
   function saveLayout(layout: ColumnMap) {
-    if (!importId) return;
+    if (!importId || !detail) return;
     void run(async () => {
       await unwrap<ImportDetail>(
-        api.PUT("/api/v1/imports/{import_id}/layout", { params: { path: { import_id: importId } }, body: layout }),
+        api.PUT("/api/v1/imports/{import_id}/layout", {
+          params: { path: { import_id: importId }, query: { previewRevision: detail.previewRevision } },
+          body: layout,
+        }),
       );
       setChangingColumns(false);
       await refresh();
     });
   }
 
-  function changeRows(rows: RowChange[]) {
-    if (!importId) return;
+  function selectSheet(sheetName: string) {
+    if (!importId || !detail || !file) return;
     void run(async () => {
       await unwrap<ImportDetail>(
-        api.PATCH("/api/v1/imports/{import_id}/rows", { params: { path: { import_id: importId } }, body: { rows } }),
+        api.PUT("/api/v1/imports/{import_id}/sheet", {
+          params: { path: { import_id: importId }, query: { previewRevision: detail.previewRevision } },
+          body: { sheetName, file: "" },
+          bodySerializer: () => {
+            const form = new FormData();
+            form.append("sheetName", sheetName);
+            form.append("file", file);
+            return form;
+          },
+        }),
+      );
+      setChangingColumns(false);
+      setStatusFilter("");
+      setLimit(PAGE);
+      await refresh();
+    });
+  }
+
+  function changeRows(rows: RowChange[]) {
+    if (!importId || !detail) return;
+    void run(async () => {
+      await unwrap<ImportDetail>(
+        api.PATCH("/api/v1/imports/{import_id}/rows", {
+          params: { path: { import_id: importId }, query: { previewRevision: detail.previewRevision } },
+          body: { rows },
+        }),
       );
       await refresh();
     });
   }
 
   function confirm() {
-    if (!importId) return;
+    if (!importId || !detail) return;
     void run(async () => {
       const done = await unwrap<ImportDetail>(
-        api.POST("/api/v1/imports/{import_id}/confirm", { params: { path: { import_id: importId } } }),
+        api.POST("/api/v1/imports/{import_id}/confirm", {
+          params: { path: { import_id: importId }, query: { previewRevision: detail.previewRevision } },
+        }),
       );
       await invalidateLedger(queryClient);
       toast(`Imported ${done.importedCount} transactions from ${done.fileName}`);
@@ -157,7 +192,7 @@ export function ImportStatementDialog({
       return <p className="py-8 text-center text-sm text-ink-soft">This import was undone.</p>;
     }
     if (!detail.layoutConfirmed || changingColumns) {
-      return <LayoutStep detail={detail} busy={busy} error={error} onConfirm={saveLayout} />;
+      return <LayoutStep key={detail.previewRevision} detail={detail} busy={busy} error={error} onConfirm={saveLayout} />;
     }
     return (
       <PreviewStep
@@ -186,6 +221,24 @@ export function ImportStatementDialog({
       title="Import statement"
       description={detail ? `${detail.fileName} · ${detail.account.name}` : undefined}
     >
+      {detail?.status === "previewing" && detail.sheetNames.length > 1 ? (
+        <div className="mb-4 flex flex-col gap-3">
+          {initialImportId ? (
+            <Field label="Original workbook" hint="Choose the original file to switch worksheets.">
+              {({ id, describedBy }) => (
+                <Input id={id} aria-describedby={describedBy} type="file" accept={XLSX} disabled={busy} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+              )}
+            </Field>
+          ) : null}
+          <Field label="Worksheet" hint="Switching sheets resets the preview and any row edits.">
+            {({ id, describedBy }) => (
+              <Select id={id} aria-describedby={describedBy} value={detail.sheetName ?? ""} disabled={!file || busy} onChange={(event) => selectSheet(event.target.value)}>
+                {detail.sheetNames.map((name) => <option key={name} value={name}>{name}</option>)}
+              </Select>
+            )}
+          </Field>
+        </div>
+      ) : null}
       {body()}
     </Dialog>
   );
@@ -213,7 +266,7 @@ function UploadForm({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <p className="text-sm text-ink-soft">
-        Upload the CSV your bank or card gives you. Nothing is saved until you review the preview.
+        Upload a CSV or Excel statement from your bank or card. Review the preview before importing transactions.
       </p>
       <Field label="Account" hint="Every row will be filed under this account.">
         {({ id, describedBy }) => (
@@ -227,13 +280,13 @@ function UploadForm({
           </Select>
         )}
       </Field>
-      <Field label="Statement file (CSV)" hint="Up to 5 MB and 5,000 rows.">
+      <Field label="Statement file" hint="CSV or .xlsx, up to 5 MB and 5,000 rows.">
         {({ id, describedBy }) => (
           <Input
             id={id}
             aria-describedby={describedBy}
             type="file"
-            accept=".csv,text/csv"
+            accept={`.csv,text/csv,${XLSX}`}
             required
             className="py-1.5"
             onChange={(event) => onFile(event.target.files?.[0] ?? null)}

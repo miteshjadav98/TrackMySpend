@@ -102,6 +102,11 @@ class StatementImport(Base):
     header_signature: Mapped[str] = mapped_column(String(64))
     # The ColumnMap in use, as JSON; the saved StatementLayout is the per-account memory.
     layout: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    sheet_name: Mapped[str | None] = mapped_column(String(100))
+    # Sheet changes re-read the same upload; only its digest and sheet names are kept here.
+    sheet_names: Mapped[list[str] | None] = mapped_column(JSONB(none_as_null=True))
+    workbook_digest: Mapped[str | None] = mapped_column(String(64))
+    preview_revision: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     layout_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
     row_count: Mapped[int] = mapped_column(Integer, default=0)
     imported_count: Mapped[int] = mapped_column(Integer, default=0)
