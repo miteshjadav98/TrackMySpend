@@ -71,6 +71,16 @@ def _not_previewing() -> ConflictError:
     )
 
 
+def _check_preview_revision(imp: StatementImport, expected: int | None) -> None:
+    # Existing single-table clients can omit the version. Switching worksheets always requires it.
+    if expected is None and len(imp.sheet_names or []) <= 1:
+        return
+    if expected != imp.preview_revision:
+        raise ConflictError(
+            "This preview changed. Review the latest rows and try again.", code="stale_preview"
+        )
+
+
 def _type_of(direction: str | None) -> str | None:
     return {"out": "expense", "in": "income"}.get(direction or "")
 
@@ -210,12 +220,14 @@ class ImportService:
         sheet_name: str,
         data: bytes,
         *,
+        preview_revision: int | None = None,
         request_id: str | None = None,
     ) -> ImportDetail:
         """Replace preview rows with a table from another sheet in the original upload."""
         imp = await self._own_import(ctx.user_id, import_id, lock=True)
         if imp.status != "previewing":
             raise _not_previewing()
+        _check_preview_revision(imp, preview_revision)
         check_file_size(data)
         if imp.workbook_digest is None or imp.workbook_digest != sha256(data).hexdigest():
             raise ValidationFailedError(
@@ -225,6 +237,7 @@ class ImportService:
             return await self._detail(ctx, imp)
         workbook = await asyncio.to_thread(read_workbook, data, sheet_name=sheet_name)
         imp.sheet_name = workbook.sheet_name
+        imp.preview_revision += 1
         saved = await self._saved_layout(ctx.user_id, imp.account_id)
         await self._preview_table(ctx, imp, workbook.table, saved)
         record_audit(
@@ -241,12 +254,14 @@ class ImportService:
         import_id: uuid.UUID,
         columns: ColumnMapInput,
         *,
+        preview_revision: int | None = None,
         request_id: str | None = None,
     ) -> ImportDetail:
         """Confirm (or correct) the layout, remember it for the account, and re-read the rows."""
         imp = await self._own_import(ctx.user_id, import_id, lock=True)
         if imp.status != "previewing":
             raise _not_previewing()
+        _check_preview_revision(imp, preview_revision)
         layout = ColumnMap.model_validate(columns.model_dump())
         if not layout.is_usable():
             raise ValidationFailedError(
@@ -261,6 +276,7 @@ class ImportService:
         await self._remember_layout(ctx.user_id, imp, layout)
         imp.layout = layout.model_dump()
         imp.layout_confirmed = True
+        imp.preview_revision += 1
         raw_rows = list(
             await self._session.scalars(
                 select(ImportRow.raw_cells)
@@ -283,6 +299,7 @@ class ImportService:
         import_id: uuid.UUID,
         changes: RowChanges,
         *,
+        preview_revision: int | None = None,
         request_id: str | None = None,
     ) -> ImportDetail:
         """Tick, untick or recategorise preview rows. A category the user picks is remembered
@@ -290,6 +307,7 @@ class ImportService:
         imp = await self._own_import(ctx.user_id, import_id, lock=True)
         if imp.status != "previewing":
             raise _not_previewing()
+        _check_preview_revision(imp, preview_revision)
         wanted = {change.id for change in changes.rows}
         rows = {
             row.id: row
@@ -309,6 +327,7 @@ class ImportService:
                 self._tick(row, change.is_selected)
             if change.category_id is not None:
                 await self._set_category(ctx, row, change.category_id)
+        imp.preview_revision += 1
         record_audit(
             self._session, user_id=ctx.user_id, actor="user", action="import.rows_changed",
             entity_type="statement_import", entity_id=imp.id,
@@ -344,12 +363,18 @@ class ImportService:
     # -- saving and undoing -----------------------------------------------------------------
 
     async def confirm(
-        self, ctx: UserContext, import_id: uuid.UUID, *, request_id: str | None = None
+        self,
+        ctx: UserContext,
+        import_id: uuid.UUID,
+        *,
+        preview_revision: int | None = None,
+        request_id: str | None = None,
     ) -> ImportDetail:
         """Save every ticked row as a transaction, all in one database transaction."""
         imp = await self._own_import(ctx.user_id, import_id, lock=True)
         if imp.status != "previewing":
             raise _not_previewing()
+        _check_preview_revision(imp, preview_revision)
         if not imp.layout_confirmed:
             raise ConflictError(
                 "Confirm which columns are the date, description and amount first.",
@@ -591,14 +616,19 @@ class ImportService:
     # -- views ------------------------------------------------------------------------------
 
     async def _own_import(
-        self, user_id: uuid.UUID, import_id: uuid.UUID, *, lock: bool = False
+        self,
+        user_id: uuid.UUID,
+        import_id: uuid.UUID,
+        *,
+        lock: bool = False,
+        read_lock: bool = False,
     ) -> StatementImport:
         # Ownership is part of the WHERE clause: another user's import is simply "not found".
         query = select(StatementImport).where(
             StatementImport.id == import_id, StatementImport.user_id == user_id
         )
-        if lock:
-            query = query.with_for_update()  # a double-clicked confirm waits for the first
+        if lock or read_lock:
+            query = query.with_for_update(read=read_lock).execution_options(populate_existing=True)
         imp = await self._session.scalar(query)
         expired = (
             imp is not None
@@ -619,6 +649,9 @@ class ImportService:
         offset: int = 0,
         limit: int = DEFAULT_PAGE_SIZE,
     ) -> ImportDetail:
+        # Read the parent and all its rows under the same lock. A mutation replaces rows only
+        # while it holds an exclusive lock on the parent.
+        imp = await self._own_import(ctx.user_id, imp.id, read_lock=True)
         account = await self._session.get(Account, imp.account_id)
         assert account is not None
         page = (
@@ -651,6 +684,7 @@ class ImportService:
             layout=ColumnMap.model_validate(imp.layout),
             sheet_name=imp.sheet_name,
             sheet_names=imp.sheet_names or [],
+            preview_revision=imp.preview_revision,
             layout_confirmed=imp.layout_confirmed,
             counts=await self._counts(imp),
             rows=[

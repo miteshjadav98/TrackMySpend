@@ -27,6 +27,7 @@ def _service(session: SessionDep, container: ContainerDep) -> ImportService:
 
 
 ServiceDep = Annotated[ImportService, Depends(_service)]
+PreviewRevision = Annotated[int | None, Query(alias="previewRevision", ge=0)]
 
 
 @router.post("", status_code=201)
@@ -77,8 +78,11 @@ async def save_layout(
     ctx: UserContextDep,
     service: ServiceDep,
     request_id: RequestIdDep,
+    preview_revision: PreviewRevision = None,
 ) -> ImportDetail:
-    return await service.save_layout(ctx, import_id, body, request_id=request_id)
+    return await service.save_layout(
+        ctx, import_id, body, preview_revision=preview_revision, request_id=request_id
+    )
 
 
 @router.put("/{import_id}/sheet")
@@ -89,9 +93,15 @@ async def select_sheet(
     request_id: RequestIdDep,
     sheet_name: Annotated[str, Form(alias="sheetName", min_length=1, max_length=100)],
     file: Annotated[UploadFile, File()],
+    preview_revision: PreviewRevision = None,
 ) -> ImportDetail:
     return await service.select_sheet(
-        ctx, import_id, sheet_name, await file.read(MAX_FILE_BYTES + 1), request_id=request_id
+        ctx,
+        import_id,
+        sheet_name,
+        await file.read(MAX_FILE_BYTES + 1),
+        preview_revision=preview_revision,
+        request_id=request_id,
     )
 
 
@@ -102,15 +112,24 @@ async def update_rows(
     ctx: UserContextDep,
     service: ServiceDep,
     request_id: RequestIdDep,
+    preview_revision: PreviewRevision = None,
 ) -> ImportDetail:
-    return await service.update_rows(ctx, import_id, body, request_id=request_id)
+    return await service.update_rows(
+        ctx, import_id, body, preview_revision=preview_revision, request_id=request_id
+    )
 
 
 @router.post("/{import_id}/confirm")
 async def confirm_import(
-    import_id: uuid.UUID, ctx: UserContextDep, service: ServiceDep, request_id: RequestIdDep
+    import_id: uuid.UUID,
+    ctx: UserContextDep,
+    service: ServiceDep,
+    request_id: RequestIdDep,
+    preview_revision: PreviewRevision = None,
 ) -> ImportDetail:
-    return await service.confirm(ctx, import_id, request_id=request_id)
+    return await service.confirm(
+        ctx, import_id, preview_revision=preview_revision, request_id=request_id
+    )
 
 
 @router.post("/{import_id}/undo")

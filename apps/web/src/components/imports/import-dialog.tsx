@@ -56,6 +56,10 @@ export function ImportStatementDialog({
       await action();
     } catch (caught) {
       setError(messageOf(caught));
+      if (caught instanceof ApiError && caught.code === "stale_preview") {
+        setChangingColumns(false);
+        await refresh();
+      }
     } finally {
       setBusy(false);
     }
@@ -87,10 +91,13 @@ export function ImportStatementDialog({
   }
 
   function saveLayout(layout: ColumnMap) {
-    if (!importId) return;
+    if (!importId || !detail) return;
     void run(async () => {
       await unwrap<ImportDetail>(
-        api.PUT("/api/v1/imports/{import_id}/layout", { params: { path: { import_id: importId } }, body: layout }),
+        api.PUT("/api/v1/imports/{import_id}/layout", {
+          params: { path: { import_id: importId }, query: { previewRevision: detail.previewRevision } },
+          body: layout,
+        }),
       );
       setChangingColumns(false);
       await refresh();
@@ -98,11 +105,11 @@ export function ImportStatementDialog({
   }
 
   function selectSheet(sheetName: string) {
-    if (!importId || !file) return;
+    if (!importId || !detail || !file) return;
     void run(async () => {
       await unwrap<ImportDetail>(
         api.PUT("/api/v1/imports/{import_id}/sheet", {
-          params: { path: { import_id: importId } },
+          params: { path: { import_id: importId }, query: { previewRevision: detail.previewRevision } },
           body: { sheetName, file: "" },
           bodySerializer: () => {
             const form = new FormData();
@@ -120,20 +127,25 @@ export function ImportStatementDialog({
   }
 
   function changeRows(rows: RowChange[]) {
-    if (!importId) return;
+    if (!importId || !detail) return;
     void run(async () => {
       await unwrap<ImportDetail>(
-        api.PATCH("/api/v1/imports/{import_id}/rows", { params: { path: { import_id: importId } }, body: { rows } }),
+        api.PATCH("/api/v1/imports/{import_id}/rows", {
+          params: { path: { import_id: importId }, query: { previewRevision: detail.previewRevision } },
+          body: { rows },
+        }),
       );
       await refresh();
     });
   }
 
   function confirm() {
-    if (!importId) return;
+    if (!importId || !detail) return;
     void run(async () => {
       const done = await unwrap<ImportDetail>(
-        api.POST("/api/v1/imports/{import_id}/confirm", { params: { path: { import_id: importId } } }),
+        api.POST("/api/v1/imports/{import_id}/confirm", {
+          params: { path: { import_id: importId }, query: { previewRevision: detail.previewRevision } },
+        }),
       );
       await invalidateLedger(queryClient);
       toast(`Imported ${done.importedCount} transactions from ${done.fileName}`);
@@ -180,7 +192,7 @@ export function ImportStatementDialog({
       return <p className="py-8 text-center text-sm text-ink-soft">This import was undone.</p>;
     }
     if (!detail.layoutConfirmed || changingColumns) {
-      return <LayoutStep key={detail.sheetName} detail={detail} busy={busy} error={error} onConfirm={saveLayout} />;
+      return <LayoutStep key={detail.previewRevision} detail={detail} busy={busy} error={error} onConfirm={saveLayout} />;
     }
     return (
       <PreviewStep

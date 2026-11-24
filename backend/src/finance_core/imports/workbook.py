@@ -16,7 +16,12 @@ from openpyxl.worksheet._read_only import ReadOnlyWorksheet
 
 from finance_core.errors import PayloadTooLargeError, ValidationFailedError
 from finance_core.imports.cells import Cell, cell_text
-from finance_core.imports.columns import HEADER_SEARCH_ROWS, find_header_row, header_signature
+from finance_core.imports.columns import (
+    HEADER_SEARCH_ROWS,
+    find_header_row,
+    find_statement_data_header,
+    header_signature,
+)
 from finance_core.imports.readers import NOT_A_STATEMENT
 from finance_core.imports.table import MAX_DATA_ROWS, StatementTable, locate_table
 
@@ -87,21 +92,31 @@ def _choose_table(
                     return WorkbookTable(table, name, names)
 
     fallback = None
+    empty_error = None
+    all_empty = True
     for sheet in sheets:
         rows = _sheet_rows(sheet)
-        recognized = find_header_row(rows) is not None
-        if not recognized and fallback is not None:
-            continue
+        recognizable = (
+            find_header_row(rows) is not None or find_statement_data_header(rows) is not None
+        )
         try:
             table = locate_table(rows)
-        except ValidationFailedError:
+        except ValidationFailedError as error:
+            if error.code == "empty_file":
+                empty_error = error
+            else:
+                all_empty = False
             continue
         candidate = WorkbookTable(table, sheet.title, names)
-        if recognized:
+        if recognizable:
             return candidate
-        fallback = candidate
+        all_empty = False
+        if fallback is None:
+            fallback = candidate
     if fallback is not None:
         return fallback
+    if all_empty and empty_error is not None:
+        raise empty_error
     raise ValidationFailedError(
         "I couldn't find a table of transactions in that workbook.", code=NOT_A_STATEMENT
     )

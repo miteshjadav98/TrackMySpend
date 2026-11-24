@@ -12,7 +12,11 @@ from itertools import islice
 
 from finance_core.errors import ValidationFailedError
 from finance_core.imports.cells import Cell
-from finance_core.imports.columns import HEADER_SEARCH_ROWS, find_header_row
+from finance_core.imports.columns import (
+    HEADER_SEARCH_ROWS,
+    find_header_row,
+    find_statement_data_header,
+)
 
 NOT_A_STATEMENT = "not_a_statement"
 _DELIMITERS = ",;\t|"
@@ -30,15 +34,20 @@ def _decode(data: bytes) -> str:
 
 def _delimiter(text: str) -> str:
     """Prefer a delimiter that gives us a recognizable statement header."""
+    plausible: list[tuple[int, str]] = []
     for delimiter in _DELIMITERS:
         try:
             rows = list(
-                islice(csv.reader(io.StringIO(text), delimiter=delimiter), HEADER_SEARCH_ROWS)
+                islice(csv.reader(io.StringIO(text), delimiter=delimiter), HEADER_SEARCH_ROWS + 5)
             )
         except csv.Error:
             continue
         if find_header_row(rows) is not None:
             return delimiter
+        if (index := find_statement_data_header(rows)) is not None:
+            plausible.append((index, delimiter))
+    if plausible:
+        return min(plausible, key=lambda match: match[0])[1]
     sample = "\n".join(text.splitlines()[:30])
     try:
         return csv.Sniffer().sniff(sample, delimiters=_DELIMITERS).delimiter

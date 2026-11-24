@@ -108,6 +108,7 @@ class ImportDetail(ImportSummary):
     layout: ColumnMap
     sheet_name: str | None
     sheet_names: list[str]
+    preview_revision: int
     # False until the user confirms a layout the first time for this account's statement shape.
     layout_confirmed: bool
     counts: PreviewCounts

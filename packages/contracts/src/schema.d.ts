@@ -1407,6 +1407,8 @@ export interface components {
             sheetName: string | null;
             /** Sheetnames */
             sheetNames: string[];
+            /** Previewrevision */
+            previewRevision: number;
             /** Layoutconfirmed */
             layoutConfirmed: boolean;
             counts: components["schemas"]["PreviewCounts"];
@@ -3727,7 +3729,9 @@ export interface operations {
     };
     save_layout_api_v1_imports__import_id__layout_put: {
         parameters: {
-            query?: never;
+            query?: {
+                previewRevision?: number | null;
+            };
             header?: never;
             path: {
                 import_id: string;
@@ -3762,7 +3766,9 @@ export interface operations {
     };
     select_sheet_api_v1_imports__import_id__sheet_put: {
         parameters: {
-            query?: never;
+            query?: {
+                previewRevision?: number | null;
+            };
             header?: never;
             path: {
                 import_id: string;
@@ -3797,7 +3803,9 @@ export interface operations {
     };
     update_rows_api_v1_imports__import_id__rows_patch: {
         parameters: {
-            query?: never;
+            query?: {
+                previewRevision?: number | null;
+            };
             header?: never;
             path: {
                 import_id: string;
@@ -3832,7 +3840,9 @@ export interface operations {
     };
     confirm_import_api_v1_imports__import_id__confirm_post: {
         parameters: {
-            query?: never;
+            query?: {
+                previewRevision?: number | null;
+            };
             header?: never;
             path: {
                 import_id: string;

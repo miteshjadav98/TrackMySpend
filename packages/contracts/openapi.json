@@ -1688,6 +1688,23 @@
               "format": "uuid",
               "title": "Import Id"
             }
+          },
+          {
+            "name": "previewRevision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Previewrevision"
+            }
           }
         ],
         "requestBody": {
@@ -1740,6 +1757,23 @@
               "type": "string",
               "format": "uuid",
               "title": "Import Id"
+            }
+          },
+          {
+            "name": "previewRevision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Previewrevision"
             }
           }
         ],
@@ -1794,6 +1828,23 @@
               "format": "uuid",
               "title": "Import Id"
             }
+          },
+          {
+            "name": "previewRevision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Previewrevision"
+            }
           }
         ],
         "requestBody": {
@@ -1846,6 +1897,23 @@
               "type": "string",
               "format": "uuid",
               "title": "Import Id"
+            }
+          },
+          {
+            "name": "previewRevision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Previewrevision"
             }
           }
         ],
@@ -4848,6 +4916,10 @@
             "type": "array",
             "title": "Sheetnames"
           },
+          "previewRevision": {
+            "type": "integer",
+            "title": "Previewrevision"
+          },
           "layoutConfirmed": {
             "type": "boolean",
             "title": "Layoutconfirmed"
@@ -4886,6 +4958,7 @@
           "layout",
           "sheetName",
           "sheetNames",
+          "previewRevision",
           "layoutConfirmed",
           "counts",
           "rows",

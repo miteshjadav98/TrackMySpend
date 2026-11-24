@@ -52,15 +52,24 @@ async def upload(
 
 async def confirm_layout(client: httpx.AsyncClient, detail: dict[str, Any]) -> dict[str, Any]:
     """Accept the guessed layout as it is."""
-    response = await client.put(f"{IMPORTS}/{detail['id']}/layout", json=detail["layout"])
+    response = await client.put(
+        f"{IMPORTS}/{detail['id']}/layout",
+        params={"previewRevision": detail["previewRevision"]},
+        json=detail["layout"],
+    )
     assert response.status_code == 200, response.text
     return response.json()  # type: ignore[no-any-return]
 
 
 async def confirm(
-    client: httpx.AsyncClient, import_id: str, *, expect: int = 200
+    client: httpx.AsyncClient,
+    import_id: str,
+    *,
+    expect: int = 200,
+    revision: int | None = None,
 ) -> dict[str, Any]:
-    response = await client.post(f"{IMPORTS}/{import_id}/confirm")
+    params = {"previewRevision": revision} if revision is not None else None
+    response = await client.post(f"{IMPORTS}/{import_id}/confirm", params=params)
     assert response.status_code == expect, response.text
     return response.json()  # type: ignore[no-any-return]
 
@@ -72,7 +81,7 @@ async def import_statement(
     detail = await upload(client, account_id, name)
     if not detail["layoutConfirmed"]:
         detail = await confirm_layout(client, detail)
-    return await confirm(client, detail["id"])
+    return await confirm(client, detail["id"], revision=detail["previewRevision"])
 
 
 async def transactions(client: httpx.AsyncClient, **params: str) -> list[dict[str, Any]]:
@@ -167,13 +176,16 @@ async def test_excel_skips_the_cover_sheet_and_remembers_the_worksheet_the_user_
 
     url = f"{IMPORTS}/{first['id']}/sheet"
     data = {"sheetName": "Alternate"}
-    rejected = await client.put(url, data=data, files={"file": (ICICI, b"Different file")})
+    params = {"previewRevision": first["previewRevision"]}
+    rejected = await client.put(
+        url, params=params, data=data, files={"file": (ICICI, b"Different file")}
+    )
     assert rejected.status_code == 422
     assert rejected.json()["error"]["code"] == "wrong_workbook"
     assert (await client.get(f"{IMPORTS}/{first['id']}")).json()["sheetName"] == "Savings"
 
     files = {"file": (ICICI, (FIXTURES / ICICI).read_bytes())}
-    response = await client.put(url, data=data, files=files)
+    response = await client.put(url, params=params, data=data, files=files)
     assert response.status_code == 200, response.text
     switched = response.json()
     assert switched["id"] == first["id"]
@@ -183,7 +195,7 @@ async def test_excel_skips_the_cover_sheet_and_remembers_the_worksheet_the_user_
 
     confirmed = await confirm_layout(client, switched)
     assert confirmed["layoutConfirmed"] is True
-    done = await confirm(client, confirmed["id"])
+    done = await confirm(client, confirmed["id"], revision=confirmed["previewRevision"])
     assert done["importedCount"] == 1
     assert done["sheetName"] == "Alternate"
     assert done["sheetNames"] == []
@@ -193,6 +205,50 @@ async def test_excel_skips_the_cover_sheet_and_remembers_the_worksheet_the_user_
     assert uploaded_again["sheetName"] == "Alternate"
     assert uploaded_again["layoutConfirmed"] is True
     assert uploaded_again["rows"][0]["status"] == "skipped"
+
+
+async def test_a_stale_excel_preview_cannot_save_a_different_worksheet(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    account_id = await make_account(client, "ICICI Savings")
+    first = await confirm_layout(client, await upload(client, account_id, ICICI))
+    path = f"{IMPORTS}/{first['id']}"
+    params = {"previewRevision": first["previewRevision"]}
+    response = await client.put(
+        f"{path}/sheet",
+        params=params,
+        data={"sheetName": "Alternate"},
+        files={"file": (ICICI, (FIXTURES / ICICI).read_bytes())},
+    )
+    assert response.status_code == 200, response.text
+    refused = await client.put(f"{path}/layout", params=params, json=first["layout"])
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "stale_preview"
+
+    current = await confirm_layout(client, response.json())
+    refused = await confirm(client, first["id"], expect=409, revision=first["previewRevision"])
+    assert refused["error"]["code"] == "stale_preview"
+    refused = await confirm(client, first["id"], expect=409)
+    assert refused["error"]["code"] == "stale_preview"
+    assert await transactions(client) == []
+    saved = await confirm(client, first["id"], revision=current["previewRevision"])
+    assert saved["importedCount"] == 1
+
+
+async def test_a_blank_header_slot_cannot_reuse_a_layout_by_mistake(
+    client: httpx.AsyncClient,
+) -> None:
+    await register(client)
+    account_id = await make_account(client)
+    await confirm_layout(
+        client, await upload(client, account_id, b"Date,Description,Amount\n02/10/2026,Tea,-50\n")
+    )
+    new = await upload(
+        client, account_id, b"Date,Description,,Amount\n03/10/2026,Coffee,12345,-60\n"
+    )
+    assert new["layoutConfirmed"] is False
+    assert new["layout"]["amountColumn"] == 3
 
 
 @pytest.mark.parametrize(
