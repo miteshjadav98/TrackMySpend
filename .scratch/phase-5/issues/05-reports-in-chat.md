@@ -8,18 +8,26 @@ Spec: `../spec.md` → User stories 17-19; Chat contract.
 
 **Blocked by:** 01, 03, 04
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A versioned `report` interaction carries a bounded trusted report payload and reproducible
+- [x] A versioned `report` interaction carries a bounded trusted report payload and reproducible
   Reports-page URL; old stored interactions continue to load.
-- [ ] Understanding distinguishes explicit trend/breakdown/insight requests from ordinary totals;
+- [x] Understanding distinguishes explicit trend/breakdown/insight requests from ordinary totals;
   the offline parser covers the same supported phrases.
-- [ ] Workflow nodes call `ReportService`; no model output supplies amounts, grouping, percentages,
+- [x] Workflow nodes call `ReportService`; no model output supplies amounts, grouping, percentages,
   data points or currency conversion.
-- [ ] Chat renders an accessible compact report card and links to the full report with matching
+- [x] Chat renders an accessible compact report card and links to the full report with matching
   period/currency filters.
-- [ ] Unit/integration tests cover routing, replay, restart, one and multiple currencies, ordinary
+- [x] Unit/integration tests cover routing, replay, restart, one and multiple currencies, ordinary
   summary regression and equality with the reports API.
-- [ ] New prompt cases are added to the eval set and measured over repeated live runs before release.
-- [ ] Contracts, API checks, full pytest and web checks pass.
+- [x] New prompt cases are added to the eval set and measured over repeated live runs before release.
+- [x] Contracts, API checks, full pytest and web checks pass.
 
+
+## Comments
+
+2026-11-24: Merged as `9d90f46`.
+797 backend tests passed (two opt-in live tests skipped), 24 browser tests passed, production
+build and static checks passed. Five live production-pipeline runs: 298/300 overall,
+40/40 report cases; provider fallback exercised six times. Raw-provider measurements are
+retained alongside the final production-pipeline results.
