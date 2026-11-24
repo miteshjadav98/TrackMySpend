@@ -39,9 +39,10 @@
 }
 
 /*
- * Dark theme: the same sky palette after dusk. The paper becomes deep blue-grey, and text,
- * lines and accents are lifted so they keep their contrast. The theme
- * script in the root layout sets data-theme before the first paint (see lib/theme.ts).
+ * Dark theme: a near-black workspace with quiet charcoal surfaces and crisp blue actions.
+ * Surfaces stay neutral so financial content remains easy to scan; blue is reserved for
+ * selection, focus and primary actions. The root-layout script sets data-theme before the
+ * first paint (see lib/theme.ts).
  */
 :root {
   color-scheme: light;
@@ -49,28 +50,28 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-paper: #111c27;
-  --color-surface: #172536;
-  --color-ink: #eef6f8;
-  --color-ink-soft: #c7d5dc;
-  --color-ink-faint: #91a6b2;
-  --color-line: #293b4a;
-  --color-line-strong: #3b5263;
-  --color-sky: #84cbe8;
-  --color-sky-deep: #a9ddf2;
-  --color-sky-ink: #c9effb;
-  --color-sky-wash: #204052;
-  --color-sky-fill: #2d7f9f;
-  --color-sky-press: #256c88;
-  --color-turmeric: #f0b43a;
-  --color-turmeric-ink: #f6cd72;
-  --color-turmeric-wash: #3a2e12;
-  --color-income: #4cc29f;
-  --color-income-wash: #12352d;
-  --color-danger: #e8635b;
-  --color-danger-wash: #3d1a19;
-  --color-night: #0b121b;
-  --shadow-card: 0 1px 0 rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --color-paper: #0a0c0f;
+  --color-surface: #15181d;
+  --color-ink: #f3f4f6;
+  --color-ink-soft: #c5c9d0;
+  --color-ink-faint: #8b929d;
+  --color-line: #292e36;
+  --color-line-strong: #3a414c;
+  --color-sky: #60a5fa;
+  --color-sky-deep: #75baff;
+  --color-sky-ink: #bfdbfe;
+  --color-sky-wash: #152844;
+  --color-sky-fill: #2563eb;
+  --color-sky-press: #1d4ed8;
+  --color-turmeric: #f5b942;
+  --color-turmeric-ink: #ffd579;
+  --color-turmeric-wash: #35280d;
+  --color-income: #4adea3;
+  --color-income-wash: #0f3027;
+  --color-danger: #ff716a;
+  --color-danger-wash: #351717;
+  --color-night: #050608;
+  --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.015), 0 14px 34px -20px rgb(0 0 0 / 0.9);
 }
 
 html {
@@ -78,10 +79,16 @@ html {
   color: var(--color-ink);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 
 body {
   min-height: 100dvh;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-sky-fill) 55%, transparent);
+  color: var(--color-ink);
 }
 
 /* Figures: condensed, tabular, so columns of amounts line up like a ledger. */
