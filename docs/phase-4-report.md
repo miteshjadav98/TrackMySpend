@@ -70,5 +70,5 @@ test suite covers provider failure, merchant-rule precedence and unknown categor
 
 ## Release status
 
-Phase 4 is integrated locally on `phase-4/integration`. Merging into `main` awaits owner
-approval. Phase 5 covers charts, insights and totals across currencies.
+Phase 4 was merged into `main` as `9d886cc` on 24 November 2026. Phase 5 covers charts and
+deterministic insights while keeping exact monetary totals separate by currency.

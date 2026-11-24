@@ -114,7 +114,7 @@ retried settlement request is saved once; a linked friend can tag their own acco
 settlement; and replies tell two friends with the same name apart by email. `uv run pytest`:
 609 passed, 1 skipped.
 
-## Phase 4 (built on `phase-4/integration`)
+## Phase 4 (merged to `main`)
 
 Import CSV and Excel bank and card statements. Settled in a grilling session on 2026-11-01;
 spec `.scratch/phase-4/spec.md`, 6 tickets in `.scratch/phase-4/issues/` (each `Status:` line
@@ -129,10 +129,19 @@ See the [Phase 4 report](phase-4-report.md) for the verification, Vertex evaluat
 limitations. The [README](../README.md#trying-a-statement-import-locally) has synthetic
 statements for trying the flow locally.
 
+## Phase 5 (started on `phase-5/integration`)
+
+Charts and deterministic insights, with exact monetary totals kept separate by currency. The
+spec is `.scratch/phase-5/spec.md`; six ordered tickets live in `.scratch/phase-5/issues/`.
+Reporting stays in the modular monolith and uses Postgres plus the existing generation-keyed
+Redis cache. FX conversion, report exports, budgets/forecasts and arbitrary generated UI remain
+out of scope.
+
 ## Next
 
-1. Confirm the Phase 4 integration changes with the owner before merging into `main`.
-2. Phase 5 covers charts, insights and a policy for totals across currencies.
+1. Build ticket 01: the reporting read model, equal-length comparison and currency-policy ADR.
+2. Add the Reports page, accessible charts, deterministic insights and the fixed chat interaction
+   in tickets 02 through 05, then document and verify the phase in ticket 06.
 
 ## Resume
 
