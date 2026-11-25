@@ -9,31 +9,34 @@ Accounts; Scale, failure and operations plan.
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] ADR 0003, the glossary, schemas and code use the same meanings for asset account, liability
+- [x] ADR 0003, the glossary, schemas and code use the same meanings for asset account, liability
   account, account balance, balance anchor and friend balance.
-- [ ] Account kind supports `loan`; create/update/view supports an optional signed anchor amount and
+- [x] Account kind supports `loan`; create/update/view supports an optional signed anchor amount and
   local date, with explicit held/owed/overdraft/credit meaning, without changing the fixed currency
   or weakening active-name uniqueness.
 - [ ] Cross-boundary asset/liability kind changes cannot reinterpret an existing anchor; card bills
   and debt plans prevent incompatible kind changes.
-- [ ] Accounts without anchors return an explicit unknown balance; no service or UI formats unknown
+- [x] Accounts without anchors return an explicit unknown balance; no service or UI formats unknown
   as zero.
-- [ ] `AccountBalanceService` applies exact integer cash effects on/after the anchor date for
+- [x] `AccountBalanceService` applies exact integer cash effects on/after the anchor date for
   income, expense, both transfer ends, imports, settlements and shared expenses; liability
   direction is the inverse of an asset's money-in/money-out direction.
-- [ ] A payer's shared-expense account reflects the full cash outflow exactly once; a non-payer's
+- [x] A payer's shared-expense account reflects the full cash outflow exactly once; a non-payer's
   share has no purchase-time account effect; report/share totals remain unchanged.
-- [ ] Edits, delete/restore, import undo and shared-expense/settlement changes produce the correct
+- [x] Edits, delete/restore, import undo and shared-expense/settlement changes produce the correct
   current result and invalidate the existing user data generation.
-- [ ] Per-currency known asset/liability/net totals name unknown excluded accounts and never combine
+- [x] Per-currency known asset/liability/net totals name unknown excluded accounts and never combine
   currencies.
-- [ ] A paginated account balance ledger exposes typed source references and running effects without
+- [x] A paginated account balance ledger exposes typed source references and running effects without
   leaking another user or duplicating sensitive descriptions.
-- [ ] Migration, integration/unit tests, contracts, API checks and Alembic drift checks pass.
+- [x] Migration, integration/unit tests, contracts, API checks and Alembic drift checks pass.
 
 ## Comments
 
 Planning decision: start-of-day anchors make same-day inclusion deterministic. Revisit monthly
 checkpoints only after measuring 100,000 movements for one account.
+
+Integrated in `b8a7e6f`. Anchored accounts reject cross-boundary changes. The remaining kind
+constraints depend on card bills and loan plans introduced by tickets 03 and 04.
