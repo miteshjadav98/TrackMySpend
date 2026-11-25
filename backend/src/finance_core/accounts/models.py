@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Index, String, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from finance_core.database.base import (
@@ -17,7 +17,8 @@ from finance_core.database.base import (
     uuid_pk,
 )
 
-ACCOUNT_KINDS = ("bank", "credit_card", "wallet", "cash", "other")
+ACCOUNT_KINDS = ("bank", "credit_card", "wallet", "cash", "other", "loan")
+LIABILITY_KINDS = {"credit_card", "loan"}
 ACTIVE_NAME_INDEX = "uq_accounts_user_active_name"
 
 
@@ -30,6 +31,7 @@ class Account(Base):
             f"kind IN ({', '.join(repr(kind) for kind in ACCOUNT_KINDS)})", name="kind"
         ),
         CheckConstraint("currency ~ '^[A-Z]{3}$'", name="currency"),
+        CheckConstraint("(anchor_minor IS NULL) = (anchor_date IS NULL)", name="anchor_pair"),
         # Active names are unique per user, ignoring case. Archived accounts keep their names,
         # so a retired "HDFC" does not block a new one.
         Index(
@@ -49,6 +51,8 @@ class Account(Base):
     name: Mapped[str] = mapped_column(String(60))
     kind: Mapped[str] = mapped_column(String(16))
     currency: Mapped[str] = mapped_column(String(3))
+    anchor_minor: Mapped[int | None] = mapped_column(BigInteger)
+    anchor_date: Mapped[date | None]
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()

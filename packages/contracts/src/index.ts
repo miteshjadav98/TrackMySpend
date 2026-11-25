@@ -23,7 +23,9 @@ export type PasswordChange = S["PasswordChange"];
 export type PasswordResetRequest = S["PasswordResetRequest"];
 export type PasswordResetConfirm = S["PasswordResetConfirm"];
 
-export type AccountView = S["AccountView"];
+export type AccountView = S["AccountBalanceView"];
+export type AccountOverview = S["AccountOverview"];
+export type BalanceLedger = S["BalanceLedger"];
 export type AccountCreate = S["AccountCreate"];
 export type AccountUpdate = S["AccountUpdate"];
 export type AccountKind = AccountView["kind"];

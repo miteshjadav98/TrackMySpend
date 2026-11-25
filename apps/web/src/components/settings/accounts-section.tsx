@@ -15,6 +15,7 @@ import { invalidateAccounts, useAccounts, useMe, useQueryClient } from "@/lib/qu
 const KINDS: { value: AccountKind; label: string }[] = [
   { value: "bank", label: "Bank account" },
   { value: "credit_card", label: "Credit card" },
+  { value: "loan", label: "Loan" },
   { value: "wallet", label: "Wallet" },
   { value: "cash", label: "Cash" },
   { value: "other", label: "Other" },

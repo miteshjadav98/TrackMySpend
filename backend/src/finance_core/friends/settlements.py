@@ -31,6 +31,7 @@ from sqlalchemy.orm import aliased
 from finance_core.accounts.schemas import AccountRef
 from finance_core.accounts.service import AccountService
 from finance_core.audit.service import record_audit
+from finance_core.cache.primitives import UserDataGeneration
 from finance_core.clock import Clock
 from finance_core.dates import EARLIEST_ALLOWED_DATE
 from finance_core.errors import NotFoundError, ValidationFailedError
@@ -60,8 +61,11 @@ MAX_LIST = 200
 class SettlementService:
     """Records, lists and deletes the settlements a user recorded."""
 
-    def __init__(self, session: AsyncSession, *, clock: Clock) -> None:
+    def __init__(
+        self, session: AsyncSession, *, clock: Clock, generation: UserDataGeneration | None = None
+    ) -> None:
         self._session = session
+        self._generation = generation
         self._clock = clock
         self._accounts = AccountService(session)
         self._notices = NoticeWriter(session)
@@ -142,6 +146,8 @@ class SettlementService:
                 raise
             return await self._replay(ctx, first), False
         await self._session.refresh(settlement)
+        if self._generation is not None:
+            await self._generation.bump(ctx.user_id)
 
         view = (await self._views(ctx, [(settlement, friend)]))[0]
         warning = None
@@ -197,6 +203,8 @@ class SettlementService:
             data={"accountId": str(account_id) if account_id else None}, request_id=request_id,
         )  # fmt: skip
         await self._session.commit()
+        if self._generation is not None:
+            await self._generation.bump(ctx.user_id)
         return (await self._views(ctx, [(settlement, mine)]))[0]
 
     async def list_settlements(
@@ -251,6 +259,10 @@ class SettlementService:
         await self._notify(ctx, friend, SETTLEMENT_DELETED, settlement)
         await self._session.delete(settlement)
         await self._session.commit()
+        if self._generation is not None:
+            await self._generation.bump(ctx.user_id)
+            if friend.linked_user_id:
+                await self._generation.bump(friend.linked_user_id)
 
     # -- helpers --------------------------------------------------------------------------
 
