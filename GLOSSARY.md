@@ -24,8 +24,36 @@ A transaction that moves money from one of the user's own accounts (the "from" a
 _Avoid_: payment (money sent to another person is an expense)
 
 **Account**:
-A place where the user's money is held. Its kind is bank, credit card, wallet, cash or other. Optional on an expense or income ("paid from HDFC"); a transfer always has one at each end. There are no balances yet.
+A place where the user's money is held or owed. Its kind is bank, credit card, loan, wallet, cash or other. Optional on an expense or income ("paid from HDFC"); a transfer always has one at each end.
 _Avoid_: wallet (one kind of account), source, user account (that is the User)
+
+**Asset account**:
+An account whose balance is money the user holds, such as a bank, wallet or cash account. Money in increases it and money out decreases it.
+_Avoid_: positive account
+
+**Liability account**:
+An account whose balance is money the user owes, currently a credit card or loan. Spending or borrowing through it increases the amount owed; refunds and repayments decrease it.
+_Avoid_: debt (the amount owed), negative account
+
+**Account balance**:
+The amount held in an asset account or owed on a liability account, computed from a balance anchor and later cash movements. It is unknown when the account has no anchor.
+_Avoid_: Balance (that is what one friend owes another), current total
+
+**Balance anchor**:
+An exact signed amount at the start of a stated local date, from which later account movements are applied. Positive means held for an asset or owed for a liability; negative means overdraft or credit. It is a fact about an account, not a transaction.
+_Avoid_: opening transaction, assumed balance
+
+**Credit-card bill**:
+A card issuer's request for payment for one non-overlapping statement period, with a statement date, due date, total due and optional minimum due.
+_Avoid_: card expense, statement (that is an imported file)
+
+**Bill payment**:
+The part of a transfer into a credit-card account allocated to one credit-card bill. It reduces the bill and the card's amount owed but is not spending.
+_Avoid_: card expense, repayment (used broadly for loans)
+
+**Debt plan**:
+The lender, installment and next due date attached to one loan account. It tracks obligations but does not calculate interest or an amortisation schedule.
+_Avoid_: loan (that is the account), repayment schedule
 
 **Archived account**:
 An account the user has retired: it stays on its past transactions but cannot be picked for new ones, and the user can unarchive it. Accounts are never deleted.
@@ -128,6 +156,14 @@ _Avoid_: widget, component, card (the card is how the web app draws one)
 The deterministic, rule-based reader of messages, used to cross-check the language model and to answer on its own when the model is unavailable.
 _Avoid_: rules engine, fallback model
 
+**Assistant language**:
+The user's choice of English, Hinglish or Gujarati for chat replies and voice input. It is separate from locale, which controls date and money formatting.
+_Avoid_: locale, translation language
+
+**Voice transcription**:
+Editable text produced from one push-to-talk recording before the user sends it as a turn. The recording itself is not a turn and is not retained.
+_Avoid_: voice command (it has no effect until sent), audio message
+
 **Degraded turn**:
 A turn the offline parser answered because the language model was unavailable.
 _Avoid_: fallback turn
@@ -154,9 +190,9 @@ _Avoid_: portion, cut, split (that is how the shares are worked out)
 How a shared expense is divided into shares: equally, or by exact amounts. The payer's share takes any leftover paisa so the shares add up exactly.
 _Avoid_: division, distribution
 
-**Balance**:
-What one person owes another across their shared expenses and settlements, per currency, such as "Jaymin owes you ₹500". Accounts still have no balances.
-_Avoid_: debt, due, outstanding
+**Friend balance**:
+What one person owes another across their shared expenses and settlements, per currency, such as "Jaymin owes you ₹500". It is unrelated to an account balance.
+_Avoid_: debt, due, outstanding, account balance
 
 **Settlement**:
 A record that one person paid another to reduce their balance, such as "Jaymin paid me 500". It is never spending or income.

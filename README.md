@@ -107,7 +107,7 @@ Exact transaction drill-down also accepts `uncategorized=true`, `merchantKey`, o
 | 3 | Split expenses with friends, Splitwise-style: "me and Jaymin spent 1000 on pizza, split it"; who owes whom, settling up, and the friend sees it in their own records | Done |
 | 4 | CSV and Excel bank and card statements, with preview, duplicate detection, categorisation, transfers and undo | Done |
 | 5 | Charts and deterministic insights; exact totals stay separate by currency | Built on `phase-5/integration` |
-| 6 | Voice and Indian languages (Gujarati, Hinglish, lakh/crore), debt and credit-card bill tracking | Planned |
+| 6 | Voice and Indian languages (Gujarati, Hinglish, lakh/crore), debt and credit-card bill tracking | Planning on `phase-6/integration` |
 | 7 | MCP server over the same domain services (OAuth 2.1, confirmation before writes) | Planned |
 
 Phase 2 in detail:

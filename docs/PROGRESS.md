@@ -254,3 +254,16 @@ docker compose up -d
 uv sync --all-packages
 cd backend; uv run alembic upgrade head
 ```
+
+## Phase 6 (planning started 25 November 2026)
+
+The Phase 5 release candidate remains unchanged on `phase-5/integration` pending owner acceptance.
+Phase 6 planning continues separately on `phase-6/integration`, based on the verified Phase 5
+commit. The draft spec is `.scratch/phase-6/spec.md`; eight ordered tickets live in
+`.scratch/phase-6/issues/`.
+
+The proposed phase adds explicit dated balance anchors, asset/liability cash effects, credit-card
+bills, simple loan due plans, English/Hinglish/Gujarati chat and review-before-send push-to-talk.
+It keeps raw audio out of storage and routes accepted transcripts through the existing text
+workflow. Implementation has not started; the draft assumptions and product boundaries still need
+owner review.
