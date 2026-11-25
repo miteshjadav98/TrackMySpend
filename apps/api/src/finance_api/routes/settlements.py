@@ -29,7 +29,7 @@ IdempotencyKey = Annotated[
 
 
 def _service(session: SessionDep, container: ContainerDep) -> SettlementService:
-    return SettlementService(session, clock=container.clock)
+    return SettlementService(session, clock=container.clock, generation=container.generation)
 
 
 @router.get("")

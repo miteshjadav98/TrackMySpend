@@ -254,6 +254,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounts/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Overview */
+        get: operations["overview_api_v1_accounts_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounts/{account_id}/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ledger */
+        get: operations["ledger_api_v1_accounts__account_id__ledger_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounts/{account_id}": {
         parameters: {
             query?: never;
@@ -838,6 +872,42 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountBalanceView */
+        AccountBalanceView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "bank" | "credit_card" | "wallet" | "cash" | "other" | "loan";
+            /** Currency */
+            currency: string;
+            /** Isarchived */
+            isArchived: boolean;
+            /**
+             * Createdat
+             * Format: date-time
+             */
+            createdAt: string;
+            /**
+             * Updatedat
+             * Format: date-time
+             */
+            updatedAt: string;
+            balanceAnchor: components["schemas"]["BalanceAnchor"] | null;
+            balance: components["schemas"]["MoneyAmount"] | null;
+            /**
+             * Balancestate
+             * @enum {string}
+             */
+            balanceState: "held" | "owed" | "overdraft" | "credit" | "missing_anchor" | "currency_mismatch";
+        };
         /**
          * AccountCreate
          * @description A new account. Without a currency it takes the user's base currency.
@@ -849,9 +919,17 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "bank" | "credit_card" | "wallet" | "cash" | "other";
+            kind: "bank" | "credit_card" | "wallet" | "cash" | "other" | "loan";
             /** Currency */
             currency?: string | null;
+            balanceAnchor?: components["schemas"]["BalanceAnchor"] | null;
+        };
+        /** AccountOverview */
+        AccountOverview: {
+            /** Accounts */
+            accounts: components["schemas"]["AccountBalanceView"][];
+            /** Positions */
+            positions: components["schemas"]["CurrencyPosition"][];
         };
         /**
          * AccountRef
@@ -869,11 +947,14 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "bank" | "credit_card" | "wallet" | "cash" | "other";
+            kind: "bank" | "credit_card" | "wallet" | "cash" | "other" | "loan";
         };
         /**
          * AccountUpdate
-         * @description Partial update: a field left out (or null) stays as it is.
+         * @description Omitted fields retain their values. An explicit null balanceAnchor clears the anchor.
+         *
+         *     Setting or clearing balanceAnchor requires the account's last observed updatedAt in
+         *     expectedUpdatedAt.
          *
          *     There is no `currency`: an account's currency is fixed when it is created, so sending
          *     one is rejected like any other unknown field.
@@ -882,41 +963,52 @@ export interface components {
             /** Name */
             name?: string | null;
             /** Kind */
-            kind?: ("bank" | "credit_card" | "wallet" | "cash" | "other") | null;
+            kind?: ("bank" | "credit_card" | "wallet" | "cash" | "other" | "loan") | null;
             /** Isarchived */
             isArchived?: boolean | null;
+            balanceAnchor?: components["schemas"]["BalanceAnchor"] | null;
+            /** Expectedupdatedat */
+            expectedUpdatedAt?: string | null;
         };
         /**
-         * AccountView
-         * @description An account as clients see it. An archived account stays on past transactions.
+         * BalanceAnchor
+         * @description Start-of-day balance in account currency minor units. Negative means overdraft or credit.
          */
-        AccountView: {
+        BalanceAnchor: {
             /**
-             * Id
-             * Format: uuid
+             * Asof
+             * Format: date
              */
-            id: string;
-            /** Name */
-            name: string;
+            asOf: string;
+            /** Amountminor */
+            amountMinor: number;
+        };
+        /** BalanceLedger */
+        BalanceLedger: {
+            /** Items */
+            items: components["schemas"]["BalanceMovement"][];
+            /** Nextoffset */
+            nextOffset: number | null;
+        };
+        /** BalanceMovement */
+        BalanceMovement: {
             /**
-             * Kind
+             * Sourcekind
              * @enum {string}
              */
-            kind: "bank" | "credit_card" | "wallet" | "cash" | "other";
-            /** Currency */
-            currency: string;
-            /** Isarchived */
-            isArchived: boolean;
+            sourceKind: "transaction" | "shared_expense" | "settlement";
             /**
-             * Createdat
-             * Format: date-time
+             * Sourceid
+             * Format: uuid
              */
-            createdAt: string;
+            sourceId: string;
             /**
-             * Updatedat
-             * Format: date-time
+             * Occurredon
+             * Format: date
              */
-            updatedAt: string;
+            occurredOn: string;
+            cashEffect: components["schemas"]["MoneyAmount"];
+            balanceAfter: components["schemas"]["MoneyAmount"] | null;
         };
         /**
          * BalanceView
@@ -1215,6 +1307,16 @@ export interface components {
              * Format: date-time
              */
             lastMessageAt: string;
+        };
+        /** CurrencyPosition */
+        CurrencyPosition: {
+            /** Currency */
+            currency: string;
+            assets: components["schemas"]["MoneyAmount"];
+            liabilities: components["schemas"]["MoneyAmount"];
+            net: components["schemas"]["MoneyAmount"];
+            /** Excludedaccounts */
+            excludedAccounts: components["schemas"]["AccountRef"][];
         };
         /** CurrencyReport */
         CurrencyReport: {
@@ -3120,7 +3222,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccountView"][];
+                    "application/json": components["schemas"]["AccountBalanceView"][];
                 };
             };
             /** @description Validation Error */
@@ -3153,7 +3255,61 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccountView"];
+                    "application/json": components["schemas"]["AccountBalanceView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    overview_api_v1_accounts_overview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOverview"];
+                };
+            };
+        };
+    };
+    ledger_api_v1_accounts__account_id__ledger_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BalanceLedger"];
                 };
             };
             /** @description Validation Error */
@@ -3188,7 +3344,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccountView"];
+                    "application/json": components["schemas"]["AccountBalanceView"];
                 };
             };
             /** @description Validation Error */

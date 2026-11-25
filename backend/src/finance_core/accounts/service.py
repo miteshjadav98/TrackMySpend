@@ -19,9 +19,10 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from finance_core.accounts.models import ACTIVE_NAME_INDEX, Account
-from finance_core.accounts.schemas import AccountCreate, AccountUpdate, AccountView
+from finance_core.accounts.models import ACTIVE_NAME_INDEX, LIABILITY_KINDS, Account
+from finance_core.accounts.schemas import AccountCreate, AccountUpdate, AccountView, BalanceAnchor
 from finance_core.audit.service import record_audit
+from finance_core.clock import Clock, SystemClock
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
 from finance_core.ids import uuid7
 from finance_core.money import SUPPORTED_CURRENCIES
@@ -61,8 +62,15 @@ def _currency_for_new_account(requested: str | None, ctx: UserContext) -> str:
 class AccountService:
     """Lists, adds, renames, re-kinds, archives and unarchives one user's accounts."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, clock: Clock | None = None) -> None:
         self._session = session
+        self._clock = clock or SystemClock()
+
+    def _set_anchor(self, account: Account, ctx: UserContext, anchor: BalanceAnchor | None) -> None:
+        if anchor and anchor.as_of > ctx.today(self._clock):
+            raise ValidationFailedError("A balance anchor cannot be in the future.")
+        account.anchor_date = anchor.as_of if anchor else None
+        account.anchor_minor = anchor.amount_minor if anchor else None
 
     async def list_accounts(
         self, ctx: UserContext, *, include_archived: bool = False
@@ -95,9 +103,17 @@ class AccountService:
             is_archived=False,
         )
         self._session.add(account)
+        self._set_anchor(account, ctx, data.balance_anchor)
+        creation: dict[str, Any] = {
+            "name": account.name,
+            "kind": account.kind,
+            "currency": account.currency,
+        }
+        if data.balance_anchor:
+            creation["balanceAnchor"] = data.balance_anchor.model_dump(mode="json")
         self._audit(
             ctx, "account.created", account, request_id=request_id,
-            data={"name": account.name, "kind": account.kind, "currency": account.currency},
+            data=creation,
         )  # fmt: skip
         if commit:
             await self._commit()
@@ -115,17 +131,44 @@ class AccountService:
         request_id: str | None = None,
     ) -> AccountView:
         """Rename, re-kind, archive or unarchive one of the user's accounts."""
-        account = await self._owned_account(ctx.user_id, account_id)
+        account = await self._owned_account(ctx.user_id, account_id, lock=True)
+        if (
+            patch.expected_updated_at is not None
+            and patch.expected_updated_at != account.updated_at
+        ):
+            raise ConflictError(
+                "The account has changed. Refresh before editing.", code="account_changed"
+            )
+        if "balance_anchor" in patch.model_fields_set and patch.expected_updated_at is None:
+            raise ValidationFailedError(
+                "Supply expectedUpdatedAt when changing the balance anchor."
+            )
         name = account.name if patch.name is None else patch.name
         kind = account.kind if patch.kind is None else patch.kind
         archived = account.is_archived if patch.is_archived is None else patch.is_archived
 
-        changes = {
+        if account.anchor_date and (kind in LIABILITY_KINDS) != (account.kind in LIABILITY_KINDS):
+            raise ConflictError(
+                "Clear the anchor before changing between asset and liability.",
+                code="anchored_account_kind",
+            )
+        changes: dict[str, Any] = {
             field: [old, new]
             for field, old, new in (("name", account.name, name), ("kind", account.kind, kind))
             if old != new
         }
         archive_flips = archived != account.is_archived
+        if "balance_anchor" in patch.model_fields_set:
+            before = (
+                BalanceAnchor(as_of=account.anchor_date, amount_minor=account.anchor_minor)
+                if account.anchor_date and account.anchor_minor is not None
+                else None
+            )
+            if before != patch.balance_anchor:
+                changes["balanceAnchor"] = [
+                    a.model_dump(mode="json") if a else None for a in (before, patch.balance_anchor)
+                ]
+                self._set_anchor(account, ctx, patch.balance_anchor)
         if not changes and not archive_flips:
             return to_view(account)  # nothing to save, nothing to audit
 
@@ -193,12 +236,16 @@ class AccountService:
         return to_view(account)
 
     async def _owned_account(
-        self, user_id: uuid.UUID, account_id: uuid.UUID, *, field: str | None = None
+        self,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        *,
+        field: str | None = None,
+        lock: bool = False,
     ) -> Account:
         # Ownership is part of the WHERE clause: another user's id is simply "not found".
-        account = await self._session.scalar(
-            select(Account).where(Account.id == account_id, Account.user_id == user_id)
-        )
+        query = select(Account).where(Account.id == account_id, Account.user_id == user_id)
+        account = await self._session.scalar(query.with_for_update() if lock else query)
         if account is None:
             raise NotFoundError("Account not found", details={"field": field} if field else None)
         return account

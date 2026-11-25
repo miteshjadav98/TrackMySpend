@@ -955,7 +955,9 @@ class FinanceNodes:
             accounts = await AccountService(session).list_accounts(ctx.user)
             account = resolve_account_name(spec.account, accounts) if spec.account else None
             try:
-                created, _ = await SettlementService(session, clock=self._deps.clock).create(
+                created, _ = await SettlementService(
+                    session, clock=self._deps.clock, generation=self._deps.generation
+                ).create(
                     ctx.user,
                     SettlementCreate(
                         friend_id=uuid.UUID(plan["friend_id"]),

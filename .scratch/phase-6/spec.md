@@ -1,6 +1,6 @@
 # Phase 6: balances, bills, debt and Indian-language voice
 
-Status: draft for owner review
+Status: approved for implementation on 25 November 2026
 Integration branch: `phase-6/integration`
 Tickets: `issues/` in this directory
 

@@ -484,7 +484,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/AccountView"
+                    "$ref": "#/components/schemas/AccountBalanceView"
                   },
                   "title": "Response List Accounts Api V1 Accounts Get"
                 }
@@ -525,7 +525,94 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccountView"
+                  "$ref": "#/components/schemas/AccountBalanceView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/overview": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Overview",
+        "operationId": "overview_api_v1_accounts_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/ledger": {
+      "get": {
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Ledger",
+        "operationId": "ledger_api_v1_accounts__account_id__ledger_get",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceLedger"
                 }
               }
             }
@@ -578,7 +665,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccountView"
+                  "$ref": "#/components/schemas/AccountBalanceView"
                 }
               }
             }
@@ -3476,6 +3563,95 @@
   },
   "components": {
     "schemas": {
+      "AccountBalanceView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "bank",
+              "credit_card",
+              "wallet",
+              "cash",
+              "other",
+              "loan"
+            ],
+            "title": "Kind"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "isArchived": {
+            "type": "boolean",
+            "title": "Isarchived"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          },
+          "balanceAnchor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceAnchor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneyAmount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "balanceState": {
+            "type": "string",
+            "enum": [
+              "held",
+              "owed",
+              "overdraft",
+              "credit",
+              "missing_anchor",
+              "currency_mismatch"
+            ],
+            "title": "Balancestate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "currency",
+          "isArchived",
+          "createdAt",
+          "updatedAt",
+          "balanceAnchor",
+          "balance",
+          "balanceState"
+        ],
+        "title": "AccountBalanceView"
+      },
       "AccountCreate": {
         "properties": {
           "name": {
@@ -3491,7 +3667,8 @@
               "credit_card",
               "wallet",
               "cash",
-              "other"
+              "other",
+              "loan"
             ],
             "title": "Kind"
           },
@@ -3507,6 +3684,16 @@
               }
             ],
             "title": "Currency"
+          },
+          "balanceAnchor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceAnchor"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -3517,6 +3704,30 @@
         ],
         "title": "AccountCreate",
         "description": "A new account. Without a currency it takes the user's base currency."
+      },
+      "AccountOverview": {
+        "properties": {
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountBalanceView"
+            },
+            "type": "array",
+            "title": "Accounts"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/CurrencyPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accounts",
+          "positions"
+        ],
+        "title": "AccountOverview"
       },
       "AccountRef": {
         "properties": {
@@ -3536,7 +3747,8 @@
               "credit_card",
               "wallet",
               "cash",
-              "other"
+              "other",
+              "loan"
             ],
             "title": "Kind"
           }
@@ -3574,7 +3786,8 @@
                   "credit_card",
                   "wallet",
                   "cash",
-                  "other"
+                  "other",
+                  "loan"
                 ]
               },
               {
@@ -3593,66 +3806,130 @@
               }
             ],
             "title": "Isarchived"
+          },
+          "balanceAnchor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceAnchor"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "expectedUpdatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedupdatedat"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "title": "AccountUpdate",
-        "description": "Partial update: a field left out (or null) stays as it is.\n\nThere is no `currency`: an account's currency is fixed when it is created, so sending\none is rejected like any other unknown field."
+        "description": "Omitted fields retain their values. An explicit null balanceAnchor clears the anchor.\n\nSetting or clearing balanceAnchor requires the account's last observed updatedAt in\nexpectedUpdatedAt.\n\nThere is no `currency`: an account's currency is fixed when it is created, so sending\none is rejected like any other unknown field."
       },
-      "AccountView": {
+      "BalanceAnchor": {
         "properties": {
-          "id": {
+          "asOf": {
             "type": "string",
-            "format": "uuid",
-            "title": "Id"
+            "format": "date",
+            "title": "Asof"
           },
-          "name": {
-            "type": "string",
-            "title": "Name"
+          "amountMinor": {
+            "type": "integer",
+            "maximum": 1000000000000000.0,
+            "minimum": -1000000000000000.0,
+            "title": "Amountminor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "asOf",
+          "amountMinor"
+        ],
+        "title": "BalanceAnchor",
+        "description": "Start-of-day balance in account currency minor units. Negative means overdraft or credit."
+      },
+      "BalanceLedger": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BalanceMovement"
+            },
+            "type": "array",
+            "title": "Items"
           },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "bank",
-              "credit_card",
-              "wallet",
-              "cash",
-              "other"
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Kind"
-          },
-          "currency": {
-            "type": "string",
-            "title": "Currency"
-          },
-          "isArchived": {
-            "type": "boolean",
-            "title": "Isarchived"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Createdat"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updatedat"
+            "title": "Nextoffset"
           }
         },
         "type": "object",
         "required": [
-          "id",
-          "name",
-          "kind",
-          "currency",
-          "isArchived",
-          "createdAt",
-          "updatedAt"
+          "items",
+          "nextOffset"
         ],
-        "title": "AccountView",
-        "description": "An account as clients see it. An archived account stays on past transactions."
+        "title": "BalanceLedger"
+      },
+      "BalanceMovement": {
+        "properties": {
+          "sourceKind": {
+            "type": "string",
+            "enum": [
+              "transaction",
+              "shared_expense",
+              "settlement"
+            ],
+            "title": "Sourcekind"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Sourceid"
+          },
+          "occurredOn": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurredon"
+          },
+          "cashEffect": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "balanceAfter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneyAmount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "sourceKind",
+          "sourceId",
+          "occurredOn",
+          "cashEffect",
+          "balanceAfter"
+        ],
+        "title": "BalanceMovement"
       },
       "BalanceView": {
         "properties": {
@@ -4494,6 +4771,39 @@
           "lastMessageAt"
         ],
         "title": "ConversationView"
+      },
+      "CurrencyPosition": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "assets": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "liabilities": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "net": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "excludedAccounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountRef"
+            },
+            "type": "array",
+            "title": "Excludedaccounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "assets",
+          "liabilities",
+          "net",
+          "excludedAccounts"
+        ],
+        "title": "CurrencyPosition"
       },
       "CurrencyReport": {
         "properties": {

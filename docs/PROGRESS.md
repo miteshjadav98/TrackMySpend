@@ -267,3 +267,23 @@ bills, simple loan due plans, English/Hinglish/Gujarati chat and review-before-s
 It keeps raw audio out of storage and routes accepted transcripts through the existing text
 workflow. Implementation has not started; the draft assumptions and product boundaries still need
 owner review.
+
+### Ticket 01 implementation — 25 November 2026
+
+The owner approved the Phase 6 draft. The local ticket branch is
+`phase-6/t01-balances`. Migration `0018` adds loan accounts and optional signed, start-of-day
+anchors. The accounts API returns signed balances, a per-currency overview of active accounts,
+and paginated movements from each anchor. Each response uses one Postgres snapshot.
+
+An account with a foreign-currency movement since its anchor appears under excluded accounts
+with reason `currency_mismatch`. Its ledger shows that movement in the original currency.
+Anchor corrections and clears take the previously observed `updatedAt` as `expectedUpdatedAt`.
+Two clients editing the same anchor receive a conflict on the stale write.
+
+The account-kind guard covers anchored accounts. Tickets 03 and 04 must extend it to
+unanchored accounts that have a bill or debt plan when those records are introduced.
+
+Verification on the ticket branch: 801 backend tests passed on an isolated Postgres database
+and Redis DB 6. The two opt-in live Gemini evaluations skipped. Ruff, strict mypy, import
+boundaries, web typecheck and lint passed. OpenAPI and TypeScript contracts regenerated.
+Alembic reported a single head at `0018` and no schema drift.
