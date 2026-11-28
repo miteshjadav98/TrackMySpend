@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 const SESSION_COOKIE = "mm_session";
-const APP_PATHS = ["/chat", "/transactions", "/reports", "/settings"];
+const APP_PATHS = ["/chat", "/transactions", "/accounts", "/reports", "/settings"];
 
 /**
  * Optimistic routing only: avoids flashing the app shell for signed-out visitors. The API
@@ -20,5 +20,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/chat/:path*", "/transactions/:path*", "/reports/:path*", "/settings/:path*"],
+  matcher: ["/chat/:path*", "/transactions/:path*", "/accounts/:path*", "/reports/:path*", "/settings/:path*"],
 };

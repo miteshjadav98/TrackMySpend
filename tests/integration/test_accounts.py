@@ -178,7 +178,17 @@ async def test_every_account_change_is_audited(app: Any, client: httpx.AsyncClie
     await client.patch(path, json={"name": "SBI Salary"})
     await client.patch(path, json={"name": "SBI Salary", "kind": "bank"})  # changes nothing
     await client.patch(path, json={"isArchived": True})
-    await client.patch(path, json={"isArchived": False})
+    active = (await client.patch(path, json={"isArchived": False})).json()
+    opening = {"asOf": "2026-10-20", "amountMinor": 2500}
+    set_anchor = await client.patch(
+        path, json={"expectedUpdatedAt": active["updatedAt"], "balanceAnchor": opening}
+    )
+    assert set_anchor.status_code == 200
+    corrected = {"asOf": "2026-10-21", "amountMinor": -100}
+    correction = await client.patch(
+        path, json={"expectedUpdatedAt": set_anchor.json()["updatedAt"], "balanceAnchor": corrected}
+    )
+    assert correction.status_code == 200
 
     async with app.state.container.session_factory() as session:
         events = (
@@ -195,6 +205,10 @@ async def test_every_account_change_is_audited(app: Any, client: httpx.AsyncClie
         "account.updated",
         "account.archived",
         "account.unarchived",
+        "account.updated",
+        "account.updated",
     ]
     assert events[0].data == {"name": "SBI", "kind": "bank", "currency": "INR"}
     assert events[1].data == {"changes": {"name": ["SBI", "SBI Salary"]}}
+    assert events[4].data == {"changes": {"balanceAnchor": [None, opening]}}
+    assert events[5].data == {"changes": {"balanceAnchor": [opening, corrected]}}

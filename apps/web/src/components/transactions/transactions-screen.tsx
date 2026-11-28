@@ -1,6 +1,7 @@
 "use client";
 
 import type { TransactionType, TransactionView } from "@moneymoney/contracts";
+import { useQuery } from "@tanstack/react-query";
 import { FileUp, History, Plus, Search } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -12,6 +13,7 @@ import { TransactionDialog } from "@/components/transactions/transaction-dialog"
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { NamedIcon } from "@/components/ui/icons";
+import { api, unwrap } from "@/lib/api";
 import { accountOptionLabel, CURRENCIES, formatDay, paymentLabel, transferRoute } from "@/lib/format";
 import { type TransactionFilters, useAccounts, useCategories, useTransactions } from "@/lib/queries";
 
@@ -29,6 +31,13 @@ function amountTone(type: TransactionView["type"]): string {
 
 export function TransactionsScreen() {
   const params = useSearchParams();
+  const entryId = params.get("entry");
+  const entry = useQuery({
+    queryKey: ["transactions", "entry", entryId], enabled: !!entryId,
+    queryFn: ({ signal }) => unwrap<TransactionView>(api.GET("/api/v1/transactions/{transaction_id}", {
+      params: { path: { transaction_id: entryId! } }, signal,
+    })),
+  });
   const query = params.get("q") ?? "";
   const type = (params.get("type") ?? "") as "" | TransactionType;
   const categoryId = params.get("categoryId") ?? "";
@@ -309,11 +318,16 @@ export function TransactionsScreen() {
           </div>
         ) : null}
       </div>
+      {entryId && entry.isError && <p role="alert" className="mx-auto p-4 text-danger">{entry.error.message} <Button onClick={() => changeFilters({ entry: null }, true)}>Dismiss</Button></p>}
       <TransactionDialog
-        open={dialog.open}
-        transaction={dialog.transaction}
-        onClose={() => setDialog({ open: false, transaction: null })}
+        open={dialog.open || Boolean(entryId && entry.data)}
+        transaction={entryId && entry.data ? entry.data : dialog.transaction}
+        onClose={() => {
+          if (entryId) changeFilters({ entry: null }, true);
+          setDialog({ open: false, transaction: null });
+        }}
         onOpenShared={(id) => {
+          if (entryId) changeFilters({ entry: null }, true);
           setDialog({ open: false, transaction: null });
           setSharedId(id);
         }}

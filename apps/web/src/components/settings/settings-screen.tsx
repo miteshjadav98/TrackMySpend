@@ -19,7 +19,7 @@ export function SettingsScreen() {
         <div className="mt-8 flex flex-col gap-10">
           <ProfileSection />
           <AppearanceSection />
-          <AccountsSection />
+          <div id="accounts"><AccountsSection /></div>
           <MerchantRulesSection />
           <SecuritySection />
         </div>

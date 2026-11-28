@@ -58,6 +58,7 @@ export const keys = {
 /** Anything that changes money: refresh every view that shows totals or rows. */
 export function invalidateLedger(client: QueryClient): Promise<unknown> {
   return Promise.all([
+    client.invalidateQueries({ queryKey: ["accounts"] }),
     client.invalidateQueries({ queryKey: ["summary"] }),
     client.invalidateQueries({ queryKey: ["reports"] }),
     client.invalidateQueries({ queryKey: ["transactions"] }),
@@ -283,6 +284,7 @@ export function useFriendInvites() {
 /** After any friend or invite change: both lists can move (accepting adds a friend). */
 export function invalidateFriends(client: QueryClient): Promise<unknown> {
   return Promise.all([
+    client.invalidateQueries({ queryKey: ["accounts"] }),
     client.invalidateQueries({ queryKey: keys.friends }),
     client.invalidateQueries({ queryKey: keys.friendInvites }),
   ]);

@@ -287,3 +287,18 @@ Verification on the ticket branch: 801 backend tests passed on an isolated Postg
 and Redis DB 6. The two opt-in live Gemini evaluations skipped. Ruff, strict mypy, import
 boundaries, web typecheck and lint passed. OpenAPI and TypeScript contracts regenerated.
 Alembic reported a single head at `0018` and no schema drift.
+
+### Ticket 02 implementation — 28 November 2026
+
+Ticket 01 is integrated in `b8a7e6f`. The authenticated Accounts page is complete on
+`phase-6/t02-accounts-page`. It groups known assets, liabilities and net position by currency
+and names accounts excluded from each total. Account details show the saved opening balance
+and paginated movements with links to ordinary transactions and shared expenses. Users can
+review a signed opening balance before saving it, and stale edits prompt them to reopen the
+editor. Settings remains the entry point for account management.
+
+20 focused API tests passed, including before-and-after audit assertions for anchor changes.
+All 30 browser tests passed in Chrome, along with web typecheck and lint. The webpack production
+build passed. Turbopack could not bind its CSS worker port in the local environment.
+
+The next ticket is [credit-card bills and payment allocation](../.scratch/phase-6/issues/03-credit-card-bills.md).
