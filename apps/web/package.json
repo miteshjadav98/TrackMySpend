@@ -7,24 +7,26 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "test:browser": "playwright test"
   },
   "dependencies": {
-    "next": "16.4.3",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
     "@moneymoney/contracts": "*",
     "@tanstack/react-query": "^5.104.5",
+    "lucide-react": "*",
+    "next": "16.4.6",
     "openapi-fetch": "^0.17.0",
-    "lucide-react": "*"
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.3",
+    "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

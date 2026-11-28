@@ -49,6 +49,11 @@ async def list_transactions(
     min_amount: Annotated[Decimal | None, Query(alias="minAmount", gt=0)] = None,
     max_amount: Annotated[Decimal | None, Query(alias="maxAmount", gt=0)] = None,
     currency: Annotated[str | None, Query(min_length=3, max_length=3)] = None,
+    merchant_key: Annotated[
+        str | None, Query(alias="merchantKey", min_length=1, max_length=600)
+    ] = None,
+    other_merchants: Annotated[bool, Query(alias="otherMerchants")] = False,
+    uncategorized: Annotated[bool, Query()] = False,
     sort: Annotated[SortField, Query()] = "recent",
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: Annotated[str | None, Query(max_length=200)] = None,
@@ -65,6 +70,9 @@ async def list_transactions(
             min_amount=min_amount,
             max_amount=max_amount,
             currency=currency,
+            merchant_key=merchant_key,
+            other_merchants=other_merchants,
+            uncategorized=uncategorized,
             sort=sort,
             limit=limit,
             cursor=cursor,

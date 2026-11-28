@@ -27,6 +27,8 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 npm-debug.log*
+test-results/
+playwright-report/
 
 # Editors / OS
 .vscode/

@@ -10,6 +10,28 @@ from __future__ import annotations
 from typing import Any
 
 CASES: list[dict[str, Any]] = [
+    {"text": "show my spending trend for six months", "intent": "spending_report",
+     "report": {"kind": "trend", "currency": None},
+     "period": {"kind": "range", "start": "2026-05-01", "end": "2026-10-24"}},
+    {"text": "USD income chart for the past 3 months", "intent": "spending_report",
+     "report": {"kind": "trend", "currency": "USD"},
+     "period": {"kind": "range", "start": "2026-08-01", "end": "2026-10-24"}},
+    {"text": "where did my money go this month?", "intent": "spending_report",
+     "report": {"kind": "breakdown"}, "period": {"kind": "this_month"}},
+    {"text": "top merchants last month", "intent": "spending_report",
+     "report": {"kind": "breakdown"}, "period": {"kind": "last_month"}},
+    {"text": "show spending insights this year", "intent": "spending_report",
+     "report": {"kind": "insights"}, "period": {"kind": "this_year"}},
+    {"text": "compare my spending last month", "intent": "spending_report",
+     "report": {"kind": "insights"}, "period": {"kind": "last_month"}},
+    {"text": "largest category this month", "intent": "spending_report",
+     "report": {"kind": "breakdown"}},
+    {"text": "show my spending trend from 2026-09-01 to 2026-10-20", "intent": "spending_report",
+     "period": {"kind": "range", "start": "2026-09-01", "end": "2026-10-20"}},
+    {"text": "how much did I spend this month without charts?", "intent": "spending_summary"},
+    {"text": "spent 350 on graph paper", "intent": "record_transactions",
+     "transactions": [{"amount": "350", "type": "expense"}]},
+
     {
         "text": "I spent ₹350 on dinner yesterday using UPI",
         "intent": "record_transactions",
@@ -344,7 +366,7 @@ def check(case: dict[str, Any], understanding: Any) -> list[str]:
                         problems.append(f"{section}.{field} {actual!r} != {value!r}")
                 elif actual != value:
                     problems.append(f"{section}.{field} {actual!r} != {value!r}")
-    for section in ("period", "search"):
+    for section in ("period", "search", "report"):
         expected = case.get(section)
         if expected:
             got = getattr(understanding, section)

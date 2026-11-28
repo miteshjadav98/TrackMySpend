@@ -451,9 +451,9 @@ MoneyMoney remembers the category you use for each merchant (`merchants/`).
   `stream_reply()` returns text. Gemini and the offline rules engine both implement it.
 - **Gemini:** `gemini-3.5-flash-lite` with thinking level `low`, using JSON-schema
   structured output. Prompts are versioned files (`llm/prompts/`), and the version is
-  logged with every call. The understand prompt is `understand_v4` (settlements, balance
-  questions and shared-expense lists, on top of v3's shared expenses and friend names in
-  the context block); `understand_v1` to `understand_v3` stay beside it.
+  logged with every call. The understand prompt is `understand_v5`, adding explicit report
+  kind, period and currency selection to v4’s settlements, balances and shared expenses. Older prompt versions stay
+  beside it; the context block remains first.
 - **Reconciliation** (`workflows/reconcile.py`): the model's output is merged with the
   deterministic rules parse. This step:
   - fills gaps
@@ -488,8 +488,10 @@ The LLM interprets intent. It never calculates. Every total comes from SQL.
 ## Financial correctness
 
 - **Totals are SQL sums** over live rows, grouped by currency, inside the period resolved
-  in the user's timezone. Different currencies are never added together (there is no FX
-  conversion yet). Transfers are excluded from income and expense, so paying a
+  in the user's timezone. Different currencies are never added together: the profile's base
+  currency is a default, not an exchange rate. [ADR 0002](adr/0002-monetary-totals-stay-per-currency.md)
+  records the reproducibility requirements for any future conversion. Transfers are excluded from
+  income and expense, so paying a
   credit card bill from a bank account is not counted twice.
 - **Every summary states its period and label** ("October 2026", 1–26 Oct), so the user can
   see exactly what was counted.
@@ -592,6 +594,75 @@ A circuit breaker stops the app from waiting on a dead Redis, and socket timeout
   add/edit dialog shows From account and To account when the type is Transfer.
 - The chat view consumes the SSE stream and renders typed interaction cards. A running
   "tally" strip shows this month's totals and refreshes after each save.
+
+## Reports and transaction drill-down
+
+The authenticated Reports page consumes `GET /api/v1/reports/overview`. Its period and currency
+selection live in the URL. The server owns monetary totals, comparisons, category shares,
+merchant grouping and display formatting; the browser only scales those values into SVG/CSS
+geometry. Income and expense trends use different shapes and line patterns, and every chart
+has an expandable table with exact values. Charts and tables link to the same transaction filters.
+
+Transaction URLs restore dates, type, category, account, currency and search. Report drill-down
+also supports `uncategorized=true`, `merchantKey` and `otherMerchants=true`. These exact merchant
+filters do not use the broad text search. `merchants/report_groups.py` shares Unicode case-folding,
+top-ten ranking and remainder rules between reports and transaction search, preserving original
+stored spellings for SQL matching. A named merchant called "Other" remains distinct from the
+aggregate Other merchants bucket.
+
+Merchant filtering first aggregates user-scoped live rows within the requested currency and
+dates, then applies exact alias matching before keyset pagination. The remainder requires an
+expense type, currency and explicit range of at most 1,830 inclusive days; optional category,
+account and text refinements do not change which merchants constitute that report's remainder.
+This adds one grouped read to a merchant-filtered transaction query, with no schema change or
+external service. The local 100,000-transaction measurement and its limits are in the
+[Phase 5 verification report](phase-5-report.md).
+
+### Trusted report read path
+
+`ReportService.overview` uses authenticated `UserContext` and user-scoped SQL to aggregate
+current/category totals, equal-length previous totals, daily values and merchant totals. It
+fills zero gaps and chooses daily buckets through 62 days, weekly through 366, and monthly
+beyond that. The maximum range is 1,830 days and output never exceeds 120 buckets per currency.
+Categories are exhaustive; merchants are the top ten plus one remainder containing unnamed
+and remaining merchants. Monetary values remain exact minor units with server display strings.
+
+Cache keys include user, ledger generation, dates, locale and base currency, under
+`report-overview-v2:v1`. Writes advance the existing per-user generation. Redis read/write
+failures fall back to SQL; a failed dimension query fails the whole request. A successful
+response is cached with jittered TTL. Logs record range, cardinality, hit/miss and duration,
+without descriptions, merchant names or amounts. This uses the existing read-committed
+sessions; reports can be refreshed after concurrent ledger edits, rather than serving as an
+immutable accounting statement.
+
+Insights are typed deterministic facts: spending change, largest expense category and largest
+named merchant. Their evidence includes period/currency and relevant amounts or grouping key.
+Zero previous spending has a null percentage; equal maxima are labelled joint; the remainder
+is never treated as a single merchant. No model generates values or insight prose. See
+[ADR 0002](adr/0002-monetary-totals-stay-per-currency.md) for the per-currency policy.
+
+### Reports in chat
+
+The additive `report` branch in `finance-v1` is `understand → report → respond`. The model
+selects only kind (`trend`, `breakdown`, `insights`), period and optional currency.
+Reconciliation recognizes explicit report wording before amounts, so a period count cannot
+create a transaction. Ordinary totals still use `summarize`; old graph node names remain valid.
+The report node resolves bounded dates and calls the same service as REST. Invalid dates are
+reported explicitly rather than silently replaced with the current month.
+
+A persisted `report` interaction, version 1, contains one currency and a bounded preview:
+up to 120 trend buckets, five categories, three merchant groups or three insights. It also
+stores exact headline metrics, inclusive dates, comparison dates, available currencies,
+overall transaction count, generation time and a relative Reports URL pinned to dates/currency.
+Checkpoint state is plain JSON and identity stays in immutable runtime context. Retries replay
+the original saved snapshot; a new question or full Reports link reads the current ledger.
+The web allowlist renders one fixed card and reuses the owned accessible trend chart. No raw
+model chart configuration or executable formatter reaches the browser.
+
+At the assumed low traffic, one Postgres instance and Redis remain sufficient. Measure cold
+reads again on deployment hardware and more varied merchant/category/currency distributions.
+Inspect SQL plans and indexes first if p95 exceeds one second at 100,000 rows or reporting
+approaches 30% of DB load; a warehouse or background pipeline is not justified yet.
 
 ## Failure behaviour
 

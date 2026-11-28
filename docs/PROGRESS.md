@@ -1,6 +1,6 @@
 # Build progress
 
-Living checklist for the Phase 1 build. Update it at each checkpoint commit.
+Living build history. The latest checkpoint is at the end of the Phase 5 section.
 
 ## Done
 
@@ -129,7 +129,7 @@ See the [Phase 4 report](phase-4-report.md) for the verification, Vertex evaluat
 limitations. The [README](../README.md#trying-a-statement-import-locally) has synthetic
 statements for trying the flow locally.
 
-## Phase 5 (started on `phase-5/integration`)
+## Phase 5 (built on `phase-5/integration`)
 
 Charts and deterministic insights, with exact monetary totals kept separate by currency. The
 spec is `.scratch/phase-5/spec.md`; six ordered tickets live in `.scratch/phase-5/issues/`.
@@ -137,11 +137,115 @@ Reporting stays in the modular monolith and uses Postgres plus the existing gene
 Redis cache. FX conversion, report exports, budgets/forecasts and arbitrary generated UI remain
 out of scope.
 
+### Previous checkpoint — 24 November 2026 (saved before integration)
+
+- Working checkout: `tms-phase4-integration/`; current branch: `phase-5/t02-reports`.
+- Ticket 01 is complete on `phase-5/integration` (merge `94adb66`).
+- The verified Next.js 16.4.6 security branch was merged into `phase-5/integration` as
+  `f73e2d4`, before creating the ticket 02 branch. This integration merge has not been pushed.
+- Ticket 02 is implemented and locally verified on `phase-5/t02-reports`, but **has not been
+  merged or pushed**. Its tracker status remains unchanged until integration, per the issue
+  tracker convention.
+- Delivered for ticket 02: authenticated `/reports`, desktop/mobile navigation, URL-restored
+  period and currency filters, date validation, exact spent/received/net and comparison cards,
+  base currency first, loading/error/empty states, and report invalidation through the existing
+  ledger mutation helper. Three/six-month selections include the current month to date plus
+  the preceding two/five calendar months and pin explicit dates in the URL.
+- Browser coverage found an expired-session loop: the proxy treated cookie presence as valid
+  authentication and redirected login back to chat. Login now stays reachable with a stale
+  cookie, and the app's sign-in redirect preserves the report query string. The regression
+  failed before the fix and passed afterward.
+- Verified: web typecheck, ESLint, Next.js production build, **12 Playwright tests passed**
+  against the production build using installed Chrome, **5 reporting integration tests passed**
+  against real Postgres/Redis, generated OpenAPI/TypeScript contracts had no drift, and the
+  local database migration was already current. Desktop light/mobile dark screenshots were
+  inspected. Full backend tests, full Python static checks and container builds were not rerun
+  for this frontend ticket.
+- Playwright tests use isolated API fixtures on port 3100 and never modify the demo ledger.
+  CI now installs Chromium and runs the same browser suite after the web build.
+- Local Postgres and Redis were started; dependencies are installed. No API or web demo server
+  was left running, so port 3000 does not yet serve this new Reports page. No `.env` exists in
+  this checkout; local HTTP API startup needs `COOKIE_SECURE=false`.
+- User requested a checkpoint and stop before ticket integration, publishing or ticket 03.
+
+### Resumed — 24 November 2026
+
+Ticket 02's verified Reports page (`7a49b73`) is now integrated into `phase-5/integration`.
+Its tracker acceptance criteria are complete. The Next.js 16.4.6 security update is included.
+Ticket 02 was merged as `9fb6d7b` and both the ticket and integration branches were pushed.
+
+### Ticket 03 testing checkpoint — 24 November 2026
+
+- Current branch: `phase-5/t03-charts`, based on integration merge `9fb6d7b`.
+- Implemented: income/expense SVG trend (circle/square and solid/dashed encodings), category and
+  merchant bars, keyboard/hover values, exact table alternatives, mobile/dark/reduced-motion
+  support and transaction drill-down. Money, category percentages and formatting come from the API.
+- Transactions restore filters from the URL, including currency, exact merchant, remainder and
+  uncategorized buckets. Shared Unicode merchant grouping keeps every report bucket identical to
+  its paginated transaction rows. Browser coverage caught and fixed rapid typing losing characters
+  while Next transitions URL state; the native input now preserves typing and restores history.
+- Verification: web typecheck, lint and production build passed; **19 production-browser tests
+  passed**; strict Python checks and import boundaries passed; **10 focused report/grouping tests
+  passed**. Contracts regenerated and Alembic reports no drift. Desktop/light and mobile/dark chart
+  screenshots inspected.
+- Full backend suite: **776 passed, 2 skipped, 1 failed**. The failure is the existing
+  `test_five_thousand_rows_import_in_one_go`: returning the confirmation detail hits the database's
+  five-second statement timeout in the import-row matched-transaction join. It reproduces in
+  isolation on both this branch and the unchanged pre-chart `tms-next-security` checkout. Do not
+  describe the full suite as green. Investigate the import detail query's plan separately.
+- User requested a running UI for testing. API is running on `127.0.0.1:8000`; production web is
+  running on `127.0.0.1:3000`. Database and Redis readiness passed; `/login` returns 200 and the
+  proxied unauthenticated `/api/v1/me` returns 401. The browser is open at the sign-in page with
+  `/reports?period=this_year` preserved as its destination. Existing user data was not seeded or
+  changed by the browser tests. Chat currently uses the default offline rules provider.
+- This ticket is saved locally for user testing, **not merged or pushed**. Its tracker status
+  remains unchanged until integration. Keep the current build stable while feedback arrives.
+
+### Ticket 04 checkpoint — 24 November 2026
+
+- User accepted ticket 03; merged locally as `fb90b08`, tracker recorded in `a74dbe8`.
+- Ticket 04 implements typed server-side spending-change, largest-category and largest-named-
+  merchant facts with period/currency/evidence. Ties are explicit; zero previous spending has
+  no invented percentage; the aggregate Other merchants bucket is never called one merchant.
+  Cards reuse the exact transaction drill-down links. Cache namespace is versioned for insights.
+- Fixed the reproduced 5,000-row import timeout by counting unjoined import rows and materializing
+  the bounded page before joining duplicate/category/account detail. The original failing test
+  now passes without increasing the database timeout. All import regression cases pass.
+- Verification: **779 backend tests passed, 2 opt-in live LLM tests skipped; 20 browser tests
+  passed**. Ruff, strict mypy, import boundaries, web typecheck/lint and production build passed.
+  OpenAPI and TypeScript contracts regenerated. No schema or prompt change.
+- Local API and UI restarted on ports 8000 and 3000 with the new implementation. The API uses
+  offline rules for chat. Ticket 04 is saved for user testing before integration/publication.
+- Only ticket 02 and its integration were pushed earlier. Ticket 03 integration and ticket 04
+  commits remain local; do not claim them published.
+
+### Phase complete — 24 November 2026
+
+Tickets 03 and 04 are integrated (`fb90b08`, `2850f60`); the accepted charts and deterministic
+insights are included. Ticket 05 adds version-1 saved report snapshots in chat, trusted values
+from `ReportService`, pinned full-report links, ordinary-summary compatibility and prompt v5.
+Ticket 06 records the final behavior, currency policy, measured performance and verification.
+All six ticket criteria are complete after their integration merges.
+
+Final checks: **797 backend tests passed, 2 opt-in live tests skipped; 24 browser tests passed**.
+Python/web static checks, production build, regenerated contracts and Alembic drift checks pass
+(single head `0017`). Five live production-pipeline evaluations: **298/300** overall,
+**40/40** report cases; six provider failures used rules fallback. Two remaining misses involve
+existing shared-expense wording. The local 100,000-transaction benchmark's five-year report
+p95 is **249.48 ms**, JSON **53,452 bytes**, with 61 trend and 11 merchant buckets per currency.
+See [phase-5-report.md](phase-5-report.md) for exact commands, results and limits.
+
+The owner requested ticket integration, a push of the completed phase and a refreshed local UI
+for testing. The integration branch is the saved release candidate; main remains at Phase 4
+until this local acceptance pass. Use the normal local API on port 8000 and web on port 3000.
+
 ## Next
 
-1. Build ticket 01: the reporting read model, equal-length comparison and currency-policy ADR.
-2. Add the Reports page, accessible charts, deterministic insights and the fixed chat interaction
-   in tickets 02 through 05, then document and verify the phase in ticket 06.
+1. Test Reports and chat requests such as “show my spending trend for six months” and
+   “where did my money go this month?”. Full report links read the current ledger; saved chat
+   cards keep their original snapshot.
+2. After owner acceptance, merge the phase into main and verify hosted CI/container builds.
+3. FX conversion, exports, budgets/forecasts, account balances and AG-UI/A2UI remain out of scope.
 
 ## Resume
 

@@ -2431,6 +2431,44 @@
             }
           },
           {
+            "name": "merchantKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 600
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Merchantkey"
+            }
+          },
+          {
+            "name": "otherMerchants",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Othermerchants"
+            }
+          },
+          {
+            "name": "uncategorized",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Uncategorized"
+            }
+          },
+          {
             "name": "sort",
             "in": "query",
             "required": false,
@@ -2848,6 +2886,132 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SpendingSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/overview": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Get Overview",
+        "description": "Chart-ready exact aggregates, always separated by currency.",
+        "operationId": "get_overview_api_v1_reports_overview_get",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_week",
+                "last_week",
+                "this_month",
+                "last_month",
+                "this_year",
+                "last_year",
+                "last_n_days",
+                "month",
+                "range"
+              ],
+              "type": "string",
+              "default": "this_month",
+              "title": "Period"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1830,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportOverview"
                 }
               }
             }
@@ -4331,6 +4495,63 @@
         ],
         "title": "ConversationView"
       },
+      "CurrencyReport": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "income": {
+            "$ref": "#/components/schemas/MetricComparison"
+          },
+          "expense": {
+            "$ref": "#/components/schemas/MetricComparison"
+          },
+          "net": {
+            "$ref": "#/components/schemas/MetricComparison"
+          },
+          "expenseByCategory": {
+            "items": {
+              "$ref": "#/components/schemas/CategoryTotal"
+            },
+            "type": "array",
+            "title": "Expensebycategory"
+          },
+          "topMerchants": {
+            "items": {
+              "$ref": "#/components/schemas/MerchantTotal"
+            },
+            "type": "array",
+            "title": "Topmerchants"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/TrendBucket"
+            },
+            "type": "array",
+            "title": "Trend"
+          },
+          "insights": {
+            "items": {
+              "$ref": "#/components/schemas/ReportInsight"
+            },
+            "type": "array",
+            "title": "Insights"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "income",
+          "expense",
+          "net",
+          "expenseByCategory",
+          "topMerchants",
+          "trend",
+          "insights"
+        ],
+        "title": "CurrencyReport"
+      },
       "CurrencySummary": {
         "properties": {
           "currency": {
@@ -5312,6 +5533,39 @@
         "title": "MerchantRuleView",
         "description": "One learned rule: the merchant, the category it files them under, and how often."
       },
+      "MerchantTotal": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "total": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "isOther": {
+            "type": "boolean",
+            "title": "Isother",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "total",
+          "count",
+          "isOther"
+        ],
+        "title": "MerchantTotal"
+      },
       "MessagePage": {
         "properties": {
           "items": {
@@ -5368,6 +5622,9 @@
                   "$ref": "#/components/schemas/SummaryInteraction"
                 },
                 {
+                  "$ref": "#/components/schemas/ReportInteraction"
+                },
+                {
                   "$ref": "#/components/schemas/TransactionListInteraction"
                 },
                 {
@@ -5379,6 +5636,7 @@
                 "mapping": {
                   "clarification": "#/components/schemas/ClarificationInteraction",
                   "confirmation": "#/components/schemas/ConfirmationInteraction",
+                  "report": "#/components/schemas/ReportInteraction",
                   "suggestions": "#/components/schemas/SuggestionsInteraction",
                   "summary": "#/components/schemas/SummaryInteraction",
                   "transaction_list": "#/components/schemas/TransactionListInteraction",
@@ -5439,6 +5697,39 @@
           "createdAt"
         ],
         "title": "MessageView"
+      },
+      "MetricComparison": {
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "change": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "changePercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changepercent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "previous",
+          "change",
+          "changePercent"
+        ],
+        "title": "MetricComparison",
+        "description": "One exact monetary metric and its equal-length previous-period comparison."
       },
       "MoneyAmount": {
         "properties": {
@@ -6155,6 +6446,254 @@
           "displayName"
         ],
         "title": "RegisterRequest"
+      },
+      "ReportInsight": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "spending_change",
+              "largest_category",
+              "largest_merchant"
+            ],
+            "title": "Kind"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "current": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneyAmount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoneyAmount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changePercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changepercent"
+          },
+          "sharePercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharepercent"
+          },
+          "categoryId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoryid"
+          },
+          "merchantKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merchantkey"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "currency",
+          "period",
+          "text",
+          "current",
+          "previous",
+          "change",
+          "changePercent",
+          "sharePercent",
+          "categoryId",
+          "merchantKey"
+        ],
+        "title": "ReportInsight",
+        "description": "A deterministic fact and the exact evidence needed to explain or drill into it."
+      },
+      "ReportInteraction": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "report",
+            "title": "Type",
+            "default": "report"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version",
+            "default": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "trend",
+              "breakdown",
+              "insights"
+            ],
+            "title": "Kind"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "comparisonPeriod": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "availableCurrencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "title": "Availablecurrencies"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transactionCount": {
+            "type": "integer",
+            "title": "Transactioncount"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generatedat"
+          },
+          "reportHref": {
+            "type": "string",
+            "pattern": "^/reports\\?",
+            "title": "Reporthref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "id",
+          "version",
+          "kind",
+          "period",
+          "comparisonPeriod",
+          "currency",
+          "availableCurrencies",
+          "preview",
+          "transactionCount",
+          "generatedAt",
+          "reportHref"
+        ],
+        "title": "ReportInteraction",
+        "description": "Versioned, bounded snapshot of one currency; the full report remains linked."
+      },
+      "ReportOverview": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "comparisonPeriod": {
+            "$ref": "#/components/schemas/PeriodView"
+          },
+          "bucketKind": {
+            "type": "string",
+            "title": "Bucketkind"
+          },
+          "baseCurrency": {
+            "type": "string",
+            "title": "Basecurrency"
+          },
+          "currencies": {
+            "items": {
+              "$ref": "#/components/schemas/CurrencyReport"
+            },
+            "type": "array",
+            "title": "Currencies"
+          },
+          "transactionCount": {
+            "type": "integer",
+            "title": "Transactioncount"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generatedat"
+          },
+          "dataSource": {
+            "type": "string",
+            "title": "Datasource",
+            "default": "Transactions recorded in MoneyMoney"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "comparisonPeriod",
+          "bucketKind",
+          "baseCurrency",
+          "currencies",
+          "transactionCount",
+          "generatedAt",
+          "dataSource"
+        ],
+        "title": "ReportOverview",
+        "description": "A deterministic chart/report read model; monetary values never cross currencies."
       },
       "RevokedSessionsView": {
         "properties": {
@@ -7850,6 +8389,43 @@
         ],
         "title": "TransactionsSavedInteraction"
       },
+      "TrendBucket": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "income": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "expense": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          },
+          "net": {
+            "$ref": "#/components/schemas/MoneyAmount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "label",
+          "income",
+          "expense",
+          "net"
+        ],
+        "title": "TrendBucket"
+      },
       "TurnResult": {
         "properties": {
           "userMessage": {
@@ -8002,6 +8578,7 @@
               "mapping": {
                 "clarification": "#/components/schemas/ClarificationInteraction",
                 "confirmation": "#/components/schemas/ConfirmationInteraction",
+                "report": "#/components/schemas/ReportInteraction",
                 "suggestions": "#/components/schemas/SuggestionsInteraction",
                 "summary": "#/components/schemas/SummaryInteraction",
                 "transaction_list": "#/components/schemas/TransactionListInteraction",
@@ -8021,6 +8598,9 @@
               },
               {
                 "$ref": "#/components/schemas/SummaryInteraction"
+              },
+              {
+                "$ref": "#/components/schemas/ReportInteraction"
               },
               {
                 "$ref": "#/components/schemas/TransactionListInteraction"

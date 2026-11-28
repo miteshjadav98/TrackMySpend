@@ -1,8 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 const SESSION_COOKIE = "mm_session";
-const APP_PATHS = ["/chat", "/transactions", "/settings"];
-const AUTH_PATHS = ["/login", "/register"];
+const APP_PATHS = ["/chat", "/transactions", "/reports", "/settings"];
 
 /**
  * Optimistic routing only: avoids flashing the app shell for signed-out visitors. The API
@@ -16,12 +15,10 @@ export function proxy(request: NextRequest) {
     url.searchParams.set("next", `${pathname}${search}`);
     return NextResponse.redirect(url);
   }
-  if (hasSession && AUTH_PATHS.includes(pathname)) {
-    return NextResponse.redirect(new URL("/chat", request.url));
-  }
+  // A cookie can be expired or revoked. Let login render; only the API can prove a session.
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/chat/:path*", "/transactions/:path*", "/settings/:path*", "/login", "/register"],
+  matcher: ["/chat/:path*", "/transactions/:path*", "/reports/:path*", "/settings/:path*"],
 };

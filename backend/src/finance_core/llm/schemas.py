@@ -16,6 +16,7 @@ from finance_core.dates import PeriodKind
 Intent = Literal[
     "record_transactions",
     "spending_summary",
+    "spending_report",
     "search_transactions",
     "record_settlement",
     "balance_question",
@@ -135,6 +136,13 @@ class PeriodSpec(_Lenient):
     days: int | None = Field(default=None, description="N when kind is 'last_n_days'")
 
 
+class ReportSpec(_Lenient):
+    """Presentation intent only; all report values come from the reporting service."""
+
+    kind: Literal["trend", "breakdown", "insights"] = "trend"
+    currency: str | None = Field(default=None, description="ISO currency only if explicitly named")
+
+
 class SearchSpec(_Lenient):
     type: Literal["expense", "income", "transfer"] | None = None
     category: str | None = Field(default=None, description="Category slug filter, if any")
@@ -156,6 +164,7 @@ class TurnUnderstanding(_Lenient):
     transactions: list[ExtractedTransaction] = Field(default_factory=list)
     period: PeriodSpec | None = None
     search: SearchSpec | None = None
+    report: ReportSpec | None = None
     settlement: SettlementSpec | None = None
     balance: BalanceSpec | None = None
     pending_answer: PendingAnswer | None = None

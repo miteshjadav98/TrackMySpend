@@ -15,6 +15,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    agentUpgrade: "security",
+  },
   output: "standalone",
   transpilePackages: ["@moneymoney/contracts"],
   async rewrites() {

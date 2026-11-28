@@ -16,11 +16,12 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Literal
 
-from sqlalchemy import and_, or_, select, tuple_
+from sqlalchemy import and_, false, func, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from sqlalchemy.orm.exc import StaleDataError
+from sqlalchemy.sql.elements import ColumnElement
 
 from finance_core.accounts.models import Account
 from finance_core.accounts.schemas import AccountRef, AccountView
@@ -31,9 +32,10 @@ from finance_core.categories.models import Category
 from finance_core.categories.schemas import CategoryRef
 from finance_core.categories.service import CategoryService
 from finance_core.clock import Clock
-from finance_core.dates import EARLIEST_ALLOWED_DATE
+from finance_core.dates import EARLIEST_ALLOWED_DATE, MAX_RANGE_DAYS
 from finance_core.errors import ConflictError, NotFoundError, ValidationFailedError
 from finance_core.ids import uuid7
+from finance_core.merchants.report_groups import report_merchant_groups, report_merchant_key
 from finance_core.merchants.service import MerchantRuleService
 from finance_core.money import (
     SUPPORTED_CURRENCIES,
@@ -119,6 +121,30 @@ def _decode_cursor(cursor: str) -> tuple[date, uuid.UUID]:
 
 def _escape_like(text: str) -> str:
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _validate_search_filters(query: TransactionQuery) -> None:
+    if query.uncategorized and query.category_id:
+        raise ValidationFailedError(
+            "Choose a category or uncategorized, not both", details={"field": "categoryId"}
+        )
+    if query.merchant_key is not None and (
+        query.other_merchants or not report_merchant_key(query.merchant_key)
+    ):
+        raise ValidationFailedError(
+            "Choose one non-empty merchant filter", details={"field": "merchantKey"}
+        )
+    if query.other_merchants and (
+        query.type != "expense"
+        or not query.currency
+        or query.date_from is None
+        or query.date_to is None
+        or not 1 <= (query.date_to - query.date_from).days + 1 <= MAX_RANGE_DAYS
+    ):
+        raise ValidationFailedError(
+            "Other merchants needs an expense report's currency and date range (up to 5 years)",
+            details={"field": "otherMerchants"},
+        )
 
 
 def _clean_text(value: str | None) -> str | None:
@@ -763,6 +789,7 @@ class TransactionService:
         return [views[row_id] for row_id in ids]
 
     async def search(self, ctx: UserContext, query: TransactionQuery) -> TransactionPage:
+        _validate_search_filters(query)
         limit = max(1, min(query.limit, MAX_PAGE_SIZE))
         to_account = aliased(Account)
         stmt = (
@@ -774,7 +801,8 @@ class TransactionService:
         )
         if query.type:
             stmt = stmt.where(Transaction.type == query.type)
-        if query.category_id:
+        if query.category_id or query.uncategorized:
+            # SQLAlchemy turns == None into IS NULL for the uncategorized report bucket.
             stmt = stmt.where(Transaction.category_id == query.category_id)
         if query.account_id:
             # Another user's account is a 404 here too, not an empty list.
@@ -815,6 +843,9 @@ class TransactionService:
             if query.max_amount is not None:
                 stmt = stmt.where(Transaction.amount_minor <= int(query.max_amount * scale))
 
+        if query.merchant_key is not None or query.other_merchants:
+            stmt = stmt.where(await self._report_merchant_filter(ctx, query))
+
         if query.sort == "largest":
             stmt = stmt.order_by(Transaction.amount_minor.desc(), Transaction.id.desc())
         else:
@@ -837,6 +868,47 @@ class TransactionService:
             last = rows[-1][0]
             next_cursor = _encode_cursor(last.occurred_on, last.id)
         return TransactionPage(items=items, next_cursor=next_cursor)
+
+    async def _report_merchant_filter(
+        self, ctx: UserContext, query: TransactionQuery
+    ) -> ColumnElement[bool]:
+        """Match report groups before pagination, with identical Unicode and remainder rules.
+
+        The remainder is ranked within the report's currency and date range, independently
+        of optional search/category/account refinements. No merchant strings leave this user.
+        """
+        stmt = (
+            select(Transaction.merchant, func.sum(Transaction.amount_minor), func.count())
+            .where(Transaction.user_id == ctx.user_id, Transaction.deleted_at.is_(None))
+            .group_by(Transaction.merchant)
+        )
+        if query.type:
+            stmt = stmt.where(Transaction.type == query.type)
+        if query.currency:
+            stmt = stmt.where(Transaction.currency == query.currency.upper())
+        if query.date_from:
+            stmt = stmt.where(Transaction.occurred_on >= query.date_from)
+        if query.date_to:
+            stmt = stmt.where(Transaction.occurred_on <= query.date_to)
+        rows = [
+            (merchant, int(total), int(count))
+            for merchant, total, count in (await self._session.execute(stmt)).all()
+        ]
+        if query.other_merchants:
+            aliases = [
+                alias
+                for group in report_merchant_groups(rows)
+                if group.is_other
+                for alias in group.aliases
+            ]
+        else:
+            key = report_merchant_key(query.merchant_key)
+            aliases = [name for name, _, _ in rows if report_merchant_key(name) == key]
+        names = [alias for alias in aliases if alias is not None]
+        return or_(
+            Transaction.merchant.in_(names),
+            Transaction.merchant.is_(None) if None in aliases else false(),
+        )
 
     # -- helpers --------------------------------------------------------------------------
 
